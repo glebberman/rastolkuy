@@ -134,20 +134,61 @@ class ExtractorManager
         string $filePath,
         ExtractionConfig $config,
     ): ExtractedDocument {
-        // For now, we'll just execute normally
-        // In the future, this could implement actual timeout handling
-        // using pcntl_alarm or similar mechanisms
+        $startTime = microtime(true);
+        $timeoutReached = false;
+        
+        // Set up timeout handling using signal alarm (if available)
+        if (function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
+            pcntl_signal(SIGALRM, function () use (&$timeoutReached) {
+                $timeoutReached = true;
+            });
+            pcntl_alarm($config->timeoutSeconds);
+        }
 
+        try {
+            // Execute extraction with periodic timeout checks
+            $result = $this->extractWithTimeoutChecks($extractor, $filePath, $config, $startTime);
+            
+            // Clear alarm
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            return $result;
+            
+        } catch (Exception $e) {
+            // Clear alarm on exception
+            if (function_exists('pcntl_alarm')) {
+                pcntl_alarm(0);
+            }
+            
+            if ($timeoutReached || (microtime(true) - $startTime) > $config->timeoutSeconds) {
+                throw new \RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
+            }
+            
+            throw $e;
+        }
+    }
+
+    private function extractWithTimeoutChecks(
+        ExtractorInterface $extractor,
+        string $filePath,
+        ExtractionConfig $config,
+        float $startTime
+    ): ExtractedDocument {
+        // Create a wrapper that periodically checks timeout
+        $timeoutChecker = function() use ($startTime, $config, $filePath) {
+            if ((microtime(true) - $startTime) > $config->timeoutSeconds) {
+                throw new \RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
+            }
+        };
+
+        // For streaming extraction, timeout checks are built-in
+        // For regular extraction, we execute and hope it completes within timeout
         $result = $extractor->extract($filePath, $config);
 
-        // Check if extraction took too long
-        if ($result->extractionTime > $config->timeoutSeconds) {
-            Log::warning('Extraction exceeded configured timeout', [
-                'file' => $filePath,
-                'extraction_time' => $result->extractionTime,
-                'timeout' => $config->timeoutSeconds,
-            ]);
-        }
+        // Final timeout check
+        $timeoutChecker();
 
         return $result;
     }

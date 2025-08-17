@@ -20,6 +20,44 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Security Limits
+    |--------------------------------------------------------------------------
+    |
+    | Security and performance limits for content validation.
+    |
+    */
+    'limits' => [
+        'max_file_size' => env('EXTRACTOR_MAX_SIZE', 50 * 1024 * 1024), // 50MB
+        'max_line_length' => env('EXTRACTOR_MAX_LINE_LENGTH', 10000),
+        'max_lines' => env('EXTRACTOR_MAX_LINES', 100000),
+        'chunk_size' => env('EXTRACTOR_CHUNK_SIZE', 1024 * 1024), // 1MB
+        'stream_threshold' => env('EXTRACTOR_STREAM_THRESHOLD', 10 * 1024 * 1024), // 10MB
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Element Classification Settings
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for document element classification logic.
+    |
+    */
+    'classification' => [
+        'paragraph_min_length' => env('EXTRACTOR_PARAGRAPH_MIN_LENGTH', 50),
+        'header_max_length' => env('EXTRACTOR_HEADER_MAX_LENGTH', 100),
+        'header_min_font_size' => env('EXTRACTOR_HEADER_MIN_FONT_SIZE', 16),
+        'bold_min_font_size' => env('EXTRACTOR_BOLD_MIN_FONT_SIZE', 12),
+        'table_min_separators' => env('EXTRACTOR_TABLE_MIN_SEPARATORS', 2),
+        'default_confidence' => (float) env('EXTRACTOR_DEFAULT_CONFIDENCE', 0.8),
+        'font_sizes' => [
+            'h1' => (int) env('EXTRACTOR_H1_FONT_SIZE', 20),
+            'h2' => (int) env('EXTRACTOR_H2_FONT_SIZE', 16),
+            'h3' => (int) env('EXTRACTOR_H3_FONT_SIZE', 14),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Supported File Types
     |--------------------------------------------------------------------------
     |

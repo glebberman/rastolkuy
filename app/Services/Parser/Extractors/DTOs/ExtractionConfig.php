@@ -16,6 +16,8 @@ final readonly class ExtractionConfig
         public bool $enableAsync = true,
         public array $allowedMimeTypes = [],
         public bool $collectMetrics = true,
+        public bool $streamProcessing = false,
+        public int $chunkSize = 1024 * 1024, // 1MB
     ) {
     }
 
@@ -31,6 +33,8 @@ final readonly class ExtractionConfig
             enableAsync: $config['enable_async'] ?? true,
             allowedMimeTypes: $config['allowed_mime_types'] ?? [],
             collectMetrics: $config['collect_metrics'] ?? true,
+            streamProcessing: $config['stream_processing'] ?? false,
+            chunkSize: $config['chunk_size'] ?? 1024 * 1024,
         );
     }
 
@@ -51,6 +55,25 @@ final readonly class ExtractionConfig
             enableAsync: true,
             allowedMimeTypes: [],
             collectMetrics: true,
+            streamProcessing: true,
+            chunkSize: 2 * 1024 * 1024, // 2MB for large files
+        );
+    }
+
+    public static function createStreaming(): self
+    {
+        return new self(
+            preserveFormatting: false,
+            extractImages: false,
+            extractTables: false,
+            detectHeaders: true,
+            maxPages: 1000,
+            timeoutSeconds: 300,
+            enableAsync: true,
+            allowedMimeTypes: [],
+            collectMetrics: true,
+            streamProcessing: true,
+            chunkSize: 1024 * 1024, // 1MB chunks
         );
     }
 

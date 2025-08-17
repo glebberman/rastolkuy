@@ -11,7 +11,7 @@ class ElementClassifier
         '/^(chapter|глава)\s+\d+/i',
         '/^(section|раздел)\s+\d+/i',
         '/^(part|часть)\s+[IVX\d]+/i',
-        '/^\d+\.\s+[А-ЯA-Z]/', // Numbered headers
+        '/^\d+\.\s+[А-ЯA-Z][А-ЯA-Z\s]+$/', // Numbered headers (all caps after number)
         '/^[А-ЯA-Z][А-Я\sA-Z]+$/', // All caps (short)
     ];
 
@@ -40,18 +40,24 @@ class ElementClassifier
             return 'header';
         }
 
-        // Check for lists
+        // Check for lists (should be checked before paragraph)
         if ($this->isListItem($text)) {
             return 'list';
         }
 
-        // Check for table-like content
+        // Check for table-like content (should be checked before paragraph)
         if ($this->isTableContent($text)) {
             return 'table';
         }
 
+        // Check if it's a multi-line list
+        if (str_contains($text, "\n") && $this->isMultilineList($text)) {
+            return 'list';
+        }
+
         // Default to paragraph for multi-line or regular text
-        if (str_contains($text, "\n") || strlen($text) > 50) {
+        $paragraphMinLength = config('extractors.classification.paragraph_min_length', 50);
+        if (str_contains($text, "\n") || strlen($text) > $paragraphMinLength) {
             return 'paragraph';
         }
 
@@ -68,16 +74,21 @@ class ElementClassifier
         // Use font size if available
         if (isset($style['font_size'])) {
             $fontSize = (int) $style['font_size'];
+            $fontSizes = (array) config('extractors.classification.font_sizes', [
+                'h1' => 20,
+                'h2' => 16,
+                'h3' => 14,
+            ]);
 
-            if ($fontSize >= 20) {
+            if ($fontSize >= ($fontSizes['h1'] ?? 20)) {
                 return 1;
             }
 
-            if ($fontSize >= 16) {
+            if ($fontSize >= ($fontSizes['h2'] ?? 16)) {
                 return 2;
             }
 
-            if ($fontSize >= 14) {
+            if ($fontSize >= ($fontSizes['h3'] ?? 14)) {
                 return 3;
             }
 
@@ -103,20 +114,23 @@ class ElementClassifier
             case 'table':
                 return $this->getTableConfidence($text);
             default:
-                return 0.8;
+                $confidence = config('extractors.classification.default_confidence', 0.8);
+                return is_numeric($confidence) ? (float) $confidence : 0.8;
         }
     }
 
     private function isHeaderByStyle(array $style): bool
     {
         // Large font size
-        if (isset($style['font_size']) && (int) $style['font_size'] >= 16) {
+        $headerMinFontSize = config('extractors.classification.header_min_font_size', 16);
+        if (isset($style['font_size']) && (int) $style['font_size'] >= $headerMinFontSize) {
             return true;
         }
 
         // Bold and larger than normal
+        $boldMinFontSize = config('extractors.classification.bold_min_font_size', 12);
         if (isset($style['font_weight']) && str_contains($style['font_weight'], 'bold')) {
-            if (isset($style['font_size']) && (int) $style['font_size'] >= 12) {
+            if (isset($style['font_size']) && (int) $style['font_size'] >= $boldMinFontSize) {
                 return true;
             }
         }
@@ -138,7 +152,8 @@ class ElementClassifier
         }
 
         // Short text in all caps (likely header)
-        if (strlen($text) < 100 && preg_match('/^[А-ЯA-Z\s\d\-.,!?]+$/', $text)) {
+        $headerMaxLength = config('extractors.classification.header_max_length', 100);
+        if (strlen($text) < $headerMaxLength && preg_match('/^[А-ЯA-Z\s\d\-.,!?]+$/', $text)) {
             return true;
         }
 
@@ -156,12 +171,38 @@ class ElementClassifier
         return false;
     }
 
+    private function isMultilineList(string $text): bool
+    {
+        $lines = explode("\n", $text);
+        $listLines = 0;
+        $totalLines = count($lines);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) {
+                continue; // Skip empty lines
+            }
+
+            foreach (self::LIST_PATTERNS as $pattern) {
+                if (preg_match($pattern, $line)) {
+                    $listLines++;
+                    break;
+                }
+            }
+        }
+
+        // At least 50% of non-empty lines should be list items
+        $nonEmptyLines = count(array_filter($lines, fn($line) => !empty(trim($line))));
+        return $nonEmptyLines > 0 && ($listLines / $nonEmptyLines) >= 0.5;
+    }
+
     private function isTableContent(string $text): bool
     {
         // Look for table-like separators
         $separatorCount = substr_count($text, '|') + substr_count($text, "\t");
+        $minSeparators = config('extractors.classification.table_min_separators', 2);
 
-        return $separatorCount >= 2;
+        return $separatorCount >= $minSeparators;
     }
 
     private function getHeaderConfidence(string $text, array $style): float

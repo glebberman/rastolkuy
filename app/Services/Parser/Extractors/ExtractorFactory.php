@@ -7,6 +7,7 @@ namespace App\Services\Parser\Extractors;
 use App\Services\Parser\Extractors\Support\ElementClassifier;
 use App\Services\Parser\Extractors\Support\EncodingDetector;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
+use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -21,6 +22,7 @@ class ExtractorFactory
         private readonly EncodingDetector $encodingDetector,
         private readonly ElementClassifier $classifier,
         private readonly MetricsCollector $metrics,
+        private readonly ?Container $container = null,
     ) {
         $this->registerDefaultExtractors();
     }
@@ -91,6 +93,12 @@ class ExtractorFactory
      */
     private function instantiateExtractor(string $extractorClass): ExtractorInterface
     {
+        // Try to use Laravel's container if available
+        if ($this->container !== null && $this->container->bound($extractorClass)) {
+            return $this->container->make($extractorClass);
+        }
+
+        // Fallback to manual instantiation
         return match ($extractorClass) {
             TxtExtractor::class => new TxtExtractor(
                 $this->encodingDetector,

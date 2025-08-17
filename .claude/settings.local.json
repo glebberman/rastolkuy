@@ -11,7 +11,16 @@
       "Bash(git checkout:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(curl:*)",
+      "Bash(./vendor/bin/phpstan analyse --level=9)",
+      "Bash(./vendor/bin/phpstan analyse --level=9 --memory-limit=256M)",
+      "Bash(php artisan test:*)",
+      "Bash(./vendor/bin/phpstan analyse app/Services/Parser/Extractors/ --level=8)",
+      "Bash(./vendor/bin/phpstan analyse app/Services/Parser/Extractors/ --level=8 --memory-limit=256M)",
+      "Bash(php:*)"
     ],
     "deny": [],
     "ask": []

@@ -112,7 +112,7 @@ return (new PhpCsFixer\Config())
             'import_constants' => true,
             'import_functions' => true,
         ],
-        'group_import' => true,
+        'group_import' => false,
         'no_leading_import_slash' => true,
         'no_unused_imports' => true,
         'ordered_imports' => [

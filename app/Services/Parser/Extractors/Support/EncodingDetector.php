@@ -59,13 +59,17 @@ class EncodingDetector
             return $content;
         }
 
-        $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
+        try {
+            $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
 
-        if ($converted === false) {
-            throw new RuntimeException("Failed to convert encoding from {$encoding} to UTF-8");
+            if ($converted === false) {
+                throw new RuntimeException("Failed to convert encoding from {$encoding} to UTF-8");
+            }
+
+            return $converted;
+        } catch (\ValueError $e) {
+            throw new RuntimeException("Invalid encoding: {$encoding}. " . $e->getMessage());
         }
-
-        return $converted;
     }
 
     private function detectBom(string $content): ?string

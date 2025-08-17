@@ -10,6 +10,9 @@ parameters:
         - routes/
         - tests/
 
+    # Laravel specific configurations
+    reportUnmatchedIgnoredErrors: false
+    
     # Ignore errors
     ignoreErrors:
         # Allow facades
@@ -20,11 +23,16 @@ parameters:
         
         # Ignore blade templates
         - '#Cannot call method [a-zA-Z]+\(\) on Illuminate\\View\\View\|string\.#'
-
-    # Laravel specific configurations
-    checkMissingIterableValueType: false
-    checkGenericClassInNonGenericObjectType: false
-    reportUnmatchedIgnoredErrors: false
+        
+        # Ziggy package
+        - '#Instantiated class Tighten\\Ziggy\\Ziggy not found\.#'
+        - '#Call to method toArray\(\) on an unknown class Tighten\\Ziggy\\Ziggy\.#'
+        
+        # Deprecated config options replacement
+        -
+            identifier: missingType.iterableValue
+        -
+            identifier: missingType.generics
 
     # Exclude files
     excludePaths:
