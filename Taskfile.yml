@@ -1,0 +1,114 @@
+version: '3'
+
+vars:
+  DOCKER_COMPOSE: docker-compose
+  CONTAINER_APP: laravel_app
+
+tasks:
+  phpstan:
+    desc: "Run PHPStan analysis (usage: task phpstan -- --no-progress)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/phpstan analyse {{.CLI_ARGS}}"
+
+  cs-fix:
+    desc: "Run PHP CS Fixer (usage: task cs-fix -- --dry-run)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/php-cs-fixer fix {{.CLI_ARGS}}"
+
+  dc-up:
+    desc: "Start Docker Compose services (usage: task dc-up -- -d)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} up {{.CLI_ARGS}}"
+
+  dc-down:
+    desc: "Stop Docker Compose services (usage: task dc-down -- -v)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} down {{.CLI_ARGS}}"
+
+  dc-build:
+    desc: "Build Docker Compose services (usage: task dc-build -- --no-cache)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} build {{.CLI_ARGS}}"
+
+  artisan:
+    desc: "Run Laravel Artisan commands (usage: task artisan -- migrate:fresh --seed)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} php artisan {{.CLI_ARGS}}"
+
+  test:
+    desc: "Run PHPUnit tests (usage: task test -- --filter UserTest)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/phpunit {{.CLI_ARGS}}"
+
+  # Дополнительные полезные команды
+  install:
+    desc: "Install composer dependencies"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} composer install"
+
+  npm-install:
+    desc: "Install npm dependencies"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} npm install"
+
+  npm-dev:
+    desc: "Run npm dev"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} npm run dev"
+
+  npm-build:
+    desc: "Build frontend assets"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} npm run build"
+
+  migrate:
+    desc: "Run database migrations"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} php artisan migrate"
+
+  migrate-fresh:
+    desc: "Fresh migrate with seeding"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} php artisan migrate:fresh --seed"
+
+  tinker:
+    desc: "Run Laravel Tinker"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} php artisan tinker"
+
+  logs:
+    desc: "Show Docker logs (usage: task logs -- -f app)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} logs {{.CLI_ARGS}}"
+
+  shell:
+    desc: "Access container shell"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} bash"
+
+  quality:
+    desc: "Run all quality checks (PHPStan + CS Fixer dry run + Tests)"
+    cmds:
+      - task: phpstan
+      - task: cs-fix
+        vars: {CLI_ARGS: "--dry-run --diff"}
+      - task: test
+
+  setup:
+    desc: "Initial project setup"
+    cmds:
+      - task: dc-build
+      - task: dc-up
+        vars: {CLI_ARGS: "-d"}
+      - task: install
+      - task: artisan
+        vars: {CLI_ARGS: "key:generate"}
+      - task: migrate-fresh
+      - echo "Project setup completed!"
+
+  cleanup:
+    desc: "Clean up Docker resources"
+    cmds:
+      - task: dc-down
+        vars: {CLI_ARGS: "-v --remove-orphans"}
+      - docker system prune -f
