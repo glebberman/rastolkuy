@@ -1,0 +1,44 @@
+includes:
+    - ./vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 9
+    paths:
+        - app/
+        - config/
+        - database/
+        - routes/
+        - tests/
+
+    # Ignore errors
+    ignoreErrors:
+        # Allow facades
+        - '#Call to an undefined static method Illuminate\\Support\\Facades\\[a-zA-Z]+::[a-zA-Z]+\(\)\.#'
+        
+        # Allow Laravel helper functions
+        - '#Function [a-z_]+ not found\.#'
+        
+        # Ignore blade templates
+        - '#Cannot call method [a-zA-Z]+\(\) on Illuminate\\View\\View\|string\.#'
+
+    # Laravel specific configurations
+    checkMissingIterableValueType: false
+    checkGenericClassInNonGenericObjectType: false
+    reportUnmatchedIgnoredErrors: false
+
+    # Exclude files
+    excludePaths:
+        - '*/database/migrations/*'
+        - '*/storage/*'
+        - '*/resources/views/*'
+        - '*/vendor/*'
+        - '*/node_modules/*'
+        - 'bootstrap/cache/*'
+        - '_ide_helper.php'
+        - '_ide_helper_models.php'
+        - '.phpstorm.meta.php'
+
+    # Type coverage
+    typeAliases:
+        Eloquent: 'Illuminate\Database\Eloquent\Model'
+        Collection: 'Illuminate\Support\Collection'
