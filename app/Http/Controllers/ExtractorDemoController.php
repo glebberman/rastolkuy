@@ -10,6 +10,7 @@ use App\Services\Parser\Extractors\Support\EncodingDetector;
 use App\Services\Parser\Extractors\Support\ElementClassifier;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
 use App\Services\Parser\Extractors\DTOs\ExtractionConfig;
+use App\Services\Parser\Extractors\DTOs\ExtractedDocument;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\View\View;
@@ -178,7 +179,7 @@ class ExtractorDemoController
         }
     }
 
-    private function formatExtractionResult($result): JsonResponse
+    private function formatExtractionResult(ExtractedDocument $result): JsonResponse
     {
         $elements = [];
         foreach ($result->elements as $element) {

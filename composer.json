@@ -55,7 +55,7 @@
             "@php artisan key:generate --ansi"
         ],
         "analyse": [
-            "vendor/bin/phpstan analyse"
+            "vendor/bin/phpstan analyse --level=9 --memory-limit=256M"
         ],
         "fix": [
             "vendor/bin/php-cs-fixer fix"
