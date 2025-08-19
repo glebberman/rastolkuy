@@ -1,0 +1,8 @@
+Test file with various characters.
+
+English text: Hello World!
+Numbers: 123456789
+Special chars: !@#$%^&*()
+
+Russian text: Привет мир!
+Mixed content: Hello Привет 123
