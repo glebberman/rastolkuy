@@ -11,8 +11,12 @@ use App\Services\Parser\Extractors\Support\ElementClassifier;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
 use App\Services\Parser\Extractors\DTOs\ExtractionConfig;
 use App\Services\Parser\Extractors\DTOs\ExtractedDocument;
-use Illuminate\Http\Request;
-use Illuminate\Http\JsonResponse;
+use App\Http\Requests\ExtractorDemoUploadRequest;
+use App\Http\Responses\ExtractorTestResponse;
+use App\Http\Responses\ExtractorStreamingResponse;
+use App\Http\Responses\ExtractorUploadResponse;
+use App\Http\Responses\ExtractorErrorResponse;
+use App\Http\Responses\NoContentResponse;
 use Illuminate\View\View;
 use Exception;
 
@@ -42,7 +46,7 @@ class ExtractorDemoController
         return view('extractor-demo');
     }
 
-    public function testBasic(): JsonResponse
+    public function testBasic(): ExtractorTestResponse|ExtractorErrorResponse
     {
         try {
             $testContent = "# ТЕСТОВЫЙ ДОКУМЕНТ
@@ -71,14 +75,14 @@ class ExtractorDemoController
 
             unlink($tempFile);
 
-            return $this->formatExtractionResult($result);
+            return new ExtractorTestResponse($result, 'basic');
 
         } catch (Exception $e) {
-            return $this->formatError($e);
+            return new ExtractorErrorResponse($e);
         }
     }
 
-    public function testStreaming(): JsonResponse
+    public function testStreaming(): ExtractorStreamingResponse|ExtractorErrorResponse
     {
         try {
             // Create large test file for streaming test
@@ -99,38 +103,17 @@ class ExtractorDemoController
 
             unlink($tempFile);
 
-            return response()->json([
-                'status' => 'success',
-                'processing_mode' => $result->metadata['processing_mode'] ?? 'regular',
-                'extraction_time' => round($result->extractionTime, 4) . 's',
-                'elements_count' => $result->getElementsCount(),
-                'file_size' => $result->metadata['file_size'] ?? 0,
-                'config' => [
-                    'stream_processing' => $config->streamProcessing,
-                    'chunk_size' => $config->chunkSize,
-                    'timeout' => $config->timeoutSeconds,
-                ],
-                'metrics' => $result->metrics,
-            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            return new ExtractorStreamingResponse($result, $config);
 
         } catch (Exception $e) {
-            return $this->formatError($e);
+            return new ExtractorErrorResponse($e);
         }
     }
 
-    public function upload(Request $request): JsonResponse
+    public function upload(ExtractorDemoUploadRequest $request): ExtractorUploadResponse|ExtractorErrorResponse
     {
-        if (!$request->hasFile('document')) {
-            return response()->json(['error' => 'No file uploaded'], 400);
-        }
-        
         $file = $request->file('document');
-        
-        if (!$file->isValid()) {
-            return response()->json(['error' => 'Invalid file'], 400);
-        }
-        
-        $configType = $request->input('config', 'default');
+        $configType = $request->getConfigType();
         
         try {
             // Get config based on user selection
@@ -143,75 +126,11 @@ class ExtractorDemoController
             
             $result = $this->manager->extract($file->getPathname(), $config);
             
-            // Format elements for display
-            $elements = [];
-            foreach ($result->elements as $element) {
-                $elements[] = [
-                    'type' => $element->type,
-                    'content' => $element->content,
-                    'confidence' => round($element->getConfidenceScore(), 2),
-                    'page' => $element->pageNumber,
-                    'metadata' => $element->metadata,
-                ];
-            }
-            
-            return response()->json([
-                'status' => 'success',
-                'file_info' => [
-                    'original_name' => $file->getClientOriginalName(),
-                    'size' => $file->getSize(),
-                    'mime_type' => $result->mimeType,
-                    'encoding' => $result->metadata['encoding'] ?? 'unknown',
-                    'line_count' => $result->metadata['line_count'] ?? 0,
-                    'processing_mode' => $result->metadata['processing_mode'] ?? 'regular',
-                ],
-                'extraction' => [
-                    'time' => round($result->extractionTime, 4),
-                    'elements_count' => count($elements),
-                    'config_used' => $configType,
-                ],
-                'elements' => $elements,
-                'metrics' => $result->metrics,
-            ], 200, [], JSON_UNESCAPED_UNICODE);
+            return new ExtractorUploadResponse($result, $file, $configType);
             
         } catch (Exception $e) {
-            return $this->formatError($e);
+            return new ExtractorErrorResponse($e);
         }
     }
 
-    private function formatExtractionResult(ExtractedDocument $result): JsonResponse
-    {
-        $elements = [];
-        foreach ($result->elements as $element) {
-            $elements[] = [
-                'type' => $element->type,
-                'content' => mb_substr($element->content, 0, 100) . (mb_strlen($element->content) > 100 ? '...' : ''),
-                'confidence' => $element->getConfidenceScore(),
-            ];
-        }
-
-        return response()->json([
-            'status' => 'success',
-            'extraction_time' => round($result->extractionTime, 4) . 's',
-            'elements_count' => $result->getElementsCount(),
-            'file_info' => [
-                'mime_type' => $result->mimeType,
-                'encoding' => $result->metadata['encoding'] ?? 'unknown',
-                'file_size' => $result->metadata['file_size'] ?? 0,
-                'line_count' => $result->metadata['line_count'] ?? 0,
-            ],
-            'elements' => $elements,
-            'metrics' => $result->metrics,
-        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    }
-
-    private function formatError(Exception $e): JsonResponse
-    {
-        return response()->json([
-            'status' => 'error',
-            'message' => $e->getMessage(),
-            'file' => basename($e->getFile()),
-            'line' => $e->getLine(),
-        ], 500, [], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
-    }
 }
