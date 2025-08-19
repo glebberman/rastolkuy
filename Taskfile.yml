@@ -2,7 +2,7 @@ version: '3'
 
 vars:
   DOCKER_COMPOSE: docker-compose
-  CONTAINER_APP: laravel_app
+  CONTAINER_APP: app
 
 tasks:
   phpstan:
