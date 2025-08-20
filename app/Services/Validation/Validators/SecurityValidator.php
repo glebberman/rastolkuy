@@ -7,6 +7,7 @@ namespace App\Services\Validation\Validators;
 use App\Services\Validation\Contracts\ValidatorInterface;
 use App\Services\Validation\DTOs\ValidationResult;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 
 final class SecurityValidator implements ValidatorInterface
 {
@@ -90,10 +91,24 @@ final class SecurityValidator implements ValidatorInterface
 
     private function hasEmbeddedPath(string $fileName): bool
     {
-        return str_contains($fileName, '../') || 
-               str_contains($fileName, '..\\') ||
-               str_contains($fileName, '/') ||
-               str_contains($fileName, '\\');
+        // Check for path traversal sequences
+        if (str_contains($fileName, '../') || str_contains($fileName, '..\\')) {
+            return true;
+        }
+        
+        // Check for absolute paths (Unix and Windows)
+        if (str_starts_with($fileName, '/') || 
+            (strlen($fileName) > 2 && $fileName[1] === ':' && $fileName[2] === '\\')) {
+            return true;
+        }
+        
+        // Check for directory separators in the middle (potential path injection)
+        // Allow single filename with extension but block paths like "dir/file.txt"
+        if (str_contains($fileName, '/') || str_contains($fileName, '\\')) {
+            return true;
+        }
+        
+        return false;
     }
 
     private function hasNullBytes(string $fileName): bool
@@ -106,6 +121,10 @@ final class SecurityValidator implements ValidatorInterface
         try {
             $handle = fopen($file->getPathname(), 'rb');
             if ($handle === false) {
+                Log::warning('Failed to open file for security scanning', [
+                    'filename' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                ]);
                 return null;
             }
 
@@ -113,8 +132,20 @@ final class SecurityValidator implements ValidatorInterface
             $content = fread($handle, 4096);
             fclose($handle);
 
-            return $content !== false ? $content : null;
-        } catch (\Throwable) {
+            if ($content === false) {
+                Log::warning('Failed to read file content for security scanning', [
+                    'filename' => $file->getClientOriginalName(),
+                ]);
+                return null;
+            }
+
+            return $content;
+        } catch (\Throwable $e) {
+            Log::error('Exception during security content sampling', [
+                'filename' => $file->getClientOriginalName(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             return null;
         }
     }

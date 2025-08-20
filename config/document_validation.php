@@ -74,4 +74,19 @@ return [
         ],
         'force_utf8_conversion' => true,
     ],
+
+    'performance' => [
+        'max_execution_time_per_validator' => 30, // seconds
+        'max_memory_limit' => '256M',
+        'max_text_content_read' => 1048576, // 1MB for text content extraction
+        'performance_warning_threshold_ms' => 5000, // 5 seconds
+    ],
+
+    'logging' => [
+        'log_validation_start' => true,
+        'log_validation_completion' => true,
+        'log_validator_execution_time' => true,
+        'log_performance_warnings' => true,
+        'log_security_issues' => true,
+    ],
 ];
