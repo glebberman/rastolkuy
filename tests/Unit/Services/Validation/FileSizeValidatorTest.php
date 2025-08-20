@@ -47,7 +47,7 @@ final class FileSizeValidatorTest extends TestCase
     public function test_rejects_file_too_small(): void
     {
         // 512 bytes file (below 1KB minimum)
-        $file = UploadedFile::fake()->create('document.pdf', 0.5);
+        $file = UploadedFile::fake()->createWithContent('document.pdf', str_repeat('a', 512));
         
         $result = $this->validator->validate($file);
         
@@ -77,6 +77,7 @@ final class FileSizeValidatorTest extends TestCase
         $result = $this->validator->validate($file);
         
         $this->assertTrue($result->isValid);
+        $this->assertIsString($result->metadata['file_size_human']);
         $this->assertStringContainsString('MB', $result->metadata['file_size_human']);
     }
 

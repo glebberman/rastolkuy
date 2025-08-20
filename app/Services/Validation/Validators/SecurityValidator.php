@@ -18,8 +18,10 @@ final class SecurityValidator implements ValidatorInterface
 
     public function __construct()
     {
-        $this->blockedPatterns = config('document_validation.security.blocked_patterns', []);
-        $this->maxFileNameLength = config('document_validation.security.max_file_name_length', 255);
+        $patterns = config('document_validation.security.blocked_patterns', []);
+        $maxLength = config('document_validation.security.max_file_name_length', 255);
+        $this->blockedPatterns = is_array($patterns) ? $patterns : [];
+        $this->maxFileNameLength = is_numeric($maxLength) ? (int) $maxLength : 255;
     }
 
     public function validate(UploadedFile $file): ValidationResult
@@ -72,7 +74,7 @@ final class SecurityValidator implements ValidatorInterface
         $metadata['security_scan_timestamp'] = now()->toISOString();
 
         return empty($errors) 
-            ? ValidationResult::valid($metadata)
+            ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }
 
@@ -121,11 +123,11 @@ final class SecurityValidator implements ValidatorInterface
     {
         $extension = strtolower($file->getClientOriginalExtension());
         
-        // For text files, check if content is actually binary
+        // For text files, check if content contains binary/non-printable characters
         if ($extension === 'txt') {
-            return !mb_check_encoding($content, 'UTF-8') && 
-                   !mb_check_encoding($content, 'ASCII') &&
-                   !mb_check_encoding($content, 'Windows-1251');
+            // Check for null bytes or other control characters that shouldn't be in text files
+            return str_contains($content, "\x00") || 
+                   preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/', $content);
         }
 
         // For PDF files, check for proper PDF header

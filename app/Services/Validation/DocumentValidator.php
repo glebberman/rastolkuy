@@ -181,6 +181,7 @@ final class DocumentValidator
      */
     public function getMaxFileSize(): int
     {
-        return (int) config('document_validation.file_size.max_size', 10485760);
+        $size = config('document_validation.file_size.max_size', 10485760);
+        return is_numeric($size) ? (int) $size : 10485760;
     }
 }

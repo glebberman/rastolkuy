@@ -15,8 +15,10 @@ final class FileSizeValidator implements ValidatorInterface
 
     public function __construct()
     {
-        $this->maxSize = config('document_validation.file_size.max_size', 10485760);
-        $this->minSize = config('document_validation.file_size.min_size', 1024);
+        $maxConfig = config('document_validation.file_size.max_size', 10485760);
+        $minConfig = config('document_validation.file_size.min_size', 1024);
+        $this->maxSize = is_numeric($maxConfig) ? (int) $maxConfig : 10485760;
+        $this->minSize = is_numeric($minConfig) ? (int) $minConfig : 1024;
     }
 
     public function validate(UploadedFile $file): ValidationResult
@@ -27,12 +29,14 @@ final class FileSizeValidator implements ValidatorInterface
 
         $fileSize = $file->getSize();
         $metadata['file_size'] = $fileSize;
-        $metadata['file_size_human'] = $this->formatBytes($fileSize);
 
         if ($fileSize === false) {
             $errors[] = 'Could not determine file size';
+            $metadata['file_size_human'] = 'Unknown';
             return ValidationResult::invalid($errors, $warnings, $metadata);
         }
+
+        $metadata['file_size_human'] = $this->formatBytes($fileSize);
 
         // Check minimum size
         if ($fileSize < $this->minSize) {
@@ -62,7 +66,7 @@ final class FileSizeValidator implements ValidatorInterface
         }
 
         return empty($errors) 
-            ? ValidationResult::valid($metadata)
+            ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }
 

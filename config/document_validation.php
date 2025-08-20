@@ -36,7 +36,7 @@ return [
             '/javascript:/i',
             '/<script/i',
             '/\x00/',
-            '/^\x25PDF-/m', // PDF header check will be done separately
+            // PDF header check is handled separately in isSuspiciousBinaryContent
         ],
         'max_file_name_length' => 255,
     ],

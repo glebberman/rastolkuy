@@ -7,6 +7,7 @@ namespace App\Http\Requests;
 use App\Rules\DocumentValidationRule;
 use App\Services\Validation\DocumentValidator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Http\UploadedFile;
 
 class ExtractorDemoUploadRequest extends FormRequest
 {
@@ -46,13 +47,14 @@ class ExtractorDemoUploadRequest extends FormRequest
 
     public function getConfigType(): string
     {
-        return (string) $this->input('config', 'default');
+        $config = $this->input('config', 'default');
+        return is_string($config) ? $config : 'default';
     }
 
     /**
      * Get the uploaded document file
      */
-    public function getDocument(): \Illuminate\Http\UploadedFile
+    public function getDocument(): UploadedFile
     {
         return $this->file('document');
     }

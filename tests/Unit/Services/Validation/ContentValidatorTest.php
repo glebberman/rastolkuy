@@ -26,7 +26,6 @@ final class ContentValidatorTest extends TestCase
         
         $file = UploadedFile::fake()->createWithContent(
             'contract.txt',
-            strlen($legalContent),
             $legalContent
         );
         
@@ -47,7 +46,6 @@ final class ContentValidatorTest extends TestCase
         
         $file = UploadedFile::fake()->createWithContent(
             'contract.txt',
-            strlen($legalContent),
             $legalContent
         );
         
@@ -63,7 +61,6 @@ final class ContentValidatorTest extends TestCase
         $shortContent = 'Short text';
         $file = UploadedFile::fake()->createWithContent(
             'short.txt',
-            strlen($shortContent),
             $shortContent
         );
         
@@ -80,7 +77,6 @@ final class ContentValidatorTest extends TestCase
         $longContent = str_repeat('a', 1500000); // 1.5MB
         $file = UploadedFile::fake()->createWithContent(
             'huge.txt',
-            strlen($longContent),
             $longContent
         );
         
@@ -93,10 +89,9 @@ final class ContentValidatorTest extends TestCase
 
     public function test_warns_about_non_legal_content(): void
     {
-        $nonLegalContent = str_repeat('This is just regular text without legal keywords. ', 10);
+        $nonLegalContent = str_repeat('Hello world! This text has no legal keywords whatsoever. ', 10);
         $file = UploadedFile::fake()->createWithContent(
             'regular.txt',
-            strlen($nonLegalContent),
             $nonLegalContent
         );
         
@@ -109,10 +104,9 @@ final class ContentValidatorTest extends TestCase
 
     public function test_rejects_garbage_content(): void
     {
-        $garbageContent = str_repeat('ąęłźć@#$%^&*()_+ ', 50); // Mostly special characters
+        $garbageContent = str_repeat('@#$%^&*()_+={}[]|\\:";\'<>?,./ ', 20); // Only special characters and symbols
         $file = UploadedFile::fake()->createWithContent(
             'garbage.txt',
-            strlen($garbageContent),
             $garbageContent
         );
         
@@ -128,7 +122,6 @@ final class ContentValidatorTest extends TestCase
         $pdfContent = '%PDF-1.4' . str_repeat('a', 1000);
         $file = UploadedFile::fake()->createWithContent(
             'document.pdf',
-            strlen($pdfContent),
             $pdfContent
         );
         
@@ -144,7 +137,6 @@ final class ContentValidatorTest extends TestCase
         $docxContent = 'PK' . str_repeat('a', 1000);
         $file = UploadedFile::fake()->createWithContent(
             'document.docx',
-            strlen($docxContent),
             $docxContent
         );
         
@@ -160,7 +152,6 @@ final class ContentValidatorTest extends TestCase
         $invalidPdfContent = 'NOT A PDF' . str_repeat('a', 1000);
         $file = UploadedFile::fake()->createWithContent(
             'invalid.pdf',
-            strlen($invalidPdfContent),
             $invalidPdfContent
         );
         
@@ -176,7 +167,6 @@ final class ContentValidatorTest extends TestCase
         $invalidDocxContent = 'NOT A DOCX' . str_repeat('a', 1000);
         $file = UploadedFile::fake()->createWithContent(
             'invalid.docx',
-            strlen($invalidDocxContent),
             $invalidDocxContent
         );
         
@@ -212,7 +202,6 @@ final class ContentValidatorTest extends TestCase
         
         $file = UploadedFile::fake()->createWithContent(
             'utf8.txt',
-            strlen($utf8Content),
             $utf8Content
         );
         
@@ -230,7 +219,6 @@ final class ContentValidatorTest extends TestCase
         
         $file = UploadedFile::fake()->createWithContent(
             'quality.txt',
-            strlen($goodContent),
             $goodContent
         );
         

@@ -27,7 +27,6 @@ final class DocumentValidatorTest extends TestCase
         
         $file = UploadedFile::fake()->createWithContent(
             'contract.txt',
-            strlen($legalContent),
             $legalContent
         );
         
@@ -43,36 +42,53 @@ final class DocumentValidatorTest extends TestCase
         
         // Should have executed all validators
         $executedValidators = $result->metadata['validators_executed'];
+        $this->assertIsArray($executedValidators);
         $this->assertContains('file_format', $executedValidators);
         $this->assertContains('file_size', $executedValidators);
         $this->assertContains('security', $executedValidators);
         $this->assertContains('content', $executedValidators);
     }
 
-    public function test_rejects_file_with_multiple_issues(): void
+    public function test_rejects_file_with_format_issues(): void
     {
-        // Create a file with multiple issues: wrong extension and too small
-        $file = UploadedFile::fake()->create('bad.exe', 0.1); // .exe extension, tiny size
+        // Create a file with wrong extension
+        $file = UploadedFile::fake()->create('bad.exe', 1); // .exe extension, small size
         
         $result = $this->validator->validate($file);
         
         $this->assertFalse($result->isValid);
         $this->assertNotEmpty($result->errors);
         
-        // Should contain errors from multiple validators
+        // Should contain errors from format validator (critical validator stops here)
         $errorText = implode(' ', $result->errors);
         $this->assertStringContainsString('not allowed', $errorText); // From format validator
+        // Note: Size validator won't run because format validator is critical and fails first
+    }
+
+    public function test_rejects_file_with_size_issues(): void
+    {
+        // Create a file with correct extension but too small size - below 1KB minimum
+        $file = UploadedFile::fake()->createWithContent('small.pdf', 'tiny'); // PDF extension, but tiny size (4 bytes)
+        
+        $result = $this->validator->validate($file);
+        
+        $this->assertFalse($result->isValid);
+        $this->assertNotEmpty($result->errors);
+        
+        // Should contain errors from size validator
+        $errorText = implode(' ', $result->errors);
         $this->assertStringContainsString('too small', $errorText); // From size validator
     }
 
     public function test_stops_on_critical_validator_failure(): void
     {
-        // Create a file that will fail the critical security validator
-        $file = UploadedFile::fake()->createWithContent(
-            '../../../malicious.pdf',
-            1000,
-            'Safe content'
-        );
+        // Mock a file that will fail the critical security validator
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('getClientOriginalName')->willReturn('../../../malicious.pdf');
+        $file->method('getSize')->willReturn(1024); // 1KB, above minimum
+        $file->method('getMimeType')->willReturn('application/pdf');
+        $file->method('getClientOriginalExtension')->willReturn('pdf');
+        $file->method('getPathname')->willReturn(tempnam(sys_get_temp_dir(), 'test'));
         
         $result = $this->validator->validate($file);
         
@@ -87,10 +103,9 @@ final class DocumentValidatorTest extends TestCase
     public function test_continues_on_non_critical_validator_failure(): void
     {
         // Create a text file with non-legal content (should warn but not stop validation)
-        $nonLegalContent = str_repeat('This is just regular text. ', 20);
+        $nonLegalContent = str_repeat('Hello world! Random text without any keywords. ', 30); // Make it long enough
         $file = UploadedFile::fake()->createWithContent(
             'regular.txt',
-            strlen($nonLegalContent),
             $nonLegalContent
         );
         
@@ -101,18 +116,22 @@ final class DocumentValidatorTest extends TestCase
         
         // All validators should have been executed
         $executedValidators = $result->metadata['validators_executed'];
+        $this->assertIsArray($executedValidators);
         $this->assertCount(4, $executedValidators);
     }
 
     public function test_handles_validator_exceptions(): void
     {
-        // Mock a file that could cause exceptions
-        $file = $this->createMock(UploadedFile::class);
-        $file->method('getClientOriginalName')->willReturn('test.pdf');
-        $file->method('getSize')->willThrowException(new \RuntimeException('Test exception'));
-        $file->method('getMimeType')->willReturn('application/pdf');
-        $file->method('getClientOriginalExtension')->willReturn('pdf');
+        // Create a mock validator that throws an exception
+        $mockValidator = $this->createMock(\App\Services\Validation\Contracts\ValidatorInterface::class);
+        $mockValidator->method('getName')->willReturn('mock_validator');
+        $mockValidator->method('supports')->willReturn(true);
+        $mockValidator->method('validate')->willThrowException(new \RuntimeException('Test exception'));
         
+        // Add the mock validator
+        $this->validator->addValidator($mockValidator);
+        
+        $file = UploadedFile::fake()->create('test.txt', 1000);
         $result = $this->validator->validate($file);
         
         $this->assertFalse($result->isValid);
@@ -185,7 +204,12 @@ final class DocumentValidatorTest extends TestCase
         
         $this->validator->addValidator($customValidator);
         
-        $file = UploadedFile::fake()->create('test.txt', 1000);
+        // Create a file with proper content to pass all validators
+        $legalContent = 'Данный договор заключается между сторонами. ' .
+                       'Права и обязанности сторон определяются настоящим соглашением. ' .
+                       str_repeat('Дополнительный текст договора. ', 20);
+        
+        $file = UploadedFile::fake()->createWithContent('test.txt', $legalContent);
         $result = $this->validator->validate($file);
         
         $this->assertTrue($result->isValid);

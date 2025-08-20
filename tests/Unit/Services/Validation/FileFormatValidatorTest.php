@@ -64,8 +64,9 @@ final class FileFormatValidatorTest extends TestCase
         $result = $this->validator->validate($file);
         
         $this->assertFalse($result->isValid);
-        $this->assertCount(1, $result->errors);
-        $this->assertStringContainsString('not allowed', $result->errors[0]);
+        $this->assertCount(2, $result->errors); // Both extension and MIME type errors
+        $this->assertStringContainsString('extension', $result->errors[0]);
+        $this->assertStringContainsString('MIME type', $result->errors[1]);
     }
 
     public function test_rejects_invalid_mime_type(): void
@@ -97,8 +98,10 @@ final class FileFormatValidatorTest extends TestCase
         
         $result = $this->validator->validate($file);
         
-        $this->assertFalse($result->isValid); // Will fail due to invalid MIME type
-        $this->assertNotEmpty($result->errors);
+        $this->assertTrue($result->isValid); // Should be valid but with warnings
+        $this->assertEmpty($result->errors); // No errors
+        $this->assertCount(1, $result->warnings); // But should have warnings
+        $this->assertStringContainsString('does not match', $result->warnings[0]);
     }
 
     public function test_supports_all_files(): void

@@ -17,7 +17,8 @@ final class FileFormatValidator implements ValidatorInterface
 
     public function __construct()
     {
-        $this->allowedFormats = config('document_validation.allowed_formats', []);
+        $formats = config('document_validation.allowed_formats', []);
+        $this->allowedFormats = is_array($formats) ? $formats : [];
     }
 
     public function validate(UploadedFile $file): ValidationResult
@@ -73,7 +74,7 @@ final class FileFormatValidator implements ValidatorInterface
         }
 
         return empty($errors) 
-            ? ValidationResult::valid($metadata)
+            ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }
 

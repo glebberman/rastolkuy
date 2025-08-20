@@ -32,11 +32,10 @@ final class SecurityValidatorTest extends TestCase
 
     public function test_rejects_file_with_path_traversal(): void
     {
-        $content = 'Safe content';
-        $file = UploadedFile::fake()->createWithContent(
-            '../../../etc/passwd.pdf',
-            $content
-        );
+        // Mock the uploaded file to return a malicious filename
+        $file = $this->createMock(UploadedFile::class);
+        $file->method('getClientOriginalName')->willReturn('../../../etc/passwd.pdf');
+        $file->method('getPathname')->willReturn(tempnam(sys_get_temp_dir(), 'test'));
         
         $result = $this->validator->validate($file);
         
