@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Structure\DTOs;
 
 use App\Services\Parser\Extractors\Elements\DocumentElement;
+use App\Services\Structure\Validation\InputValidator;
+use InvalidArgumentException;
 
 final readonly class DocumentSection
 {
@@ -26,6 +28,24 @@ final readonly class DocumentSection
         public float $confidence = 1.0,
         public array $metadata = [],
     ) {
+        // Валидация данных при создании
+        if (empty(trim($id))) {
+            throw new InvalidArgumentException('Section ID cannot be empty');
+        }
+
+        if (empty(trim($title))) {
+            throw new InvalidArgumentException('Section title cannot be empty');
+        }
+
+        if ($level < 1 || $level > 10) {
+            throw new InvalidArgumentException('Section level must be between 1 and 10');
+        }
+
+        if ($startPosition < 0 || $endPosition < 0 || $startPosition > $endPosition) {
+            throw new InvalidArgumentException('Invalid section positions');
+        }
+
+        InputValidator::validateConfidence($confidence);
     }
 
     public function hasSubsections(): bool

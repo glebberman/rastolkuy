@@ -6,10 +6,11 @@ namespace App\Services\Parser\Extractors\Support;
 
 use InvalidArgumentException;
 use RuntimeException;
+use ValueError;
 
 class EncodingDetector
 {
-    private const SUPPORTED_ENCODINGS = [
+    private const array SUPPORTED_ENCODINGS = [
         'UTF-8',
         'UTF-16',
         'UTF-16BE',
@@ -67,7 +68,7 @@ class EncodingDetector
             }
 
             return $converted;
-        } catch (\ValueError $e) {
+        } catch (ValueError $e) {
             throw new RuntimeException("Invalid encoding: {$encoding}. " . $e->getMessage());
         }
     }
@@ -118,8 +119,9 @@ class EncodingDetector
         // Count potential Cyrillic characters in Windows-1251 range
         $cyrillicCount = 0;
         $totalChars = 0;
+        $contentLength = strlen($content);
 
-        for ($i = 0; $i < strlen($content); ++$i) {
+        for ($i = 0; $i < $contentLength; ++$i) {
             $byte = ord($content[$i]);
 
             if ($byte >= 128) {
@@ -138,7 +140,8 @@ class EncodingDetector
     private function isExtendedAscii(string $content): bool
     {
         // Check for extended ASCII characters
-        for ($i = 0; $i < strlen($content); ++$i) {
+        $contentLength = strlen($content);
+        for ($i = 0; $i < $contentLength; ++$i) {
             $byte = ord($content[$i]);
 
             if ($byte > 127 && $byte < 192) {

@@ -13,15 +13,16 @@ use App\Services\Parser\Extractors\Elements\TextElement;
 use App\Services\Parser\Extractors\Support\ElementClassifier;
 use App\Services\Parser\Extractors\Support\EncodingDetector;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
+use Exception;
 use InvalidArgumentException;
 use RuntimeException;
 
-class TxtExtractor implements ExtractorInterface
+readonly class TxtExtractor implements ExtractorInterface
 {
     public function __construct(
-        private readonly EncodingDetector $encodingDetector,
-        private readonly ElementClassifier $classifier,
-        private readonly MetricsCollector $metrics,
+        private EncodingDetector $encodingDetector,
+        private ElementClassifier $classifier,
+        private MetricsCollector $metrics,
     ) {
     }
 
@@ -43,18 +44,18 @@ class TxtExtractor implements ExtractorInterface
 
         // Determine encoding
         $encoding = $this->encodingDetector->detect($filePath);
-        
+
         // Check if we should use streaming for large files
         $fileSize = filesize($filePath);
         $streamThreshold = config('extractors.limits.stream_threshold', 10 * 1024 * 1024);
-        
+
         if ($fileSize > $streamThreshold && $config->streamProcessing) {
             return $this->extractWithStreaming($filePath, $encoding, $config, $startTime);
         }
-        
+
         // Regular processing for smaller files
         $content = $this->readFileContent($filePath);
-        
+
         // Validate content for security
         $this->validateContent($content);
 
@@ -99,8 +100,9 @@ class TxtExtractor implements ExtractorInterface
 
         // Check if file is too large (configurable limit)
         $maxSize = config('extractors.limits.max_file_size', 50 * 1024 * 1024);
+
         if ($fileSize > $maxSize) {
-            throw new InvalidArgumentException("File is too large. Maximum size is " . round($maxSize / 1024 / 1024, 1) . "MB: {$filePath}");
+            throw new InvalidArgumentException('File is too large. Maximum size is ' . round($maxSize / 1024 / 1024, 1) . "MB: {$filePath}");
         }
 
         return true;
@@ -208,16 +210,16 @@ class TxtExtractor implements ExtractorInterface
         // Split by double newlines (paragraph breaks)
         try {
             $paragraphs = preg_split('/\n\s*\n/', $content);
-            
+
             if ($paragraphs === false) {
                 return [$content];
             }
-        } catch (\Exception $e) {
+        } catch (Exception) {
             // Fallback to simple line splitting if regex fails
             return explode("\n", $content);
         }
 
-        return array_filter($paragraphs, fn (string $p) => !empty(trim($p)));
+        return array_filter($paragraphs, static fn (string $p) => !empty(trim($p)));
     }
 
     private function isListContent(string $content): bool
@@ -229,10 +231,10 @@ class TxtExtractor implements ExtractorInterface
             $line = trim($line);
 
             try {
-                if (preg_match('/^[-*•]\s+|^\d+\.\s+|^[a-z]\)\s+/', $line)) {
+                if (preg_match('/^[-*•]\s+|^\d+\.\s+|^[a-z]\)\s+/u', $line)) {
                     ++$listLines;
                 }
-            } catch (\Exception $e) {
+            } catch (Exception) {
                 // Skip invalid regex patterns
                 continue;
             }
@@ -257,7 +259,7 @@ class TxtExtractor implements ExtractorInterface
             }
 
             // Remove list markers
-            $item = preg_replace('/^[-*•]\s+|^\d+\.\s+|^[a-z]\)\s+/', '', $line);
+            $item = preg_replace('/^[-*•]\s+|^\d+\.\s+|^[a-z]\)\s+/u', '', $line);
 
             if ($item !== null) {
                 $items[] = trim($item);
@@ -269,7 +271,7 @@ class TxtExtractor implements ExtractorInterface
 
     private function detectListType(string $content): string
     {
-        if (preg_match('/^\d+\.\s+/', $content)) {
+        if (preg_match('/^\d+\.\s+/u', $content)) {
             return 'ordered';
         }
 
@@ -277,7 +279,7 @@ class TxtExtractor implements ExtractorInterface
     }
 
     /**
-     * Safely read file content with error handling
+     * Safely read file content with error handling.
      */
     private function readFileContent(string $filePath): string
     {
@@ -285,6 +287,7 @@ class TxtExtractor implements ExtractorInterface
 
         if ($content === false) {
             $error = error_get_last();
+
             throw new RuntimeException("Cannot read file: {$filePath}. Error: " . ($error['message'] ?? 'Unknown error'));
         }
 
@@ -292,68 +295,71 @@ class TxtExtractor implements ExtractorInterface
     }
 
     /**
-     * Validate content for security issues
+     * Validate content for security issues.
      */
     private function validateContent(string $content): void
     {
         // Check for extremely long lines that could cause DoS
         $maxLineLength = config('extractors.limits.max_line_length', 10000);
         $lines = explode("\n", $content);
-        
+
         foreach ($lines as $lineNumber => $line) {
             $maxLength = is_numeric($maxLineLength) ? (int) $maxLineLength : 10000;
+
             if (mb_strlen($line) > $maxLength) {
-                throw new InvalidArgumentException("Line " . ($lineNumber + 1) . " exceeds maximum length of " . (string)$maxLength . " characters");
+                throw new InvalidArgumentException('Line ' . ($lineNumber + 1) . ' exceeds maximum length of ' . $maxLength . ' characters');
             }
         }
 
         // Check for suspicious binary content
         if ($this->containsBinaryData($content)) {
-            throw new InvalidArgumentException("File contains binary data and cannot be processed as text");
+            throw new InvalidArgumentException('File contains binary data and cannot be processed as text');
         }
 
         // Check for reasonable line count
         $maxLines = config('extractors.limits.max_lines', 100000);
         $maxLinesInt = is_numeric($maxLines) ? (int) $maxLines : 100000;
+
         if (count($lines) > $maxLinesInt) {
-            throw new InvalidArgumentException("File contains too many lines. Maximum is " . (string)$maxLinesInt);
+            throw new InvalidArgumentException('File contains too many lines. Maximum is ' . $maxLinesInt);
         }
     }
 
     /**
-     * Check if content contains binary data
+     * Check if content contains binary data.
      */
     private function containsBinaryData(string $content): bool
     {
         // Check for null bytes and other control characters
-        if (strpos($content, "\0") !== false) {
+        if (str_contains($content, "\0")) {
             return true;
         }
 
         // Check percentage of non-printable characters
         $printableChars = 0;
         $totalChars = mb_strlen($content);
-        
+
         if ($totalChars === 0) {
             return false;
         }
 
-        for ($i = 0; $i < min($totalChars, 1000); $i++) {
+        for ($i = 0; $i < min($totalChars, 1000); ++$i) {
             $char = mb_substr($content, $i, 1);
             $ord = mb_ord($char);
-            
+
             // Printable ASCII, common whitespace, or UTF-8 multibyte
-            if (($ord >= 32 && $ord <= 126) || in_array($ord, [9, 10, 13]) || $ord > 127) {
-                $printableChars++;
+            if ($ord > 127 || ($ord >= 32 && $ord <= 126) || in_array($ord, [9, 10, 13], true)) {
+                ++$printableChars;
             }
         }
 
         $printableRatio = $printableChars / min($totalChars, 1000);
+
         return $printableRatio < 0.7; // Less than 70% printable = likely binary
     }
 
     /**
-     * Extract document using streaming for large files
+     * Extract document using streaming for large files.
      */
     private function extractWithStreaming(string $filePath, string $encoding, ExtractionConfig $config, float $startTime): ExtractedDocument
     {
@@ -366,7 +372,8 @@ class TxtExtractor implements ExtractorInterface
         $totalChars = 0;
         $lineCount = 0;
 
-        $handle = fopen($filePath, 'r');
+        $handle = fopen($filePath, 'rb');
+
         if ($handle === false) {
             throw new RuntimeException("Cannot open file for streaming: {$filePath}");
         }
@@ -374,6 +381,7 @@ class TxtExtractor implements ExtractorInterface
         try {
             while (!feof($handle)) {
                 $chunk = fread($handle, $chunkSize);
+
                 if ($chunk === false) {
                     break;
                 }
@@ -386,19 +394,22 @@ class TxtExtractor implements ExtractorInterface
                 while (($pos = strpos($lineBuffer, "\n")) !== false) {
                     $line = substr($lineBuffer, 0, $pos);
                     $lineBuffer = substr($lineBuffer, $pos + 1);
-                    $lineCount++;
+                    ++$lineCount;
 
                     // Security check for line length
                     $maxLineLength = config('extractors.limits.max_line_length', 10000);
+
                     if (mb_strlen($line) > $maxLineLength) {
                         fclose($handle);
+
                         throw new InvalidArgumentException("Line {$lineCount} exceeds maximum length");
                     }
 
                     // Build paragraphs
                     if (trim($line) === '') {
                         if (!empty($paragraphBuffer)) {
-                            $elements = array_merge($elements, $this->parseTextContent($paragraphBuffer, $config));
+                            $parsedElements = $this->parseTextContent($paragraphBuffer, $config);
+                            array_push($elements, ...$parsedElements);
                             $paragraphBuffer = '';
                         }
                     } else {
@@ -408,17 +419,21 @@ class TxtExtractor implements ExtractorInterface
                     // Check line limit
                     $maxLinesConfig = config('extractors.limits.max_lines', 100000);
                     $maxLines = is_numeric($maxLinesConfig) ? (int) $maxLinesConfig : 100000;
+
                     if ($lineCount > $maxLines) {
                         fclose($handle);
-                        throw new InvalidArgumentException("File contains too many lines. Maximum is " . (string)$maxLines);
+
+                        throw new InvalidArgumentException('File contains too many lines. Maximum is ' . $maxLines);
                     }
 
                     // Check timeout periodically (every 1000 lines)
                     if ($lineCount % 1000 === 0) {
                         $currentTime = microtime(true);
+
                         if (($currentTime - $startTime) > $config->timeoutSeconds) {
                             fclose($handle);
-                            throw new \RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) while processing line {$lineCount}");
+
+                            throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) while processing line {$lineCount}");
                         }
                     }
                 }
@@ -426,9 +441,9 @@ class TxtExtractor implements ExtractorInterface
 
             // Process remaining content
             if (!empty($paragraphBuffer)) {
-                $elements = array_merge($elements, $this->parseTextContent($paragraphBuffer, $config));
+                $parsedElements = $this->parseTextContent($paragraphBuffer, $config);
+                array_push($elements, ...$parsedElements);
             }
-
         } finally {
             fclose($handle);
         }

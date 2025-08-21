@@ -5,26 +5,62 @@ declare(strict_types=1);
 namespace App\Services\Structure;
 
 use App\Services\Structure\Contracts\AnchorGeneratorInterface;
+use App\Services\Structure\Validation\InputValidator;
+use Illuminate\Support\Facades\Config;
 
 final class AnchorGenerator implements AnchorGeneratorInterface
 {
-    private const string ANCHOR_PREFIX = '<!-- SECTION_ANCHOR_';
-    private const string ANCHOR_SUFFIX = ' -->';
-    private const int MAX_TITLE_LENGTH = 50;
+    private readonly string $anchorPrefix;
+
+    private readonly string $anchorSuffix;
+
+    private readonly int $maxTitleLength;
+
+    private readonly bool $transliterationEnabled;
+
+    private readonly bool $normalizeCaseEnabled;
 
     /**
      * @var array<string>
      */
     private array $usedAnchors = [];
 
+    public function __construct()
+    {
+        /** @var array<string, mixed> $config */
+        $config = Config::get('structure_analysis.anchor_generation', []);
+        
+        // Безопасное извлечение строковых значений
+        /** @var string $prefix */
+        $prefix = $config['prefix'] ?? '<!-- SECTION_ANCHOR_';
+        /** @var string $suffix */
+        $suffix = $config['suffix'] ?? ' -->';
+        /** @var int $maxLength */
+        $maxLength = $config['max_title_length'] ?? 50;
+        
+        $this->anchorPrefix = is_string($prefix) ? $prefix : '<!-- SECTION_ANCHOR_';
+        $this->anchorSuffix = is_string($suffix) ? $suffix : ' -->';
+        $this->maxTitleLength = is_int($maxLength) ? $maxLength : 50;
+        $this->transliterationEnabled = (bool) ($config['transliteration'] ?? true);
+        $this->normalizeCaseEnabled = (bool) ($config['normalize_case'] ?? true);
+    }
+
     public function generate(string $sectionId, string $title): string
     {
+        // Валидация входных данных
+        InputValidator::validateAnchorId($sectionId);
+
+        // Валидируем заголовок только если он не пустой (пустые заголовки обрабатываются особо)
+        if (!empty(trim($title))) {
+            InputValidator::validateSectionTitle($title);
+        }
+
         $baseAnchor = $this->createBaseAnchor($sectionId, $title);
         $uniqueAnchor = $this->ensureUnique($baseAnchor);
 
         $this->usedAnchors[] = $uniqueAnchor;
 
-        return self::ANCHOR_PREFIX . $uniqueAnchor . self::ANCHOR_SUFFIX;
+        return $this->anchorPrefix . $uniqueAnchor . $this->anchorSuffix;
     }
 
     public function generateBatch(array $sections): array
@@ -44,8 +80,8 @@ final class AnchorGenerator implements AnchorGeneratorInterface
             return null;
         }
 
-        $start = strlen(self::ANCHOR_PREFIX);
-        $end = strpos($anchor, self::ANCHOR_SUFFIX);
+        $start = strlen($this->anchorPrefix);
+        $end = strpos($anchor, $this->anchorSuffix);
 
         if ($end === false) {
             return null;
@@ -56,8 +92,8 @@ final class AnchorGenerator implements AnchorGeneratorInterface
 
     public function isValidAnchor(string $anchor): bool
     {
-        return str_starts_with($anchor, self::ANCHOR_PREFIX)
-               && str_ends_with($anchor, self::ANCHOR_SUFFIX);
+        return str_starts_with($anchor, $this->anchorPrefix)
+               && str_ends_with($anchor, $this->anchorSuffix);
     }
 
     /**
@@ -65,7 +101,10 @@ final class AnchorGenerator implements AnchorGeneratorInterface
      */
     public function findAnchorsInText(string $text): array
     {
-        $pattern = '/' . preg_quote(self::ANCHOR_PREFIX, '/') . '(.*?)' . preg_quote(self::ANCHOR_SUFFIX, '/') . '/';
+        // Валидация размера текста для поиска
+        InputValidator::validateSearchText($text);
+
+        $pattern = '/' . preg_quote($this->anchorPrefix, '/') . '(.*?)' . preg_quote($this->anchorSuffix, '/') . '/';
         preg_match_all($pattern, $text, $matches);
 
         return $matches[0] ?? [];
@@ -73,21 +112,30 @@ final class AnchorGenerator implements AnchorGeneratorInterface
 
     public function replaceAnchor(string $text, string $anchorId, string $replacement): string
     {
-        $anchor = self::ANCHOR_PREFIX . $anchorId . self::ANCHOR_SUFFIX;
+        InputValidator::validateAnchorId($anchorId);
+        InputValidator::validateSearchText($text);
+
+        $anchor = $this->anchorPrefix . $anchorId . $this->anchorSuffix;
 
         return str_replace($anchor, $replacement, $text);
     }
 
     public function insertAfterAnchor(string $text, string $anchorId, string $insertion): string
     {
-        $anchor = self::ANCHOR_PREFIX . $anchorId . self::ANCHOR_SUFFIX;
+        InputValidator::validateAnchorId($anchorId);
+        InputValidator::validateSearchText($text);
+
+        $anchor = $this->anchorPrefix . $anchorId . $this->anchorSuffix;
 
         return str_replace($anchor, $anchor . "\n" . $insertion, $text);
     }
 
     public function removeAnchor(string $text, string $anchorId): string
     {
-        $anchor = self::ANCHOR_PREFIX . $anchorId . self::ANCHOR_SUFFIX;
+        InputValidator::validateAnchorId($anchorId);
+        InputValidator::validateSearchText($text);
+
+        $anchor = $this->anchorPrefix . $anchorId . $this->anchorSuffix;
 
         return str_replace($anchor, '', $text);
     }
@@ -120,18 +168,26 @@ final class AnchorGenerator implements AnchorGeneratorInterface
         $title = strip_tags($title);
 
         // Ограничиваем длину
-        if (mb_strlen($title) > self::MAX_TITLE_LENGTH) {
-            $title = mb_substr($title, 0, self::MAX_TITLE_LENGTH);
+        if (mb_strlen($title) > $this->maxTitleLength) {
+            $title = mb_substr($title, 0, $this->maxTitleLength);
         }
 
-        // Транслитерация кириллицы
-        $title = $this->transliterate($title);
+        // Транслитерация кириллицы (если включена)
+        if ($this->transliterationEnabled) {
+            $title = $this->transliterate($title);
+        }
 
-        // Приводим к snake_case
-        $title = preg_replace('/[^\w\s-]/', '', $title) ?? '';
+        // Удаляем специальные символы, оставляем только буквы, цифры, пробелы и дефисы
+        $title = preg_replace('/[^\w\s-]/u', '', $title) ?? '';
+        
+        // Заменяем пробелы и дефисы на подчеркивания
         $title = preg_replace('/[\s-]+/', '_', $title) ?? '';
         $title = trim($title, '_');
-        $title = strtolower($title);
+
+        // Нормализация регистра (если включена)
+        if ($this->normalizeCaseEnabled) {
+            $title = strtolower($title);
+        }
 
         // Если результат пустой, возвращаем fallback
         return empty($title) ? 'section' : $title;

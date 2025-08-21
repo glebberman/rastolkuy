@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace App\Http\Responses;
 
-use Illuminate\Http\JsonResponse;
 use App\Services\Parser\Extractors\DTOs\ExtractedDocument;
+use Illuminate\Http\JsonResponse;
 
 class ExtractorTestResponse extends JsonResponse
 {
     public function __construct(ExtractedDocument $result, string $testType = 'basic')
     {
         $elements = [];
+
         foreach ($result->elements as $element) {
             $elements[] = [
                 'type' => $element->type,

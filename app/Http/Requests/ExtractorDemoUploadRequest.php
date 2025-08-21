@@ -19,7 +19,7 @@ class ExtractorDemoUploadRequest extends FormRequest
     public function rules(): array
     {
         $validator = new DocumentValidator();
-        
+
         return [
             'document' => [
                 'required',
@@ -36,7 +36,7 @@ class ExtractorDemoUploadRequest extends FormRequest
         $validator = new DocumentValidator();
         $maxSizeMB = round($validator->getMaxFileSize() / 1024 / 1024, 1);
         $supportedExtensions = implode(', ', $validator->getSupportedExtensions());
-        
+
         return [
             'document.required' => 'Document file is required',
             'document.file' => 'Document must be a valid file',
@@ -48,11 +48,12 @@ class ExtractorDemoUploadRequest extends FormRequest
     public function getConfigType(): string
     {
         $config = $this->input('config', 'default');
+
         return is_string($config) ? $config : 'default';
     }
 
     /**
-     * Get the uploaded document file
+     * Get the uploaded document file.
      */
     public function getDocument(): UploadedFile
     {

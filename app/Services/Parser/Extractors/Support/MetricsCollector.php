@@ -25,7 +25,7 @@ class MetricsCollector
         }
 
         $metric = &$this->metrics[$operation];
-        
+
         ++$metric['count'];
         $metric['total_duration'] += $duration;
         $metric['total_data_size'] += $dataSize;

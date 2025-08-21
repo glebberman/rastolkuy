@@ -76,7 +76,7 @@ class ElementClassifierTest extends TestCase
             $level = $this->classifier->determineHeaderLevel($text);
             $this->assertEquals($expectedLevel, $level, "Wrong header level for '{$text}'");
         }
-        
+
         // Test default level for regular text
         $defaultLevel = $this->classifier->determineHeaderLevel('Regular header text');
         $this->assertEquals(3, $defaultLevel);
@@ -124,7 +124,7 @@ class ElementClassifierTest extends TestCase
     {
         $listTexts = [
             "* Item 1\n* Item 2\n* Item 3",
-            "1. First item\n2. Second item\n3. Third item", 
+            "1. First item\n2. Second item\n3. Third item",
             "- Point A\n- Point B\n- Point C",
             "a) пункт первый\nb) пункт второй\nc) пункт третий",
         ];

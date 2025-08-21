@@ -8,6 +8,7 @@ use App\Services\Validation\Contracts\ValidatorInterface;
 use App\Services\Validation\DTOs\ValidationResult;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final class ContentValidator implements ValidatorInterface
 {
@@ -17,23 +18,26 @@ final class ContentValidator implements ValidatorInterface
     private const int CONTENT_PREVIEW_LENGTH = 200;
     private const int MIN_WORD_LENGTH_FOR_READABILITY = 2;
     private const float READABILITY_THRESHOLD = 0.5;
-    
+
     private const int DEFAULT_MIN_TEXT_LENGTH = 100;
     private const int DEFAULT_MAX_TEXT_LENGTH = 1000000;
     private const int DEFAULT_MIN_LEGAL_KEYWORD_MATCHES = 2;
-    
+
     /** @var array<string> */
     private const array SUPPORTED_EXTENSIONS = ['txt', 'pdf', 'docx'];
-    
+
     private const string PDF_HEADER = '%PDF-';
     private const string DOCX_HEADER = 'PK';
 
     private int $minTextLength;
+
     private int $maxTextLength;
+
     /**
      * @var array<string>
      */
     private array $legalKeywords;
+
     private int $minLegalKeywordMatches;
 
     public function __construct()
@@ -42,7 +46,7 @@ final class ContentValidator implements ValidatorInterface
         $maxLength = config('document_validation.content_validation.max_text_length', self::DEFAULT_MAX_TEXT_LENGTH);
         $keywords = config('document_validation.content_validation.legal_keywords', []);
         $minMatches = config('document_validation.content_validation.min_legal_keyword_matches', self::DEFAULT_MIN_LEGAL_KEYWORD_MATCHES);
-        
+
         $this->minTextLength = is_numeric($minLength) ? (int) $minLength : self::DEFAULT_MIN_TEXT_LENGTH;
         $this->maxTextLength = is_numeric($maxLength) ? (int) $maxLength : self::DEFAULT_MAX_TEXT_LENGTH;
         $this->legalKeywords = is_array($keywords) ? $keywords : [];
@@ -57,9 +61,10 @@ final class ContentValidator implements ValidatorInterface
 
         // Extract text content based on file type
         $textContent = $this->extractTextContent($file);
-        
+
         if ($textContent === null) {
             $errors[] = 'Could not extract text content from file';
+
             return ValidationResult::invalid($errors, $warnings, $metadata);
         }
 
@@ -72,7 +77,7 @@ final class ContentValidator implements ValidatorInterface
             $errors[] = sprintf(
                 'Document content is too short (%d characters). Minimum length is %d characters',
                 $contentLength,
-                $this->minTextLength
+                $this->minTextLength,
             );
         }
 
@@ -81,7 +86,7 @@ final class ContentValidator implements ValidatorInterface
             $errors[] = sprintf(
                 'Document content is too long (%d characters). Maximum length is %d characters',
                 $contentLength,
-                $this->maxTextLength
+                $this->maxTextLength,
             );
         }
 
@@ -94,7 +99,7 @@ final class ContentValidator implements ValidatorInterface
             $warnings[] = sprintf(
                 'Document may not be a legal document. Found %d legal keywords, expected at least %d',
                 $legalKeywordMatches,
-                $this->minLegalKeywordMatches
+                $this->minLegalKeywordMatches,
             );
         }
 
@@ -114,7 +119,7 @@ final class ContentValidator implements ValidatorInterface
             $warnings[] = 'Could not detect text encoding reliably';
         }
 
-        return empty($errors) 
+        return empty($errors)
             ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }
@@ -127,6 +132,7 @@ final class ContentValidator implements ValidatorInterface
     public function supports(UploadedFile $file): bool
     {
         $extension = strtolower($file->getClientOriginalExtension());
+
         return in_array($extension, self::SUPPORTED_EXTENSIONS, true);
     }
 
@@ -146,20 +152,22 @@ final class ContentValidator implements ValidatorInterface
     {
         try {
             // Security: Limit reading to prevent DoS attacks
-            $handle = fopen($file->getPathname(), 'r');
+            $handle = fopen($file->getPathname(), 'rb');
+
             if ($handle === false) {
                 return null;
             }
-            
+
             $content = fread($handle, self::MAX_TEXT_READ_SIZE);
             fclose($handle);
-            
+
             return $content !== false ? $content : null;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('Failed to extract text content', [
                 'filename' => $file->getClientOriginalName(),
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -171,28 +179,31 @@ final class ContentValidator implements ValidatorInterface
         try {
             // Security: Only read first 4KB to check PDF header
             $handle = fopen($file->getPathname(), 'rb');
+
             if ($handle === false) {
                 return null;
             }
-            
+
             $header = fread($handle, self::PDF_HEADER_CHECK_SIZE);
             fclose($handle);
-            
+
             if ($header === false || !str_starts_with($header, self::PDF_HEADER)) {
                 Log::warning('Invalid PDF header detected', [
                     'filename' => $file->getClientOriginalName(),
                 ]);
+
                 return null;
             }
-            
+
             // Return a placeholder that will pass basic validation
             // TODO: Implement real PDF text extraction using smalot/pdfparser
             return 'PDF content placeholder - договор соглашение контракт сторона права обязанности исполнение условия пункт статья. This placeholder text contains legal keywords to satisfy content validation requirements.';
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('Failed to extract PDF content', [
                 'filename' => $file->getClientOriginalName(),
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -204,28 +215,31 @@ final class ContentValidator implements ValidatorInterface
         try {
             // Security: Only read first 4KB to check DOCX header
             $handle = fopen($file->getPathname(), 'rb');
+
             if ($handle === false) {
                 return null;
             }
-            
+
             $header = fread($handle, self::DOCX_HEADER_CHECK_SIZE);
             fclose($handle);
-            
+
             if ($header === false || !str_starts_with($header, self::DOCX_HEADER)) {
                 Log::warning('Invalid DOCX header detected', [
                     'filename' => $file->getClientOriginalName(),
                 ]);
+
                 return null;
             }
-            
+
             // Return a placeholder that will pass basic validation
             // TODO: Implement real DOCX text extraction using phpoffice/phpword
             return 'DOCX content placeholder - договор соглашение контракт сторона права обязанности исполнение условия пункт статья. This placeholder text contains legal keywords to satisfy content validation requirements.';
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::warning('Failed to extract DOCX content', [
                 'filename' => $file->getClientOriginalName(),
                 'error' => $e->getMessage(),
             ]);
+
             return null;
         }
     }
@@ -237,7 +251,7 @@ final class ContentValidator implements ValidatorInterface
 
         foreach ($this->legalKeywords as $keyword) {
             if (str_contains($text, mb_strtolower($keyword))) {
-                $matches++;
+                ++$matches;
             }
         }
 
@@ -267,6 +281,7 @@ final class ContentValidator implements ValidatorInterface
     private function performQualityChecks(string $text): array
     {
         $words = preg_split('/\s+/', trim($text));
+
         if ($words === false) {
             return [
                 'is_mostly_garbage' => true,
@@ -274,9 +289,9 @@ final class ContentValidator implements ValidatorInterface
                 'avg_word_length' => 0.0,
             ];
         }
-        
+
         $totalWords = count($words);
-        
+
         if ($totalWords === 0) {
             return [
                 'is_mostly_garbage' => true,
@@ -291,10 +306,10 @@ final class ContentValidator implements ValidatorInterface
         foreach ($words as $word) {
             $cleanWord = (string) preg_replace('/[^\p{L}\p{N}]/u', '', $word);
             $totalWordLength += mb_strlen($cleanWord);
-            
+
             // Consider word readable if it has at least 2 characters and contains letters
             if (mb_strlen($cleanWord) >= self::MIN_WORD_LENGTH_FOR_READABILITY && preg_match('/\p{L}/u', $cleanWord)) {
-                $readableWords++;
+                ++$readableWords;
             }
         }
 
@@ -312,7 +327,7 @@ final class ContentValidator implements ValidatorInterface
     {
         $encodings = config('document_validation.encoding.supported_encodings', ['UTF-8']);
         $supportedEncodings = is_array($encodings) ? $encodings : ['UTF-8'];
-        
+
         foreach ($supportedEncodings as $encoding) {
             if (is_string($encoding) && mb_check_encoding($text, $encoding)) {
                 return $encoding;
@@ -320,6 +335,7 @@ final class ContentValidator implements ValidatorInterface
         }
 
         $detected = mb_detect_encoding($text, $supportedEncodings, true);
+
         return $detected !== false ? $detected : null;
     }
 }

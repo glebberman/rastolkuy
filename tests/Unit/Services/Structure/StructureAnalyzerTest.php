@@ -27,6 +27,12 @@ class StructureAnalyzerTest extends TestCase
     {
         parent::setUp();
 
+        // Мокаем конфигурацию для тестов
+        config(['structure_analysis.detection' => [
+            'min_confidence_threshold' => 0.3,
+            'max_analysis_time_seconds' => 120,
+        ]]);
+
         $this->sectionDetector = $this->createMock(SectionDetectorInterface::class);
         $this->anchorGenerator = $this->createMock(AnchorGeneratorInterface::class);
 

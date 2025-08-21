@@ -35,3 +35,4 @@ log/*
 .idea
 .claude
 .composer
+tmp

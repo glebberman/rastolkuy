@@ -9,11 +9,12 @@ use App\Services\Parser\Extractors\DTOs\ExtractionConfig;
 use Exception;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use RuntimeException;
 
-class ExtractorManager
+readonly class ExtractorManager
 {
     public function __construct(
-        private readonly ExtractorFactory $factory,
+        private ExtractorFactory $factory,
     ) {
     }
 
@@ -33,7 +34,7 @@ class ExtractorManager
 
             // Validate file before processing
             if (!$extractor->validate($filePath)) {
-                throw new InvalidArgumentException("File validation failed: {$filePath}");
+                throw new InvalidArgumentException("File validation failed: $filePath");
             }
 
             // Check if processing time might exceed timeout
@@ -117,9 +118,7 @@ class ExtractorManager
     public function getFileMetadata(string $filePath): array
     {
         try {
-            $extractor = $this->factory->createFromFile($filePath);
-
-            return $extractor->getMetadata($filePath);
+            return $this->factory->createFromFile($filePath)->getMetadata($filePath);
         } catch (Exception $e) {
             return [
                 'error' => $e->getMessage(),
@@ -136,10 +135,10 @@ class ExtractorManager
     ): ExtractedDocument {
         $startTime = microtime(true);
         $timeoutReached = false;
-        
+
         // Set up timeout handling using signal alarm (if available)
         if (function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
-            pcntl_signal(SIGALRM, function () use (&$timeoutReached) {
+            pcntl_signal(SIGALRM, function () use (&$timeoutReached): void {
                 $timeoutReached = true;
             });
             pcntl_alarm($config->timeoutSeconds);
@@ -148,24 +147,23 @@ class ExtractorManager
         try {
             // Execute extraction with periodic timeout checks
             $result = $this->extractWithTimeoutChecks($extractor, $filePath, $config, $startTime);
-            
+
             // Clear alarm
             if (function_exists('pcntl_alarm')) {
                 pcntl_alarm(0);
             }
-            
+
             return $result;
-            
         } catch (Exception $e) {
             // Clear alarm on exception
             if (function_exists('pcntl_alarm')) {
                 pcntl_alarm(0);
             }
-            
+
             if ($timeoutReached || (microtime(true) - $startTime) > $config->timeoutSeconds) {
-                throw new \RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
+                throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
             }
-            
+
             throw $e;
         }
     }
@@ -174,12 +172,12 @@ class ExtractorManager
         ExtractorInterface $extractor,
         string $filePath,
         ExtractionConfig $config,
-        float $startTime
+        float $startTime,
     ): ExtractedDocument {
         // Create a wrapper that periodically checks timeout
-        $timeoutChecker = function() use ($startTime, $config, $filePath) {
+        $timeoutChecker = function () use ($startTime, $config, $filePath): void {
             if ((microtime(true) - $startTime) > $config->timeoutSeconds) {
-                throw new \RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
+                throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
             }
         };
 

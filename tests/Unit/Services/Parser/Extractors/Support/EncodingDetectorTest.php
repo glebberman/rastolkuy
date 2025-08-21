@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Parser\Extractors\Support;
 
 use App\Services\Parser\Extractors\Support\EncodingDetector;
+use Exception;
 use InvalidArgumentException;
 use RuntimeException;
 use Tests\TestCase;
@@ -107,13 +108,13 @@ class EncodingDetectorTest extends TestCase
     {
         $tempFile = tempnam(sys_get_temp_dir(), 'test_unreadable');
         file_put_contents($tempFile, 'content');
-        chmod($tempFile, 0000); // Remove all permissions
+        chmod($tempFile, 0o000); // Remove all permissions
 
         try {
-            $this->expectException(\Exception::class); // More general exception
+            $this->expectException(Exception::class); // More general exception
             $this->detector->detect($tempFile);
         } finally {
-            chmod($tempFile, 0644); // Restore permissions for cleanup
+            chmod($tempFile, 0o644); // Restore permissions for cleanup
             unlink($tempFile);
         }
     }

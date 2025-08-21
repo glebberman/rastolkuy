@@ -7,6 +7,8 @@ namespace Tests\Unit\Services\Parser\Extractors\Support;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
 use Tests\TestCase;
 
+use const PHP_FLOAT_MAX;
+
 class MetricsCollectorTest extends TestCase
 {
     private MetricsCollector $collector;
@@ -144,7 +146,7 @@ class MetricsCollectorTest extends TestCase
         $minDuration = $metrics['min_test']['min_duration'];
 
         $this->assertEquals(2.0, $minDuration);
-        $this->assertNotEquals(\PHP_FLOAT_MAX, $minDuration);
+        $this->assertNotEquals(PHP_FLOAT_MAX, $minDuration);
     }
 
     public function testStoresAdditionalData(): void

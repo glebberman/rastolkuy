@@ -9,22 +9,58 @@ use App\Services\Structure\Contracts\AnchorGeneratorInterface;
 use App\Services\Structure\Contracts\SectionDetectorInterface;
 use App\Services\Structure\DTOs\DocumentSection;
 use App\Services\Structure\DTOs\StructureAnalysisResult;
+use App\Services\Structure\Validation\InputValidator;
 use Exception;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
-final class StructureAnalyzer
+readonly final class StructureAnalyzer
 {
-    private const float MIN_CONFIDENCE_THRESHOLD = 0.3;
-    private const int MAX_ANALYSIS_TIME_SECONDS = 120;
+    private readonly float $minConfidenceThreshold;
+
+    private readonly int $maxAnalysisTimeSeconds;
 
     public function __construct(
         private readonly SectionDetectorInterface $sectionDetector,
         private readonly AnchorGeneratorInterface $anchorGenerator,
     ) {
+        /** @var array<string, mixed> $config */
+        $config = Config::get('structure_analysis');
+        
+        /** @var array<string, mixed> $detection */
+        $detection = $config['detection'] ?? [];
+        // Безопасное извлечение значений
+        /** @var float $threshold */
+        $threshold = $detection['min_confidence_threshold'] ?? 0.5;
+        /** @var int $maxTime */
+        $maxTime = $detection['max_analysis_time_seconds'] ?? 30;
+        
+        $this->minConfidenceThreshold = is_numeric($threshold) ? (float) $threshold : 0.5;
+        $this->maxAnalysisTimeSeconds = is_numeric($maxTime) ? (int) $maxTime : 30;
     }
 
     public function analyze(ExtractedDocument $document): StructureAnalysisResult
     {
+        // Валидация входных данных
+        try {
+            InputValidator::validateDocument($document);
+        } catch (Exception $e) {
+            Log::error('Document validation failed', [
+                'document_path' => $document->originalPath,
+                'error' => $e->getMessage(),
+            ]);
+
+            return new StructureAnalysisResult(
+                documentId: $this->generateDocumentId($document),
+                sections: [],
+                analysisTime: 0.0,
+                averageConfidence: 0.0,
+                statistics: [],
+                metadata: ['validation_error' => $e->getMessage()],
+                warnings: ['Document validation failed: ' . $e->getMessage()],
+            );
+        }
+
         $startTime = microtime(true);
 
         Log::info('Starting document structure analysis', [
@@ -51,10 +87,10 @@ final class StructureAnalyzer
             // Проверка времени выполнения
             $analysisTime = microtime(true) - $startTime;
 
-            if ($analysisTime > self::MAX_ANALYSIS_TIME_SECONDS) {
+            if ($analysisTime > $this->maxAnalysisTimeSeconds) {
                 Log::warning('Structure analysis took too long', [
                     'analysis_time' => $analysisTime,
-                    'max_time' => self::MAX_ANALYSIS_TIME_SECONDS,
+                    'max_time' => $this->maxAnalysisTimeSeconds,
                 ]);
             }
 
@@ -105,6 +141,18 @@ final class StructureAnalyzer
      */
     public function analyzeBatch(array $documents): array
     {
+        // Валидация батча
+        try {
+            InputValidator::validateDocumentBatch($documents);
+        } catch (Exception $e) {
+            Log::error('Document batch validation failed', [
+                'error' => $e->getMessage(),
+                'documents_count' => count($documents),
+            ]);
+
+            throw $e;
+        }
+
         $results = [];
 
         foreach ($documents as $key => $document) {
@@ -165,7 +213,7 @@ final class StructureAnalyzer
     private function filterByConfidence(array $sections): array
     {
         return array_filter($sections, function (DocumentSection $section) {
-            return $section->confidence >= self::MIN_CONFIDENCE_THRESHOLD;
+            return $section->confidence >= $this->minConfidenceThreshold;
         });
     }
 
@@ -186,11 +234,136 @@ final class StructureAnalyzer
             fn (DocumentSection $a, DocumentSection $b) => $a->startPosition <=> $b->startPosition,
         );
 
-        // Строим плоскую иерархию без изменения readonly объектов
-        // Для простоты возвращаем отсортированные секции как есть
-        // В будущем можно реализовать более сложную иерархию через создание новых объектов
-        return $sections;
+        // Простой стековый алгоритм построения иерархии
+        $result = [];
+        $stack = []; // Стек родительских секций
+
+        foreach ($sections as $section) {
+            // Удаляем из стека все секции с уровнем >= текущего
+            while (!empty($stack)) {
+                $lastStackItem = end($stack);
+                if ($lastStackItem !== false && $lastStackItem->level >= $section->level) {
+                    array_pop($stack);
+                } else {
+                    break;
+                }
+            }
+
+            $lastStackItem = empty($stack) ? false : end($stack);
+            
+            if (empty($stack) || $lastStackItem === false) {
+                // Корневая секция или проблема со стеком
+                $result[] = $section;
+                $stack[] = $section;
+            } else {
+                // Подсекция - добавляем к последней секции в стеке
+                $parentSection = $lastStackItem;
+                
+                // Создаем новую версию родительской секции с добавленной подсекцией
+                $updatedParent = $this->addSubsectionToParent($parentSection, $section);
+                
+                // Заменяем родительскую секцию в результате и стеке
+                $this->replaceInStack($stack, $parentSection, $updatedParent);
+                $this->replaceInResult($result, $parentSection, $updatedParent);
+                
+                // Добавляем текущую секцию в стек
+                $stack[] = $section;
+            }
+        }
+
+        return $result;
     }
+
+    /**
+     * Заменяет секцию в стеке
+     */
+    private function replaceInStack(array &$stack, DocumentSection $oldSection, DocumentSection $newSection): void
+    {
+        $stackCount = count($stack);
+        for ($i = 0; $i < $stackCount; $i++) {
+            if ($stack[$i]->id === $oldSection->id) {
+                $stack[$i] = $newSection;
+                break;
+            }
+        }
+    }
+
+    /**
+     * Заменяет секцию в результате
+     */
+    private function replaceInResult(array &$result, DocumentSection $oldSection, DocumentSection $newSection): void
+    {
+        $resultCount = count($result);
+        for ($i = 0; $i < $resultCount; $i++) {
+            if ($result[$i]->id === $oldSection->id) {
+                $result[$i] = $newSection;
+                return;
+            }
+            
+            // Рекурсивная замена в подсекциях
+            $result[$i] = $this->replaceInSubsections($result[$i], $oldSection, $newSection);
+        }
+    }
+
+
+    /**
+     * Рекурсивно заменяет секцию в подсекциях
+     */
+    private function replaceInSubsections(DocumentSection $section, DocumentSection $oldSection, DocumentSection $newSection): DocumentSection
+    {
+        if ($section->id === $oldSection->id) {
+            return $newSection;
+        }
+
+        if (empty($section->subsections)) {
+            return $section;
+        }
+
+        $updatedSubsections = array_map(
+            fn (DocumentSection $subsection) => $this->replaceInSubsections($subsection, $oldSection, $newSection),
+            $section->subsections
+        );
+
+        // Если есть изменения в подсекциях, создаем новую версию секции
+        if ($updatedSubsections !== $section->subsections) {
+            return new DocumentSection(
+                id: $section->id,
+                title: $section->title,
+                content: $section->content,
+                level: $section->level,
+                startPosition: $section->startPosition,
+                endPosition: $section->endPosition,
+                anchor: $section->anchor,
+                elements: $section->elements,
+                subsections: $updatedSubsections,
+                confidence: $section->confidence,
+                metadata: $section->metadata,
+            );
+        }
+
+        return $section;
+    }
+
+    /**
+     * Добавляет подсекцию к родительской секции
+     */
+    private function addSubsectionToParent(DocumentSection $parentSection, DocumentSection $subsection): DocumentSection
+    {
+        return new DocumentSection(
+            id: $parentSection->id,
+            title: $parentSection->title,
+            content: $parentSection->content,
+            level: $parentSection->level,
+            startPosition: $parentSection->startPosition,
+            endPosition: $parentSection->endPosition,
+            anchor: $parentSection->anchor,
+            elements: $parentSection->elements,
+            subsections: [...$parentSection->subsections, $subsection],
+            confidence: $parentSection->confidence,
+            metadata: $parentSection->metadata,
+        );
+    }
+
 
     /**
      * @param array<DocumentSection> $sections
@@ -244,7 +417,7 @@ final class StructureAnalyzer
 
         foreach ($sections as $section) {
             $result[] = $section;
-            $result = array_merge($result, $section->getAllSubsections());
+            array_push($result, ...$section->getAllSubsections());
         }
 
         return $result;
@@ -322,11 +495,11 @@ final class StructureAnalyzer
             );
         }
 
-        if ($analysisTime > self::MAX_ANALYSIS_TIME_SECONDS * 0.8) {
+        if ($analysisTime > $this->maxAnalysisTimeSeconds * 0.8) {
             $warnings[] = sprintf(
                 'Analysis time (%.2fs) approaching limit (%ds)',
                 $analysisTime,
-                self::MAX_ANALYSIS_TIME_SECONDS,
+                $this->maxAnalysisTimeSeconds,
             );
         }
 

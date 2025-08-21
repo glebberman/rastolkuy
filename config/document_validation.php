@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
     'file_size' => [
         'max_size' => env('DOCUMENT_MAX_SIZE', 10485760), // 10MB in bytes

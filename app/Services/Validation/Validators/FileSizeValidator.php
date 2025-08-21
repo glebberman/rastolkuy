@@ -11,6 +11,7 @@ use Illuminate\Http\UploadedFile;
 final class FileSizeValidator implements ValidatorInterface
 {
     private int $maxSize;
+
     private int $minSize;
 
     public function __construct()
@@ -33,6 +34,7 @@ final class FileSizeValidator implements ValidatorInterface
         if ($fileSize === false) {
             $errors[] = 'Could not determine file size';
             $metadata['file_size_human'] = 'Unknown';
+
             return ValidationResult::invalid($errors, $warnings, $metadata);
         }
 
@@ -43,7 +45,7 @@ final class FileSizeValidator implements ValidatorInterface
             $errors[] = sprintf(
                 'File is too small (%s). Minimum size is %s',
                 $this->formatBytes($fileSize),
-                $this->formatBytes($this->minSize)
+                $this->formatBytes($this->minSize),
             );
         }
 
@@ -52,20 +54,21 @@ final class FileSizeValidator implements ValidatorInterface
             $errors[] = sprintf(
                 'File is too large (%s). Maximum size is %s',
                 $this->formatBytes($fileSize),
-                $this->formatBytes($this->maxSize)
+                $this->formatBytes($this->maxSize),
             );
         }
 
         // Warning for very large files (80% of max size)
         $warningThreshold = (int) ($this->maxSize * 0.8);
+
         if ($fileSize > $warningThreshold && $fileSize <= $this->maxSize) {
             $warnings[] = sprintf(
                 'File is quite large (%s). Processing may take longer',
-                $this->formatBytes($fileSize)
+                $this->formatBytes($fileSize),
             );
         }
 
-        return empty($errors) 
+        return empty($errors)
             ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }

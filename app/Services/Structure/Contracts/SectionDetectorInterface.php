@@ -13,4 +13,14 @@ interface SectionDetectorInterface
      * @return array<DocumentSection>
      */
     public function detectSections(ExtractedDocument $document): array;
+
+    /**
+     * Очищает кэш паттернов для освобождения памяти
+     */
+    public function clearPatternCache(): void;
+
+    /**
+     * Возвращает статистику использования кэша
+     */
+    public function getCacheStats(): array;
 }

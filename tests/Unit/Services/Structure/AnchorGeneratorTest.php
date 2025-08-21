@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Services\Structure;
 
 use App\Services\Structure\AnchorGenerator;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 class AnchorGeneratorTest extends TestCase
 {
@@ -14,6 +14,16 @@ class AnchorGeneratorTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Мокаем конфигурацию для тестов
+        config(['structure_analysis.anchor_generation' => [
+            'prefix' => '<!-- SECTION_ANCHOR_',
+            'suffix' => ' -->',
+            'max_title_length' => 50,
+            'transliteration' => true,
+            'normalize_case' => true,
+        ]]);
+
         $this->generator = new AnchorGenerator();
     }
 

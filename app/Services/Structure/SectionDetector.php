@@ -10,49 +10,79 @@ use App\Services\Parser\Extractors\Elements\HeaderElement;
 use App\Services\Structure\Contracts\AnchorGeneratorInterface;
 use App\Services\Structure\Contracts\SectionDetectorInterface;
 use App\Services\Structure\DTOs\DocumentSection;
+use App\Services\Structure\Validation\InputValidator;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
 final class SectionDetector implements SectionDetectorInterface
 {
-    private const float HIGH_CONFIDENCE = 0.9;
-    private const float MEDIUM_CONFIDENCE = 0.7;
-    private const float LOW_CONFIDENCE = 0.5;
+    private readonly float $highConfidence;
 
-    private const int MIN_SECTION_LENGTH = 50;
-    private const int MAX_TITLE_LENGTH = 200;
+    private readonly float $mediumConfidence;
 
-    private const array SECTION_PATTERNS = [
-        // Нумерованные разделы
-        '/^(\d+\.?\s*[\.\s]*)(.*?)$/um',
-        '/^(Раздел\s+\d+\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Глава\s+\d+\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Статья\s+\d+\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(§\s*\d+\.?\s*[\.\s]*)(.*?)$/um',
+    private readonly float $lowConfidence;
 
-        // Подразделы
-        '/^(\d+\.\d+\.?\s*[\.\s]*)(.*?)$/um',
-        '/^(\d+\.\d+\.\d+\.?\s*[\.\s]*)(.*?)$/um',
+    private readonly int $minSectionLength;
 
-        // Именованные разделы
-        '/^(Введение\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Заключение\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Приложение\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Общие\s+положения\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Права\s+и\s+обязанности\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Ответственность\s+сторон\.?\s*[\.\s]*)(.*?)$/ium',
-        '/^(Заключительные\s+положения\.?\s*[\.\s]*)(.*?)$/ium',
-    ];
+    private readonly int $maxTitleLength;
 
-    private const array LEGAL_KEYWORDS = [
-        'договор', 'соглашение', 'контракт', 'сторона', 'стороны',
-        'обязательство', 'ответственность', 'права', 'обязанности',
-        'исполнение', 'нарушение', 'условия', 'пункт', 'статья',
-        'предмет', 'цена', 'оплата', 'срок', 'порядок',
-    ];
+    private readonly array $sectionPatterns;
+
+    private readonly array $legalKeywords;
+
+    /**
+     * @var array<string, array|bool|null> Cache for compiled regex patterns and their results
+     */
+    private array $patternCache = [];
+
 
     public function __construct(
         private readonly AnchorGeneratorInterface $anchorGenerator,
     ) {
+        /** @var array<string, mixed> $config */
+        $config = Config::get('structure_analysis');
+        
+        // Type-safe access with explicit checks
+        /** @var array<string, mixed> $confidenceLevels */
+        $confidenceLevels = $config['confidence_levels'] ?? [];
+        /** @var array<string, mixed> $detection */
+        $detection = $config['detection'] ?? [];
+        /** @var array<string, mixed> $sectionPatterns */
+        $sectionPatterns = $config['section_patterns'] ?? [];
+        /** @var array<string, mixed> $legalKeywords */
+        $legalKeywords = $config['legal_keywords'] ?? [];
+
+        // Безопасное извлечение значений с проверкой типов
+        /** @var float $high */
+        $high = $confidenceLevels['high'] ?? 0.9;
+        /** @var float $medium */
+        $medium = $confidenceLevels['medium'] ?? 0.7;
+        /** @var float $low */
+        $low = $confidenceLevels['low'] ?? 0.5;
+        /** @var int $minLength */
+        $minLength = $detection['min_section_length'] ?? 50;
+        /** @var int $maxLength */
+        $maxLength = $detection['max_title_length'] ?? 100;
+
+        $this->highConfidence = is_numeric($high) ? (float) $high : 0.9;
+        $this->mediumConfidence = is_numeric($medium) ? (float) $medium : 0.7;
+        $this->lowConfidence = is_numeric($low) ? (float) $low : 0.5;
+        $this->minSectionLength = is_numeric($minLength) ? (int) $minLength : 50;
+        $this->maxTitleLength = is_numeric($maxLength) ? (int) $maxLength : 100;
+
+        // Объединяем все паттерны из конфигурации более эффективно
+        $this->sectionPatterns = $this->flattenPatterns([
+            ...(array) ($sectionPatterns['numbered'] ?? []),
+            ...(array) ($sectionPatterns['subsections'] ?? []),
+            ...(array) ($sectionPatterns['named'] ?? []),
+        ]);
+
+        // Объединяем все ключевые слова более эффективно
+        $this->legalKeywords = $this->flattenPatterns([
+            ...(array) ($legalKeywords['contract_terms'] ?? []),
+            ...(array) ($legalKeywords['legal_entities'] ?? []),
+            ...(array) ($legalKeywords['actions'] ?? []),
+        ]);
     }
 
     /**
@@ -71,19 +101,19 @@ final class SectionDetector implements SectionDetectorInterface
         $headerSections = $this->detectByHeaders($elements);
 
         if (!empty($headerSections)) {
-            $sections = array_merge($sections, $headerSections);
+            array_push($sections, ...$headerSections);
         }
 
         // Попытка детекции через паттерны
         if (empty($sections)) {
             $patternSections = $this->detectByPatterns($elements);
-            $sections = array_merge($sections, $patternSections);
+            array_push($sections, ...$patternSections);
         }
 
         // Эвристический анализ если ничего не найдено
         if (empty($sections)) {
             $heuristicSections = $this->detectByHeuristics($elements);
-            $sections = array_merge($sections, $heuristicSections);
+            array_push($sections, ...$heuristicSections);
         }
 
         // Пост-обработка: объединение коротких секций, валидация
@@ -118,7 +148,7 @@ final class SectionDetector implements SectionDetectorInterface
                         $currentSection['level'],
                         $position - count($currentElements),
                         $position - 1,
-                        self::HIGH_CONFIDENCE,
+                        $this->highConfidence,
                     );
                 }
 
@@ -142,7 +172,7 @@ final class SectionDetector implements SectionDetectorInterface
                 $currentSection['level'],
                 $position - count($currentElements),
                 $position - 1,
-                self::HIGH_CONFIDENCE,
+                $this->highConfidence,
             );
         }
 
@@ -170,7 +200,7 @@ final class SectionDetector implements SectionDetectorInterface
                         $currentElements,
                         $position - count($currentElements),
                         $position - 1,
-                        self::MEDIUM_CONFIDENCE,
+                        $this->mediumConfidence,
                     );
                 }
 
@@ -188,7 +218,7 @@ final class SectionDetector implements SectionDetectorInterface
                 $currentElements,
                 $position - count($currentElements),
                 $position - 1,
-                self::MEDIUM_CONFIDENCE,
+                $this->mediumConfidence,
             );
         }
 
@@ -215,7 +245,7 @@ final class SectionDetector implements SectionDetectorInterface
                     $currentElements,
                     $position - count($currentElements),
                     $position - 1,
-                    self::LOW_CONFIDENCE,
+                    $this->lowConfidence,
                 );
                 $currentElements = [];
             }
@@ -230,7 +260,7 @@ final class SectionDetector implements SectionDetectorInterface
                 $currentElements,
                 $position - count($currentElements),
                 $position - 1,
-                self::LOW_CONFIDENCE,
+                $this->lowConfidence,
             );
         }
 
@@ -239,16 +269,37 @@ final class SectionDetector implements SectionDetectorInterface
 
     private function matchSectionPattern(string $content): ?array
     {
-        foreach (self::SECTION_PATTERNS as $pattern) {
-            if (preg_match($pattern, trim($content), $matches)) {
-                return [
+        $trimmedContent = trim($content);
+        
+        // Создаем кэш-ключ для контента
+        $cacheKey = 'pattern_' . hash('md5', $trimmedContent);
+        
+        // Проверяем кэш
+        if (isset($this->patternCache[$cacheKey])) {
+            /** @var array|null $cachedResult */
+            $cachedResult = $this->patternCache[$cacheKey];
+            return is_array($cachedResult) ? $cachedResult : null;
+        }
+        
+        foreach ($this->sectionPatterns as $pattern) {
+            // Используем безопасное выполнение regex
+            $matches = InputValidator::safeRegexMatch($pattern, $trimmedContent);
+            
+            if ($matches !== false && count($matches) >= 3) {
+                $result = [
                     'prefix' => $matches[1],
                     'title' => $matches[2],
                     'level' => $this->determineLevelFromPrefix($matches[1]),
                 ];
+                
+                // Кэшируем результат
+                $this->patternCache[$cacheKey] = $result;
+                return $result;
             }
         }
 
+        // Кэшируем отрицательный результат
+        $this->patternCache[$cacheKey] = null;
         return null;
     }
 
@@ -261,12 +312,12 @@ final class SectionDetector implements SectionDetectorInterface
             return min($dotCount + 1, 6); // Максимум 6 уровней
         }
 
-        // Проверяем ключевые слова
-        if (preg_match('/^(Раздел|Глава)/i', $prefix)) {
+        // Проверяем ключевые слова безопасно
+        if (InputValidator::safeRegexMatch('/^(Раздел|Глава)/i', $prefix) !== false) {
             return 1;
         }
 
-        if (preg_match('/^(Статья|§)/i', $prefix)) {
+        if (InputValidator::safeRegexMatch('/^(Статья|§)/i', $prefix) !== false) {
             return 2;
         }
 
@@ -276,19 +327,32 @@ final class SectionDetector implements SectionDetectorInterface
     private function isLikelySectionStart(DocumentElement $element): bool
     {
         $content = trim($element->content);
+        
+        // Создаем кэш-ключ для контента
+        $cacheKey = 'likely_' . hash('md5', $content);
+        
+        // Проверяем кэш
+        if (isset($this->patternCache[$cacheKey])) {
+            /** @var bool $cachedResult */
+            $cachedResult = $this->patternCache[$cacheKey];
+            return is_bool($cachedResult) ? $cachedResult : false;
+        }
 
         // Проверяем длину - заголовки обычно короткие
-        if (mb_strlen($content) > self::MAX_TITLE_LENGTH) {
+        if (mb_strlen($content) > $this->maxTitleLength) {
+            $this->patternCache[$cacheKey] = false;
             return false;
         }
 
         // Проверяем наличие двоеточия в конце
         if (str_ends_with($content, ':')) {
+            $this->patternCache[$cacheKey] = true;
             return true;
         }
 
         // Проверяем на короткую строку с заглавной буквы
-        if (mb_strlen($content) < 100 && mb_strtoupper(mb_substr($content, 0, 1)) === mb_substr($content, 0, 1)) {
+        if (mb_strlen($content) < 100 && mb_stripos($content, mb_substr($content, 0, 1)) === 0) {
+            $this->patternCache[$cacheKey] = true;
             return true;
         }
 
@@ -296,13 +360,15 @@ final class SectionDetector implements SectionDetectorInterface
         $legalKeywordCount = 0;
         $contentLower = mb_strtolower($content);
 
-        foreach (self::LEGAL_KEYWORDS as $keyword) {
+        foreach ($this->legalKeywords as $keyword) {
             if (str_contains($contentLower, $keyword)) {
                 ++$legalKeywordCount;
             }
         }
 
-        return $legalKeywordCount >= 2;
+        $result = $legalKeywordCount >= 2;
+        $this->patternCache[$cacheKey] = $result;
+        return $result;
     }
 
     /**
@@ -321,7 +387,7 @@ final class SectionDetector implements SectionDetectorInterface
             $elements,
         ));
 
-        $id = uniqid('section_', true);
+        $id = 'section_' . str_replace('.', '_', uniqid('', true));
         $anchor = $this->anchorGenerator->generate($id, $title);
 
         return new DocumentSection(
@@ -371,11 +437,11 @@ final class SectionDetector implements SectionDetectorInterface
         ));
 
         // Пропускаем слишком короткие секции
-        if (mb_strlen($content) < self::MIN_SECTION_LENGTH) {
+        if (mb_strlen($content) < $this->minSectionLength) {
             return null;
         }
 
-        $id = uniqid('section_', true);
+        $id = 'section_' . str_replace('.', '_', uniqid('', true));
         $anchor = $this->anchorGenerator->generate($id, $title);
 
         return new DocumentSection(
@@ -403,8 +469,8 @@ final class SectionDetector implements SectionDetectorInterface
         $content = trim($element->content);
 
         // Ограничиваем длину заголовка
-        if (mb_strlen($content) > self::MAX_TITLE_LENGTH) {
-            return mb_substr($content, 0, self::MAX_TITLE_LENGTH) . '...';
+        if (mb_strlen($content) > $this->maxTitleLength) {
+            return mb_substr($content, 0, $this->maxTitleLength) . '...';
         }
 
         return $content;
@@ -419,7 +485,7 @@ final class SectionDetector implements SectionDetectorInterface
     {
         // Фильтруем слишком короткие секции
         $sections = array_filter($sections, function (DocumentSection $section) {
-            return mb_strlen($section->content) >= self::MIN_SECTION_LENGTH;
+            return mb_strlen($section->content) >= $this->minSectionLength;
         });
 
         // Объединяем очень короткие соседние секции
@@ -433,7 +499,7 @@ final class SectionDetector implements SectionDetectorInterface
             }
 
             // Если текущая секция короткая, добавляем к буферу
-            if (mb_strlen($section->content) < self::MIN_SECTION_LENGTH * 2) {
+            if (mb_strlen($section->content) < $this->minSectionLength * 2) {
                 $buffer = $this->mergeSections($buffer, $section);
             } else {
                 $processed[] = $buffer;
@@ -473,5 +539,47 @@ final class SectionDetector implements SectionDetectorInterface
                 'merge_reason' => 'short_section',
             ]),
         );
+    }
+
+    /**
+     * Выравнивает вложенные массивы в плоский массив строк
+     * Фильтрует только строковые значения, игнорируя остальные типы
+     * 
+     * @param array $data
+     * @return array<string>
+     */
+    private function flattenPatterns(array $data): array
+    {
+        $result = [];
+        
+        foreach ($data as $item) {
+            if (is_string($item)) {
+                $result[] = $item;
+            } elseif (is_array($item)) {
+                // Рекурсивно обрабатываем вложенные массивы
+                $result = [...$result, ...$this->flattenPatterns($item)];
+            }
+        }
+        
+        return $result;
+    }
+
+    /**
+     * Очищает кэш паттернов для освобождения памяти
+     */
+    public function clearPatternCache(): void
+    {
+        $this->patternCache = [];
+    }
+
+    /**
+     * Возвращает статистику использования кэша
+     */
+    public function getCacheStats(): array
+    {
+        return [
+            'cache_size' => count($this->patternCache),
+            'memory_usage' => memory_get_usage(true),
+        ];
     }
 }
