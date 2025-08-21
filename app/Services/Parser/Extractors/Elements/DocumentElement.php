@@ -31,6 +31,7 @@ abstract class DocumentElement
     public function getConfidenceScore(): float
     {
         $confidence = $this->metadata['confidence'] ?? 1.0;
+
         return is_numeric($confidence) ? (float) $confidence : 1.0;
     }
 

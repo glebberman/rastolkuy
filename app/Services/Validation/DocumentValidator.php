@@ -13,6 +13,7 @@ use App\Services\Validation\Validators\SecurityValidator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
+use Throwable;
 
 final class DocumentValidator
 {
@@ -20,7 +21,7 @@ final class DocumentValidator
     private const int PERFORMANCE_WARNING_THRESHOLD_MS = 5000;
     private const int DEFAULT_MAX_FILE_SIZE = 10485760; // 10MB
     private const int DEFAULT_MIN_FILE_SIZE = 1024; // 1KB
-    
+
     /** @var array<string> */
     private const array CRITICAL_VALIDATORS = [
         'file_format',
@@ -41,17 +42,17 @@ final class DocumentValidator
             new SecurityValidator(),
             new ContentValidator(),
         ];
-        
+
         $this->validateConfiguration();
     }
 
     /**
-     * Validate uploaded document through all validators
+     * Validate uploaded document through all validators.
      */
     public function validate(UploadedFile $file): ValidationResult
     {
         $startTime = microtime(true);
-        
+
         Log::info('Starting document validation', [
             'filename' => $file->getClientOriginalName(),
             'size' => $file->getSize(),
@@ -72,10 +73,10 @@ final class DocumentValidator
 
             try {
                 $validatorStartTime = microtime(true);
-                
+
                 // Check for timeout (max 30 seconds per validator)
                 set_time_limit(self::MAX_EXECUTION_TIME_SECONDS);
-                
+
                 $result = $validator->validate($file);
                 $validatorEndTime = microtime(true);
                 $executionTime = round(($validatorEndTime - $validatorStartTime) * 1000, 2);
@@ -112,8 +113,7 @@ final class DocumentValidator
                     ]);
                     break;
                 }
-
-            } catch (\Throwable $e) {
+            } catch (Throwable $e) {
                 Log::error('Validator threw exception', [
                     'validator' => $validator->getName(),
                     'filename' => $file->getClientOriginalName(),
@@ -122,9 +122,9 @@ final class DocumentValidator
                 ]);
 
                 $errorResult = ValidationResult::invalid([
-                    sprintf('Validation failed for %s: %s', $validator->getName(), $e->getMessage())
+                    sprintf('Validation failed for %s: %s', $validator->getName(), $e->getMessage()),
                 ]);
-                
+
                 $overallResult = $overallResult->merge($errorResult);
                 $validatorResults[$validator->getName()] = [
                     'result' => $errorResult,
@@ -149,7 +149,7 @@ final class DocumentValidator
             $overallResult->isValid,
             $overallResult->errors,
             $overallResult->warnings,
-            array_merge($overallResult->metadata, $executionMetadata)
+            array_merge($overallResult->metadata, $executionMetadata),
         );
 
         Log::info('Document validation completed', [
@@ -164,16 +164,46 @@ final class DocumentValidator
     }
 
     /**
-     * Add a custom validator
+     * Add a custom validator.
      */
     public function addValidator(ValidatorInterface $validator): self
     {
         $this->validators[] = $validator;
+
         return $this;
     }
 
     /**
-     * Check if a validator is critical (validation should stop if it fails)
+     * Get list of supported file extensions.
+     *
+     * @return array<string>
+     */
+    public function getSupportedExtensions(): array
+    {
+        $extensions = [];
+        $formats = (array) config('document_validation.allowed_formats', []);
+
+        foreach ($formats as $format) {
+            if (is_array($format) && isset($format['extensions']) && is_array($format['extensions'])) {
+                array_push($extensions, ...$format['extensions']);
+            }
+        }
+
+        return array_values(array_unique($extensions));
+    }
+
+    /**
+     * Get maximum allowed file size.
+     */
+    public function getMaxFileSize(): int
+    {
+        $size = config('document_validation.file_size.max_size', self::DEFAULT_MAX_FILE_SIZE);
+
+        return is_numeric($size) ? (int) $size : self::DEFAULT_MAX_FILE_SIZE;
+    }
+
+    /**
+     * Check if a validator is critical (validation should stop if it fails).
      */
     private function isCriticalValidator(ValidatorInterface $validator): bool
     {
@@ -181,35 +211,7 @@ final class DocumentValidator
     }
 
     /**
-     * Get list of supported file extensions
-     * 
-     * @return array<string>
-     */
-    public function getSupportedExtensions(): array
-    {
-        $extensions = [];
-        $formats = (array) config('document_validation.allowed_formats', []);
-        
-        foreach ($formats as $format) {
-            if (is_array($format) && isset($format['extensions']) && is_array($format['extensions'])) {
-                array_push($extensions, ...$format['extensions']);
-            }
-        }
-        
-        return array_values(array_unique($extensions));
-    }
-
-    /**
-     * Get maximum allowed file size
-     */
-    public function getMaxFileSize(): int
-    {
-        $size = config('document_validation.file_size.max_size', self::DEFAULT_MAX_FILE_SIZE);
-        return is_numeric($size) ? (int) $size : self::DEFAULT_MAX_FILE_SIZE;
-    }
-
-    /**
-     * Validate DocumentValidator configuration
+     * Validate DocumentValidator configuration.
      */
     private function validateConfiguration(): void
     {
@@ -220,14 +222,14 @@ final class DocumentValidator
         // Validate file size configuration
         $maxSize = config('document_validation.file_size.max_size');
         $minSize = config('document_validation.file_size.min_size');
-        
+
         if (!is_numeric($maxSize) || $maxSize <= 0) {
             Log::warning('Invalid max file size configuration, using default', [
                 'configured_value' => $maxSize,
                 'default_value' => self::DEFAULT_MAX_FILE_SIZE,
             ]);
         }
-        
+
         if (!is_numeric($minSize) || $minSize <= 0) {
             Log::warning('Invalid min file size configuration, using default', [
                 'configured_value' => $minSize,
@@ -237,18 +239,19 @@ final class DocumentValidator
 
         // Validate allowed formats configuration
         $allowedFormats = config('document_validation.allowed_formats', []);
+
         if (!is_array($allowedFormats) || empty($allowedFormats)) {
             throw new InvalidArgumentException('No allowed file formats configured');
         }
 
         foreach ($allowedFormats as $formatName => $format) {
-            if (!is_array($format) ||
-                !is_array($format['extensions']) || 
-                !is_array($format['mime_types']) ||
-                empty($format['extensions']) || 
-                empty($format['mime_types'])) {
+            if (!is_array($format)
+                || !is_array($format['extensions'])
+                || !is_array($format['mime_types'])
+                || empty($format['extensions'])
+                || empty($format['mime_types'])) {
                 throw new InvalidArgumentException(
-                    "Invalid format configuration for '{$formatName}': must have non-empty extensions and mime_types arrays"
+                    "Invalid format configuration for '{$formatName}': must have non-empty extensions and mime_types arrays",
                 );
             }
         }

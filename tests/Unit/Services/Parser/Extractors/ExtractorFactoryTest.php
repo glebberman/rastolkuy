@@ -97,8 +97,8 @@ class ExtractorFactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('Extractor class must implement ExtractorInterface');
 
-        /** @var class-string<\App\Services\Parser\Extractors\ExtractorInterface> $invalidClass */
-        $invalidClass = \stdClass::class; // @phpstan-ignore-line
+        /** @var class-string<ExtractorInterface> $invalidClass */
+        $invalidClass = stdClass::class; // @phpstan-ignore-line
         $this->factory->register('application/test', $invalidClass);
     }
 }

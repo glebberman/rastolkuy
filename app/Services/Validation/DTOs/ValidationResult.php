@@ -16,7 +16,8 @@ final readonly class ValidationResult
         public array $errors = [],
         public array $warnings = [],
         public array $metadata = [],
-    ) {}
+    ) {
+    }
 
     public static function valid(array $metadata = []): self
     {
@@ -44,9 +45,9 @@ final readonly class ValidationResult
     }
 
     /**
-     * Merge with another validation result
+     * Merge with another validation result.
      */
-    public function merge(ValidationResult $other): self
+    public function merge(self $other): self
     {
         return new self(
             $this->isValid && $other->isValid,

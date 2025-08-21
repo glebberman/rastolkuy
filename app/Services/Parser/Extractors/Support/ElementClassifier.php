@@ -6,7 +6,7 @@ namespace App\Services\Parser\Extractors\Support;
 
 class ElementClassifier
 {
-    private const HEADER_PATTERNS = [
+    private const array HEADER_PATTERNS = [
         '/^#{1,6}\s+/', // Markdown headers
         '/^(chapter|глава)\s+\d+/i',
         '/^(section|раздел)\s+\d+/i',
@@ -15,7 +15,7 @@ class ElementClassifier
         '/^[А-ЯA-Z][А-Я\sA-Z]+$/', // All caps (short)
     ];
 
-    private const LIST_PATTERNS = [
+    private const array LIST_PATTERNS = [
         '/^[-*•]\s+/', // Bullet lists
         '/^\d+\.\s+/', // Numbered lists
         '/^[a-z]\)\s+/', // Letter lists
@@ -57,6 +57,7 @@ class ElementClassifier
 
         // Default to paragraph for multi-line or regular text
         $paragraphMinLength = config('extractors.classification.paragraph_min_length', 50);
+
         if (str_contains($text, "\n") || strlen($text) > $paragraphMinLength) {
             return 'paragraph';
         }
@@ -115,6 +116,7 @@ class ElementClassifier
                 return $this->getTableConfidence($text);
             default:
                 $confidence = config('extractors.classification.default_confidence', 0.8);
+
                 return is_numeric($confidence) ? (float) $confidence : 0.8;
         }
     }
@@ -123,24 +125,21 @@ class ElementClassifier
     {
         // Large font size
         $headerMinFontSize = config('extractors.classification.header_min_font_size', 16);
+
         if (isset($style['font_size']) && (int) $style['font_size'] >= $headerMinFontSize) {
             return true;
         }
 
         // Bold and larger than normal
         $boldMinFontSize = config('extractors.classification.bold_min_font_size', 12);
-        if (isset($style['font_weight']) && str_contains($style['font_weight'], 'bold')) {
-            if (isset($style['font_size']) && (int) $style['font_size'] >= $boldMinFontSize) {
-                return true;
-            }
-        }
 
-        // Underlined
-        if (isset($style['text_decoration']) && str_contains($style['text_decoration'], 'underline')) {
+        if (isset($style['font_weight']) && str_contains($style['font_weight'], 'bold') && 
+            isset($style['font_size']) && (int) $style['font_size'] >= $boldMinFontSize) {
             return true;
         }
 
-        return false;
+        // Underlined
+        return isset($style['text_decoration']) && str_contains($style['text_decoration'], 'underline');
     }
 
     private function isHeaderByPattern(string $text): bool
@@ -153,11 +152,8 @@ class ElementClassifier
 
         // Short text in all caps (likely header)
         $headerMaxLength = config('extractors.classification.header_max_length', 100);
-        if (strlen($text) < $headerMaxLength && preg_match('/^[А-ЯA-Z\s\d\-.,!?]+$/', $text)) {
-            return true;
-        }
 
-        return false;
+        return strlen($text) < $headerMaxLength && preg_match('/^[А-ЯA-Z\s\d\-.,!?]+$/u', $text);
     }
 
     private function isListItem(string $text): bool
@@ -175,24 +171,25 @@ class ElementClassifier
     {
         $lines = explode("\n", $text);
         $listLines = 0;
-        $totalLines = count($lines);
 
         foreach ($lines as $line) {
             $line = trim($line);
+
             if (empty($line)) {
                 continue; // Skip empty lines
             }
 
             foreach (self::LIST_PATTERNS as $pattern) {
                 if (preg_match($pattern, $line)) {
-                    $listLines++;
+                    ++$listLines;
                     break;
                 }
             }
         }
 
         // At least 50% of non-empty lines should be list items
-        $nonEmptyLines = count(array_filter($lines, fn($line) => !empty(trim($line))));
+        $nonEmptyLines = count(array_filter($lines, fn ($line) => !empty(trim($line))));
+
         return $nonEmptyLines > 0 && ($listLines / $nonEmptyLines) >= 0.5;
     }
 

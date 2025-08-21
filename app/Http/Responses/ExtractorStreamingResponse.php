@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Responses;
 
-use Illuminate\Http\JsonResponse;
 use App\Services\Parser\Extractors\DTOs\ExtractedDocument;
 use App\Services\Parser\Extractors\DTOs\ExtractionConfig;
+use Illuminate\Http\JsonResponse;
 
 class ExtractorStreamingResponse extends JsonResponse
 {

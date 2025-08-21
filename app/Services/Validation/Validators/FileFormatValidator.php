@@ -33,16 +33,18 @@ final class FileFormatValidator implements ValidatorInterface
 
         if (empty($extension)) {
             $errors[] = 'File must have a valid extension';
+
             return ValidationResult::invalid($errors, $warnings, $metadata);
         }
 
         // Check if extension is allowed
         $allowedExtensions = $this->getAllowedExtensions();
+
         if (!in_array($extension, $allowedExtensions, true)) {
             $errors[] = sprintf(
                 'File extension "%s" is not allowed. Allowed extensions: %s',
                 $extension,
-                implode(', ', $allowedExtensions)
+                implode(', ', $allowedExtensions),
             );
         }
 
@@ -52,15 +54,17 @@ final class FileFormatValidator implements ValidatorInterface
 
         if ($mimeType === null) {
             $errors[] = 'Could not determine file MIME type';
+
             return ValidationResult::invalid($errors, $warnings, $metadata);
         }
 
         $allowedMimeTypes = $this->getAllowedMimeTypes();
+
         if (!in_array($mimeType, $allowedMimeTypes, true)) {
             $errors[] = sprintf(
                 'File MIME type "%s" is not allowed. Allowed types: %s',
                 $mimeType,
-                implode(', ', $allowedMimeTypes)
+                implode(', ', $allowedMimeTypes),
             );
         }
 
@@ -69,11 +73,11 @@ final class FileFormatValidator implements ValidatorInterface
             $warnings[] = sprintf(
                 'File extension "%s" does not match MIME type "%s"',
                 $extension,
-                $mimeType
+                $mimeType,
             );
         }
 
-        return empty($errors) 
+        return empty($errors)
             ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }
@@ -94,9 +98,11 @@ final class FileFormatValidator implements ValidatorInterface
     private function getAllowedExtensions(): array
     {
         $extensions = [];
+
         foreach ($this->allowedFormats as $format) {
-            $extensions = array_merge($extensions, $format['extensions']);
+            array_push($extensions, ...$format['extensions']);
         }
+
         return array_unique($extensions);
     }
 
@@ -106,20 +112,23 @@ final class FileFormatValidator implements ValidatorInterface
     private function getAllowedMimeTypes(): array
     {
         $mimeTypes = [];
+
         foreach ($this->allowedFormats as $format) {
-            $mimeTypes = array_merge($mimeTypes, $format['mime_types']);
+            array_push($mimeTypes, ...$format['mime_types']);
         }
+
         return array_unique($mimeTypes);
     }
 
     private function isExtensionMimeTypeConsistent(string $extension, string $mimeType): bool
     {
         foreach ($this->allowedFormats as $format) {
-            if (in_array($extension, $format['extensions'], true) &&
-                in_array($mimeType, $format['mime_types'], true)) {
+            if (in_array($extension, $format['extensions'], true)
+                && in_array($mimeType, $format['mime_types'], true)) {
                 return true;
             }
         }
+
         return false;
     }
 }

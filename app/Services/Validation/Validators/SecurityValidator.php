@@ -8,6 +8,7 @@ use App\Services\Validation\Contracts\ValidatorInterface;
 use App\Services\Validation\DTOs\ValidationResult;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 final class SecurityValidator implements ValidatorInterface
 {
@@ -15,6 +16,7 @@ final class SecurityValidator implements ValidatorInterface
      * @var array<string>
      */
     private array $blockedPatterns;
+
     private int $maxFileNameLength;
 
     public function __construct()
@@ -39,7 +41,7 @@ final class SecurityValidator implements ValidatorInterface
             $errors[] = sprintf(
                 'File name is too long (%d characters). Maximum length is %d',
                 strlen($fileName),
-                $this->maxFileNameLength
+                $this->maxFileNameLength,
             );
         }
 
@@ -54,9 +56,10 @@ final class SecurityValidator implements ValidatorInterface
 
         // Validate file content (read first chunk)
         $fileContent = $this->getFileContentSample($file);
+
         if ($fileContent !== null) {
             $metadata['content_sample_size'] = strlen($fileContent);
-            
+
             // Check for malicious patterns in content
             foreach ($this->blockedPatterns as $pattern) {
                 if (preg_match($pattern, $fileContent)) {
@@ -74,7 +77,7 @@ final class SecurityValidator implements ValidatorInterface
         // Additional security checks
         $metadata['security_scan_timestamp'] = now()->toISOString();
 
-        return empty($errors) 
+        return empty($errors)
             ? new ValidationResult(true, [], $warnings, $metadata)
             : ValidationResult::invalid($errors, $warnings, $metadata);
     }
@@ -95,19 +98,19 @@ final class SecurityValidator implements ValidatorInterface
         if (str_contains($fileName, '../') || str_contains($fileName, '..\\')) {
             return true;
         }
-        
+
         // Check for absolute paths (Unix and Windows)
-        if (str_starts_with($fileName, '/') || 
-            (strlen($fileName) > 2 && $fileName[1] === ':' && $fileName[2] === '\\')) {
+        if (str_starts_with($fileName, '/')
+            || (strlen($fileName) > 2 && $fileName[1] === ':' && $fileName[2] === '\\')) {
             return true;
         }
-        
+
         // Check for directory separators in the middle (potential path injection)
         // Allow single filename with extension but block paths like "dir/file.txt"
         if (str_contains($fileName, '/') || str_contains($fileName, '\\')) {
             return true;
         }
-        
+
         return false;
     }
 
@@ -120,11 +123,13 @@ final class SecurityValidator implements ValidatorInterface
     {
         try {
             $handle = fopen($file->getPathname(), 'rb');
+
             if ($handle === false) {
                 Log::warning('Failed to open file for security scanning', [
                     'filename' => $file->getClientOriginalName(),
                     'size' => $file->getSize(),
                 ]);
+
                 return null;
             }
 
@@ -136,16 +141,18 @@ final class SecurityValidator implements ValidatorInterface
                 Log::warning('Failed to read file content for security scanning', [
                     'filename' => $file->getClientOriginalName(),
                 ]);
+
                 return null;
             }
 
             return $content;
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             Log::error('Exception during security content sampling', [
                 'filename' => $file->getClientOriginalName(),
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ]);
+
             return null;
         }
     }
@@ -153,12 +160,12 @@ final class SecurityValidator implements ValidatorInterface
     private function isSuspiciousBinaryContent(UploadedFile $file, string $content): bool
     {
         $extension = strtolower($file->getClientOriginalExtension());
-        
+
         // For text files, check if content contains binary/non-printable characters
         if ($extension === 'txt') {
             // Check for null bytes or other control characters that shouldn't be in text files
-            return str_contains($content, "\x00") || 
-                   preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/', $content);
+            return str_contains($content, "\x00")
+                   || preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/', $content);
         }
 
         // For PDF files, check for proper PDF header

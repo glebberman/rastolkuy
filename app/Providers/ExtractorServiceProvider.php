@@ -30,7 +30,7 @@ class ExtractorServiceProvider extends ServiceProvider
             return new TxtExtractor(
                 $app->make(EncodingDetector::class),
                 $app->make(ElementClassifier::class),
-                $app->make(MetricsCollector::class)
+                $app->make(MetricsCollector::class),
             );
         });
 
@@ -40,14 +40,14 @@ class ExtractorServiceProvider extends ServiceProvider
                 $app->make(EncodingDetector::class),
                 $app->make(ElementClassifier::class),
                 $app->make(MetricsCollector::class),
-                $app // Pass the container for DI
+                $app, // Pass the container for DI
             );
         });
 
         // Register manager
         $this->app->singleton(ExtractorManager::class, function ($app) {
             return new ExtractorManager(
-                $app->make(ExtractorFactory::class)
+                $app->make(ExtractorFactory::class),
             );
         });
 
@@ -64,10 +64,10 @@ class ExtractorServiceProvider extends ServiceProvider
     {
         // Publish configuration
         $this->publishes([
-            __DIR__.'/../../config/extractors.php' => config_path('extractors.php'),
+            __DIR__ . '/../../config/extractors.php' => config_path('extractors.php'),
         ], 'config');
 
         // Merge configuration
-        $this->mergeConfigFrom(__DIR__.'/../../config/extractors.php', 'extractors');
+        $this->mergeConfigFrom(__DIR__ . '/../../config/extractors.php', 'extractors');
     }
 }

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Responses;
 
-use Illuminate\Http\JsonResponse;
 use App\Services\Parser\Extractors\DTOs\ExtractedDocument;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\UploadedFile;
 
 class ExtractorUploadResponse extends JsonResponse
@@ -14,6 +14,7 @@ class ExtractorUploadResponse extends JsonResponse
     {
         // Format elements for display
         $elements = [];
+
         foreach ($result->elements as $element) {
             $elements[] = [
                 'type' => $element->type,
