@@ -66,6 +66,8 @@ class StructureAnalysisServiceProviderTest extends TestCase
         // Use reflection to check that dependencies are injected correctly
         $reflection = new \ReflectionClass($analyzer);
         $constructor = $reflection->getConstructor();
+        
+        $this->assertNotNull($constructor, 'Constructor should exist');
         $parameters = $constructor->getParameters();
 
         $this->assertCount(2, $parameters);

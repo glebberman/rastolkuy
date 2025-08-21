@@ -64,11 +64,11 @@ final class SectionDetector implements SectionDetectorInterface
         /** @var int $maxLength */
         $maxLength = $detection['max_title_length'] ?? 100;
 
-        $this->highConfidence = is_numeric($high) ? (float) $high : 0.9;
-        $this->mediumConfidence = is_numeric($medium) ? (float) $medium : 0.7;
-        $this->lowConfidence = is_numeric($low) ? (float) $low : 0.5;
-        $this->minSectionLength = is_numeric($minLength) ? (int) $minLength : 50;
-        $this->maxTitleLength = is_numeric($maxLength) ? (int) $maxLength : 100;
+        $this->highConfidence = (float) $high;
+        $this->mediumConfidence = (float) $medium;
+        $this->lowConfidence = (float) $low;
+        $this->minSectionLength = (int) $minLength;
+        $this->maxTitleLength = (int) $maxLength;
 
         // Объединяем все паттерны из конфигурации более эффективно
         $this->sectionPatterns = $this->flattenPatterns([
@@ -335,7 +335,7 @@ final class SectionDetector implements SectionDetectorInterface
         if (isset($this->patternCache[$cacheKey])) {
             /** @var bool $cachedResult */
             $cachedResult = $this->patternCache[$cacheKey];
-            return is_bool($cachedResult) ? $cachedResult : false;
+            return $cachedResult;
         }
 
         // Проверяем длину - заголовки обычно короткие

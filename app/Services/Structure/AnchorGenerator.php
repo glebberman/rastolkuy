@@ -38,9 +38,9 @@ final class AnchorGenerator implements AnchorGeneratorInterface
         /** @var int $maxLength */
         $maxLength = $config['max_title_length'] ?? 50;
         
-        $this->anchorPrefix = is_string($prefix) ? $prefix : '<!-- SECTION_ANCHOR_';
-        $this->anchorSuffix = is_string($suffix) ? $suffix : ' -->';
-        $this->maxTitleLength = is_int($maxLength) ? $maxLength : 50;
+        $this->anchorPrefix = $prefix;
+        $this->anchorSuffix = $suffix;
+        $this->maxTitleLength = $maxLength;
         $this->transliterationEnabled = (bool) ($config['transliteration'] ?? true);
         $this->normalizeCaseEnabled = (bool) ($config['normalize_case'] ?? true);
     }

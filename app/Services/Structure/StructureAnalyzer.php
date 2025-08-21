@@ -35,8 +35,8 @@ readonly final class StructureAnalyzer
         /** @var int $maxTime */
         $maxTime = $detection['max_analysis_time_seconds'] ?? 30;
         
-        $this->minConfidenceThreshold = is_numeric($threshold) ? (float) $threshold : 0.5;
-        $this->maxAnalysisTimeSeconds = is_numeric($maxTime) ? (int) $maxTime : 30;
+        $this->minConfidenceThreshold = (float) $threshold;
+        $this->maxAnalysisTimeSeconds = (int) $maxTime;
     }
 
     public function analyze(ExtractedDocument $document): StructureAnalysisResult
