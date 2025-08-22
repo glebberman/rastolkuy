@@ -21,22 +21,22 @@ class StructureAnalysisIntegrationTest extends TestCase
             elements: [
                 new HeaderElement('ДОГОВОР АРЕНДЫ', 1),
                 new ParagraphElement('Настоящий договор заключен между сторонами с целью аренды недвижимого имущества.'),
-                
+
                 new HeaderElement('1. Общие положения', 1),
                 new ParagraphElement('В данном разделе устанавливаются основные принципы сотрудничества между сторонами.'),
-                
+
                 new HeaderElement('1.1 Предмет договора', 2),
                 new ParagraphElement('Арендодатель предоставляет арендатору во временное пользование помещение площадью 100 кв.м.'),
-                
+
                 new HeaderElement('1.2 Права и обязанности сторон', 2),
                 new ParagraphElement('Арендатор обязуется своевременно вносить арендную плату и поддерживать помещение в надлежащем состоянии.'),
-                
+
                 new HeaderElement('2. Финансовые условия', 1),
                 new ParagraphElement('Размер арендной платы составляет 50000 рублей в месяц.'),
-                
+
                 new HeaderElement('3. Ответственность сторон', 1),
                 new ParagraphElement('За нарушение условий договора стороны несут ответственность в соответствии с законодательством РФ.'),
-                
+
                 new HeaderElement('4. Заключительные положения', 1),
                 new ParagraphElement('Договор вступает в силу с момента подписания и действует в течение одного года.'),
             ],
@@ -45,7 +45,7 @@ class StructureAnalysisIntegrationTest extends TestCase
                 'language' => 'ru',
             ],
             totalPages: 2,
-            extractionTime: 0.5
+            extractionTime: 0.5,
         );
 
         // Получаем анализатор из контейнера
@@ -66,15 +66,17 @@ class StructureAnalysisIntegrationTest extends TestCase
 
         // Проверяем что есть корневые секции
         $rootSectionsCount = 0;
+
         foreach ($sections as $section) {
             if ($section->level === 1) {
-                $rootSectionsCount++;
+                ++$rootSectionsCount;
             }
         }
         $this->assertGreaterThanOrEqual(3, $rootSectionsCount); // Ожидаем минимум 3 основных раздела
 
         // Проверяем наличие иерархии
         $hasSubsections = false;
+
         foreach ($sections as $section) {
             if ($section->hasSubsections()) {
                 $hasSubsections = true;
@@ -123,7 +125,7 @@ class StructureAnalysisIntegrationTest extends TestCase
                 ],
                 metadata: [],
                 totalPages: 1,
-                extractionTime: 0.1
+                extractionTime: 0.1,
             ),
             'contract2' => new ExtractedDocument(
                 originalPath: '/test/contract2.txt',
@@ -134,7 +136,7 @@ class StructureAnalysisIntegrationTest extends TestCase
                 ],
                 metadata: [],
                 totalPages: 1,
-                extractionTime: 0.1
+                extractionTime: 0.1,
             ),
         ];
 
@@ -169,13 +171,14 @@ class StructureAnalysisIntegrationTest extends TestCase
     {
         // Создаем большой документ
         $elements = [];
-        for ($i = 1; $i <= 100; $i++) {
+
+        for ($i = 1; $i <= 100; ++$i) {
             $elements[] = new HeaderElement("Раздел {$i}", 1);
             $elements[] = new ParagraphElement("Содержание раздела {$i}. " . str_repeat('Текст секции. ', 50));
-            
+
             if ($i % 10 === 0) {
                 $elements[] = new HeaderElement("{$i}.1 Подраздел", 2);
-                $elements[] = new ParagraphElement("Содержание подраздела. " . str_repeat('Дополнительный текст. ', 30));
+                $elements[] = new ParagraphElement('Содержание подраздела. ' . str_repeat('Дополнительный текст. ', 30));
             }
         }
 
@@ -185,11 +188,11 @@ class StructureAnalysisIntegrationTest extends TestCase
             elements: $elements,
             metadata: [],
             totalPages: 50,
-            extractionTime: 2.0
+            extractionTime: 2.0,
         );
 
         $analyzer = $this->app->make(StructureAnalyzer::class);
-        
+
         $startTime = microtime(true);
         $result = $analyzer->analyze($document);
         $endTime = microtime(true);

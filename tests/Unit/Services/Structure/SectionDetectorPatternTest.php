@@ -9,6 +9,7 @@ use App\Services\Parser\Extractors\Elements\HeaderElement;
 use App\Services\Parser\Extractors\Elements\ParagraphElement;
 use App\Services\Structure\AnchorGenerator;
 use App\Services\Structure\SectionDetector;
+use ReflectionClass;
 use Tests\TestCase;
 
 class SectionDetectorPatternTest extends TestCase
@@ -63,7 +64,7 @@ class SectionDetectorPatternTest extends TestCase
             ],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         // Это не должно выбрасывать исключение о типе параметра
@@ -74,7 +75,7 @@ class SectionDetectorPatternTest extends TestCase
         $this->assertEquals('1. Первый раздел', $sections[0]->title);
         $this->assertEquals('1.1 Подраздел', $sections[1]->title);
         $this->assertEquals('1.1.1 Подподраздел', $sections[2]->title);
-        
+
         // Проверяем уровни
         $this->assertEquals(1, $sections[0]->level);
         $this->assertEquals(2, $sections[1]->level);
@@ -85,9 +86,9 @@ class SectionDetectorPatternTest extends TestCase
     {
         // Создаем простой детектор для тестирования
         $detector = new SectionDetector(new AnchorGenerator());
-        
+
         // Используем рефлексию чтобы протестировать private метод
-        $reflection = new \ReflectionClass($detector);
+        $reflection = new ReflectionClass($detector);
         $method = $reflection->getMethod('flattenPatterns');
         $method->setAccessible(true);
 
@@ -100,7 +101,7 @@ class SectionDetectorPatternTest extends TestCase
 
         $result3 = $method->invoke($detector, [['nested1', ['nested2']], 'top']);
         $this->assertEquals(['nested1', 'nested2', 'top'], $result3);
-        
+
         // Проверяем что нестроковые элементы игнорируются
         $result4 = $method->invoke($detector, ['pattern1', 123, null, 'pattern2']);
         $this->assertEquals(['pattern1', 'pattern2'], $result4);

@@ -1,0 +1,268 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Ambiguity Analysis Response Schema",
+  "description": "Схема для ответов системы анализа неоднозначностей в юридических документах",
+  "required": [
+    "ambiguities_found",
+    "clarity_assessment"
+  ],
+  "properties": {
+    "ambiguities_found": {
+      "type": "array",
+      "description": "Список найденных неоднозначностей",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "description", "risk_level", "location"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Уникальный идентификатор неоднозначности"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["semantic", "syntactic", "referential", "scope", "temporal", "conditional"],
+            "description": "Тип неоднозначности"
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание неоднозначности"
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Уровень риска неоднозначности"
+          },
+          "location": {
+            "type": "object",
+            "required": ["section", "text_fragment"],
+            "properties": {
+              "section": {
+                "type": "string",
+                "description": "Раздел документа"
+              },
+              "text_fragment": {
+                "type": "string",
+                "description": "Неоднозначный фрагмент текста"
+              },
+              "position": {
+                "type": "object",
+                "properties": {
+                  "start": {
+                    "type": "integer"
+                  },
+                  "end": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "possible_interpretations": {
+            "type": "array",
+            "description": "Возможные интерпретации неоднозначного текста",
+            "items": {
+              "type": "object",
+              "required": ["interpretation", "likelihood"],
+              "properties": {
+                "interpretation": {
+                  "type": "string",
+                  "description": "Возможная интерпретация"
+                },
+                "likelihood": {
+                  "type": "string",
+                  "enum": ["very_high", "high", "medium", "low", "very_low"],
+                  "description": "Вероятность данной интерпретации"
+                },
+                "legal_implications": {
+                  "type": "array",
+                  "description": "Правовые последствия данной интерпретации",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "clarification_suggestions": {
+            "type": "array",
+            "description": "Предложения по устранению неоднозначности",
+            "items": {
+              "type": "object",
+              "required": ["suggestion", "rationale"],
+              "properties": {
+                "suggestion": {
+                  "type": "string",
+                  "description": "Предложение по улучшению"
+                },
+                "rationale": {
+                  "type": "string",
+                  "description": "Обоснование предложения"
+                },
+                "improved_text": {
+                  "type": "string",
+                  "description": "Предлагаемый улучшенный текст"
+                }
+              }
+            }
+          },
+          "context_dependency": {
+            "type": "object",
+            "description": "Зависимость от контекста",
+            "properties": {
+              "requires_external_context": {
+                "type": "boolean",
+                "description": "Требует ли внешний контекст для понимания"
+              },
+              "related_sections": {
+                "type": "array",
+                "description": "Связанные разделы документа",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "clarity_assessment": {
+      "type": "object",
+      "description": "Общая оценка ясности документа",
+      "required": ["overall_clarity_score", "ambiguity_distribution"],
+      "properties": {
+        "overall_clarity_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Общая оценка ясности документа (0-1)"
+        },
+        "ambiguity_distribution": {
+          "type": "object",
+          "description": "Распределение неоднозначностей по типам",
+          "properties": {
+            "semantic": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "syntactic": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "referential": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "scope": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "temporal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "conditional": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "risk_distribution": {
+          "type": "object",
+          "description": "Распределение по уровням риска",
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "readability_metrics": {
+          "type": "object",
+          "description": "Метрики читаемости",
+          "properties": {
+            "average_sentence_length": {
+              "type": "number",
+              "description": "Средняя длина предложения"
+            },
+            "complex_terms_count": {
+              "type": "integer",
+              "description": "Количество сложных терминов"
+            },
+            "passive_voice_percentage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100,
+              "description": "Процент пассивного залога"
+            }
+          }
+        }
+      }
+    },
+    "improvement_recommendations": {
+      "type": "array",
+      "description": "Рекомендации по улучшению ясности документа",
+      "items": {
+        "type": "object",
+        "required": ["category", "recommendation", "priority"],
+        "properties": {
+          "category": {
+            "type": "string",
+            "enum": ["structure", "language", "terminology", "formatting"],
+            "description": "Категория рекомендации"
+          },
+          "recommendation": {
+            "type": "string",
+            "description": "Текст рекомендации"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Приоритет выполнения"
+          },
+          "expected_impact": {
+            "type": "string",
+            "description": "Ожидаемый эффект от внедрения"
+          }
+        }
+      }
+    },
+    "quality_indicators": {
+      "type": "object",
+      "description": "Индикаторы качества анализа",
+      "properties": {
+        "analysis_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Уверенность в результатах анализа"
+        },
+        "coverage_percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Процент охвата документа анализом"
+        },
+        "processing_notes": {
+          "type": "array",
+          "description": "Заметки о процессе обработки",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

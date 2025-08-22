@@ -1,0 +1,164 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "General Analysis Response Schema",
+  "description": "Общая схема для ответов системы анализа юридических документов",
+  "required": [
+    "analysis_type",
+    "result",
+    "confidence"
+  ],
+  "properties": {
+    "analysis_type": {
+      "type": "string",
+      "enum": ["translation", "contradiction", "ambiguity", "general", "summary", "extraction"],
+      "description": "Тип выполненного анализа"
+    },
+    "result": {
+      "type": "object",
+      "description": "Результат анализа",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Краткое резюме результатов"
+        },
+        "details": {
+          "type": "object",
+          "description": "Детальные результаты анализа"
+        },
+        "key_findings": {
+          "type": "array",
+          "description": "Ключевые находки",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Уровень уверенности в результатах (0-1)"
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Метаданные анализа",
+      "properties": {
+        "processing_time_ms": {
+          "type": "number",
+          "description": "Время обработки в миллисекундах"
+        },
+        "model_version": {
+          "type": "string",
+          "description": "Версия используемой модели"
+        },
+        "analysis_date": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Дата и время анализа"
+        },
+        "document_info": {
+          "type": "object",
+          "properties": {
+            "length": {
+              "type": "integer",
+              "description": "Длина документа в символах"
+            },
+            "language": {
+              "type": "string",
+              "description": "Язык документа"
+            },
+            "format": {
+              "type": "string",
+              "description": "Формат документа"
+            }
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Предупреждения о возможных проблемах",
+      "items": {
+        "type": "object",
+        "required": ["type", "message"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["accuracy", "completeness", "complexity", "format"],
+            "description": "Тип предупреждения"
+          },
+          "message": {
+            "type": "string",
+            "description": "Текст предупреждения"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Уровень важности предупреждения"
+          }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array",
+      "description": "Рекомендации по дальнейшим действиям",
+      "items": {
+        "type": "object",
+        "required": ["action", "description"],
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Рекомендуемое действие"
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание действия"
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Приоритет выполнения"
+          },
+          "estimated_effort": {
+            "type": "string",
+            "enum": ["low", "medium", "high"],
+            "description": "Ожидаемые усилия"
+          }
+        }
+      }
+    },
+    "quality_metrics": {
+      "type": "object",
+      "description": "Метрики качества анализа",
+      "properties": {
+        "completeness_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Оценка полноты анализа"
+        },
+        "accuracy_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Оценка точности анализа"
+        },
+        "relevance_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Оценка релевантности результатов"
+        }
+      }
+    },
+    "next_steps": {
+      "type": "array",
+      "description": "Предлагаемые следующие шаги",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

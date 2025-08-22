@@ -10,6 +10,7 @@ use App\Services\Structure\Contracts\AnchorGeneratorInterface;
 use App\Services\Structure\Contracts\SectionDetectorInterface;
 use App\Services\Structure\SectionDetector;
 use App\Services\Structure\StructureAnalyzer;
+use ReflectionClass;
 use Tests\TestCase;
 
 class StructureAnalysisServiceProviderTest extends TestCase
@@ -19,12 +20,12 @@ class StructureAnalysisServiceProviderTest extends TestCase
         // Test that interfaces are bound to their implementations
         $this->assertInstanceOf(
             AnchorGenerator::class,
-            $this->app->make(AnchorGeneratorInterface::class)
+            $this->app->make(AnchorGeneratorInterface::class),
         );
 
         $this->assertInstanceOf(
             SectionDetector::class,
-            $this->app->make(SectionDetectorInterface::class)
+            $this->app->make(SectionDetectorInterface::class),
         );
 
         // Test that StructureAnalyzer is registered as singleton
@@ -64,9 +65,9 @@ class StructureAnalysisServiceProviderTest extends TestCase
         $analyzer = $this->app->make(StructureAnalyzer::class);
 
         // Use reflection to check that dependencies are injected correctly
-        $reflection = new \ReflectionClass($analyzer);
+        $reflection = new ReflectionClass($analyzer);
         $constructor = $reflection->getConstructor();
-        
+
         $this->assertNotNull($constructor, 'Constructor should exist');
         $parameters = $constructor->getParameters();
 

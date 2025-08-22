@@ -18,6 +18,11 @@ readonly class ExtractorManager
     ) {
     }
 
+    /**
+     * @throws \InvalidArgumentException
+     * @throws \RuntimeException  
+     * @throws \Exception
+     */
     public function extract(string $filePath, ?ExtractionConfig $config = null): ExtractedDocument
     {
         $config ??= ExtractionConfig::createDefault();
@@ -34,7 +39,7 @@ readonly class ExtractorManager
 
             // Validate file before processing
             if (!$extractor->validate($filePath)) {
-                throw new InvalidArgumentException("File validation failed: $filePath");
+                throw new InvalidArgumentException("File validation failed: {$filePath}");
             }
 
             // Check if processing time might exceed timeout
@@ -128,6 +133,10 @@ readonly class ExtractorManager
         }
     }
 
+    /**
+     * @throws \RuntimeException
+     * @throws \Exception
+     */
     private function executeWithTimeout(
         ExtractorInterface $extractor,
         string $filePath,

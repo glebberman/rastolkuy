@@ -213,10 +213,10 @@ class InputValidatorTest extends TestCase
     public function testValidatesRegexPatternSuccessfully(): void
     {
         $safePattern = '/^(\\d+)\\s+(.+)$/';
-        
+
         // Should not throw exception
         InputValidator::validateRegexPattern($safePattern);
-        
+
         $this->assertTrue(true); // If we get here, validation passed
     }
 
@@ -242,9 +242,9 @@ class InputValidatorTest extends TestCase
     {
         $pattern = '/^(\\d+)\\s+(.+)$/';
         $subject = '123 Test Title';
-        
+
         $result = InputValidator::safeRegexMatch($pattern, $subject);
-        
+
         $this->assertIsArray($result);
         $this->assertEquals('123 Test Title', $result[0]);
         $this->assertEquals('123', $result[1]);
@@ -255,9 +255,9 @@ class InputValidatorTest extends TestCase
     {
         $pattern = '/^(\\d+)\\s+(.+)$/';
         $subject = 'No numbers here';
-        
+
         $result = InputValidator::safeRegexMatch($pattern, $subject);
-        
+
         $this->assertFalse($result);
     }
 
@@ -265,10 +265,10 @@ class InputValidatorTest extends TestCase
     {
         $pattern = '/test/';
         $longSubject = str_repeat('a', 15000) . 'test';
-        
+
         // Should not throw exception and should work with truncated input
         $result = InputValidator::safeRegexMatch($pattern, $longSubject);
-        
+
         // Since the 'test' part is at the end and gets truncated, it should return false
         $this->assertFalse($result);
     }

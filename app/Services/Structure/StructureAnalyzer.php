@@ -14,7 +14,7 @@ use Exception;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
 
-readonly final class StructureAnalyzer
+final readonly class StructureAnalyzer
 {
     private readonly float $minConfidenceThreshold;
 
@@ -26,7 +26,7 @@ readonly final class StructureAnalyzer
     ) {
         /** @var array<string, mixed> $config */
         $config = Config::get('structure_analysis');
-        
+
         /** @var array<string, mixed> $detection */
         $detection = $config['detection'] ?? [];
         // Безопасное извлечение значений
@@ -34,9 +34,9 @@ readonly final class StructureAnalyzer
         $threshold = $detection['min_confidence_threshold'] ?? 0.5;
         /** @var int $maxTime */
         $maxTime = $detection['max_analysis_time_seconds'] ?? 30;
-        
-        $this->minConfidenceThreshold = (float) $threshold;
-        $this->maxAnalysisTimeSeconds = (int) $maxTime;
+
+        $this->minConfidenceThreshold = $threshold;
+        $this->maxAnalysisTimeSeconds = $maxTime;
     }
 
     public function analyze(ExtractedDocument $document): StructureAnalysisResult
@@ -138,6 +138,7 @@ readonly final class StructureAnalyzer
      * @param array<ExtractedDocument> $documents
      *
      * @return array<string, StructureAnalysisResult>
+     * @throws \Exception
      */
     public function analyzeBatch(array $documents): array
     {
@@ -242,6 +243,7 @@ readonly final class StructureAnalyzer
             // Удаляем из стека все секции с уровнем >= текущего
             while (!empty($stack)) {
                 $lastStackItem = end($stack);
+
                 if ($lastStackItem !== false && $lastStackItem->level >= $section->level) {
                     array_pop($stack);
                 } else {
@@ -250,7 +252,7 @@ readonly final class StructureAnalyzer
             }
 
             $lastStackItem = empty($stack) ? false : end($stack);
-            
+
             if (empty($stack) || $lastStackItem === false) {
                 // Корневая секция или проблема со стеком
                 $result[] = $section;
@@ -258,14 +260,14 @@ readonly final class StructureAnalyzer
             } else {
                 // Подсекция - добавляем к последней секции в стеке
                 $parentSection = $lastStackItem;
-                
+
                 // Создаем новую версию родительской секции с добавленной подсекцией
                 $updatedParent = $this->addSubsectionToParent($parentSection, $section);
-                
+
                 // Заменяем родительскую секцию в результате и стеке
                 $this->replaceInStack($stack, $parentSection, $updatedParent);
                 $this->replaceInResult($result, $parentSection, $updatedParent);
-                
+
                 // Добавляем текущую секцию в стек
                 $stack[] = $section;
             }
@@ -275,12 +277,13 @@ readonly final class StructureAnalyzer
     }
 
     /**
-     * Заменяет секцию в стеке
+     * Заменяет секцию в стеке.
      */
     private function replaceInStack(array &$stack, DocumentSection $oldSection, DocumentSection $newSection): void
     {
         $stackCount = count($stack);
-        for ($i = 0; $i < $stackCount; $i++) {
+
+        for ($i = 0; $i < $stackCount; ++$i) {
             if ($stack[$i]->id === $oldSection->id) {
                 $stack[$i] = $newSection;
                 break;
@@ -289,25 +292,26 @@ readonly final class StructureAnalyzer
     }
 
     /**
-     * Заменяет секцию в результате
+     * Заменяет секцию в результате.
      */
     private function replaceInResult(array &$result, DocumentSection $oldSection, DocumentSection $newSection): void
     {
         $resultCount = count($result);
-        for ($i = 0; $i < $resultCount; $i++) {
+
+        for ($i = 0; $i < $resultCount; ++$i) {
             if ($result[$i]->id === $oldSection->id) {
                 $result[$i] = $newSection;
+
                 return;
             }
-            
+
             // Рекурсивная замена в подсекциях
             $result[$i] = $this->replaceInSubsections($result[$i], $oldSection, $newSection);
         }
     }
 
-
     /**
-     * Рекурсивно заменяет секцию в подсекциях
+     * Рекурсивно заменяет секцию в подсекциях.
      */
     private function replaceInSubsections(DocumentSection $section, DocumentSection $oldSection, DocumentSection $newSection): DocumentSection
     {
@@ -321,7 +325,7 @@ readonly final class StructureAnalyzer
 
         $updatedSubsections = array_map(
             fn (DocumentSection $subsection) => $this->replaceInSubsections($subsection, $oldSection, $newSection),
-            $section->subsections
+            $section->subsections,
         );
 
         // Если есть изменения в подсекциях, создаем новую версию секции
@@ -345,7 +349,7 @@ readonly final class StructureAnalyzer
     }
 
     /**
-     * Добавляет подсекцию к родительской секции
+     * Добавляет подсекцию к родительской секции.
      */
     private function addSubsectionToParent(DocumentSection $parentSection, DocumentSection $subsection): DocumentSection
     {
@@ -363,7 +367,6 @@ readonly final class StructureAnalyzer
             metadata: $parentSection->metadata,
         );
     }
-
 
     /**
      * @param array<DocumentSection> $sections

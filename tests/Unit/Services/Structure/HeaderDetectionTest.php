@@ -65,14 +65,14 @@ class HeaderDetectionTest extends TestCase
             ],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         $sections = $this->detector->detectSections($document);
 
         $this->assertNotEmpty($sections, 'Sections should be detected from headers');
         $this->assertCount(2, $sections);
-        
+
         $this->assertEquals('Заголовок 1', $sections[0]->title);
         $this->assertEquals('Заголовок 2', $sections[1]->title);
     }

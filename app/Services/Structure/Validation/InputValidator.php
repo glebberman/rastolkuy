@@ -163,6 +163,75 @@ final class InputValidator
     }
 
     /**
+     * Валидирует паттерн regex перед выполнением для защиты от ReDoS.
+     */
+    public static function validateRegexPattern(string $pattern): void
+    {
+        // Проверяем на известные проблемные конструкции
+        $problematicPatterns = [
+            '/\*\+/',          // Nested quantifiers: *+
+            '/\+\*/',          // Nested quantifiers: +*
+            '/\?\+/',          // Nested quantifiers: ?+
+            '/\*\{/',          // Complex quantifiers: *{
+            '/\+\{/',          // Complex quantifiers: +{
+            '/\(\.\*\)\+/',    // Catastrophic backtracking: (.*)+
+            '/\(\.\+\)\*/',    // Catastrophic backtracking: (.+)*
+        ];
+
+        foreach ($problematicPatterns as $problematic) {
+            if (preg_match($problematic, $pattern)) {
+                throw new InvalidArgumentException(
+                    'Potentially unsafe regex pattern detected',
+                );
+            }
+        }
+    }
+
+    /**
+     * Безопасное выполнение regex с ограничением времени.
+     */
+    public static function safeRegexMatch(string $pattern, string $subject, int $timeoutMs = 1000): array|false
+    {
+        // TODO: Implement timeout functionality using $timeoutMs parameter
+        unset($timeoutMs);
+        
+        self::validateRegexPattern($pattern);
+
+        // Ограничиваем длину входной строки
+        if (mb_strlen($subject) > self::MAX_REGEX_INPUT_LENGTH) {
+            $subject = mb_substr($subject, 0, self::MAX_REGEX_INPUT_LENGTH);
+        }
+
+        // Выполняем с ограничением времени через PCRE settings
+        $oldTimeLimit = ini_get('pcre.backtrack_limit');
+        $oldRecursionLimit = ini_get('pcre.recursion_limit');
+
+        // Устанавливаем более строгие лимиты
+        ini_set('pcre.backtrack_limit', '100000');
+        ini_set('pcre.recursion_limit', '100000');
+
+        try {
+            $result = @preg_match($pattern, $subject, $matches);
+
+            // Проверяем на ошибки PCRE
+            if ($result === false || preg_last_error() !== PREG_NO_ERROR) {
+                return false;
+            }
+
+            // Если нет совпадений, возвращаем false
+            if ($result === 0) {
+                return false;
+            }
+
+            return $matches;
+        } finally {
+            // Восстанавливаем оригинальные лимиты
+            ini_set('pcre.backtrack_limit', $oldTimeLimit);
+            ini_set('pcre.recursion_limit', $oldRecursionLimit);
+        }
+    }
+
+    /**
      * Проверка на подозрительное содержимое.
      */
     private static function containsSuspiciousContent(string $content): bool
@@ -185,71 +254,5 @@ final class InputValidator
         }
 
         return false;
-    }
-
-    /**
-     * Валидирует паттерн regex перед выполнением для защиты от ReDoS
-     */
-    public static function validateRegexPattern(string $pattern): void
-    {
-        // Проверяем на известные проблемные конструкции
-        $problematicPatterns = [
-            '/\*\+/',          // Nested quantifiers: *+
-            '/\+\*/',          // Nested quantifiers: +*
-            '/\?\+/',          // Nested quantifiers: ?+
-            '/\*\{/',          // Complex quantifiers: *{
-            '/\+\{/',          // Complex quantifiers: +{
-            '/\(\.\*\)\+/',    // Catastrophic backtracking: (.*)+
-            '/\(\.\+\)\*/',    // Catastrophic backtracking: (.+)*
-        ];
-
-        foreach ($problematicPatterns as $problematic) {
-            if (preg_match($problematic, $pattern)) {
-                throw new InvalidArgumentException(
-                    'Potentially unsafe regex pattern detected'
-                );
-            }
-        }
-    }
-
-    /**
-     * Безопасное выполнение regex с ограничением времени
-     */
-    public static function safeRegexMatch(string $pattern, string $subject, int $timeoutMs = 1000): array|false
-    {
-        self::validateRegexPattern($pattern);
-        
-        // Ограничиваем длину входной строки
-        if (mb_strlen($subject) > self::MAX_REGEX_INPUT_LENGTH) {
-            $subject = mb_substr($subject, 0, self::MAX_REGEX_INPUT_LENGTH);
-        }
-
-        // Выполняем с ограничением времени через PCRE settings
-        $oldTimeLimit = ini_get('pcre.backtrack_limit');
-        $oldRecursionLimit = ini_get('pcre.recursion_limit');
-        
-        // Устанавливаем более строгие лимиты
-        ini_set('pcre.backtrack_limit', '100000');
-        ini_set('pcre.recursion_limit', '100000');
-        
-        try {
-            $result = @preg_match($pattern, $subject, $matches);
-            
-            // Проверяем на ошибки PCRE
-            if ($result === false || preg_last_error() !== PREG_NO_ERROR) {
-                return false;
-            }
-            
-            // Если нет совпадений, возвращаем false
-            if ($result === 0) {
-                return false;
-            }
-            
-            return $matches;
-        } finally {
-            // Восстанавливаем оригинальные лимиты
-            ini_set('pcre.backtrack_limit', $oldTimeLimit);
-            ini_set('pcre.recursion_limit', $oldRecursionLimit);
-        }
     }
 }
