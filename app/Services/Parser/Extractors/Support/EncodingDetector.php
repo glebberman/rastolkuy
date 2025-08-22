@@ -27,13 +27,13 @@ class EncodingDetector
     public function detect(string $filePath): string
     {
         if (!file_exists($filePath)) {
-            throw new InvalidArgumentException("File not found: {$filePath}");
+            throw new InvalidArgumentException("File not found: $filePath");
         }
 
         $content = file_get_contents($filePath, false, null, 0, 8192); // Read first 8KB
 
         if ($content === false) {
-            throw new RuntimeException("Cannot read file: {$filePath}");
+            throw new RuntimeException("Cannot read file: $filePath");
         }
 
         // Check for BOM
@@ -64,12 +64,12 @@ class EncodingDetector
             $converted = mb_convert_encoding($content, 'UTF-8', $encoding);
 
             if ($converted === false) {
-                throw new RuntimeException("Failed to convert encoding from {$encoding} to UTF-8");
+                throw new RuntimeException("Failed to convert encoding from $encoding to UTF-8");
             }
 
             return $converted;
         } catch (ValueError $e) {
-            throw new RuntimeException("Invalid encoding: {$encoding}. " . $e->getMessage());
+            throw new RuntimeException("Invalid encoding: $encoding. " . $e->getMessage());
         }
     }
 

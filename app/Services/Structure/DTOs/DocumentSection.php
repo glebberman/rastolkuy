@@ -112,7 +112,7 @@ final readonly class DocumentSection
             'confidence' => $this->confidence,
             'metadata' => $this->metadata,
             'subsections' => array_map(
-                fn (DocumentSection $section) => $section->serialize(),
+                static fn (DocumentSection $section) => $section->serialize(),
                 $this->subsections,
             ),
         ];

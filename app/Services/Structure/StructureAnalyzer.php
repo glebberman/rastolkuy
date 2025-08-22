@@ -232,7 +232,7 @@ final readonly class StructureAnalyzer
         // Сортируем по позиции в документе
         usort(
             $sections,
-            fn (DocumentSection $a, DocumentSection $b) => $a->startPosition <=> $b->startPosition,
+            static fn (DocumentSection $a, DocumentSection $b) => $a->startPosition <=> $b->startPosition,
         );
 
         // Простой стековый алгоритм построения иерархии
@@ -434,7 +434,7 @@ final readonly class StructureAnalyzer
         }
 
         $totalConfidence = array_sum(array_map(
-            fn (DocumentSection $section) => $section->confidence,
+            static fn (DocumentSection $section) => $section->confidence,
             $allSections,
         ));
 
@@ -459,7 +459,7 @@ final readonly class StructureAnalyzer
             'document_extraction_time' => $document->extractionTime,
             'total_elements' => count($document->elements),
             'element_types' => array_unique(array_map(
-                fn ($element) => $element->type,
+                static fn ($element) => $element->type,
                 $document->elements,
             )),
             'raw_sections_detected' => count($detectedSections),
@@ -484,7 +484,7 @@ final readonly class StructureAnalyzer
         $allSections = $this->flattenSections($sections);
         $lowConfidenceSections = array_filter(
             $allSections,
-            fn (DocumentSection $section) => $section->confidence < 0.7,
+            static fn (DocumentSection $section) => $section->confidence < 0.7,
         );
 
         if (count($lowConfidenceSections) > 0) {

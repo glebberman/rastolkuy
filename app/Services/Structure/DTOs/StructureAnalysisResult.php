@@ -108,7 +108,7 @@ final readonly class StructureAnalysisResult
     public function getAllAnchors(): array
     {
         return array_map(
-            fn (DocumentSection $section) => $section->anchor,
+            static fn (DocumentSection $section) => $section->anchor,
             $this->getAllSections(),
         );
     }
@@ -125,7 +125,7 @@ final readonly class StructureAnalysisResult
             'sections_count' => $this->getSectionsCount(),
             'total_subsections_count' => $this->getTotalSubsectionsCount(),
             'sections' => array_map(
-                fn (DocumentSection $section) => $section->serialize(),
+                static fn (DocumentSection $section) => $section->serialize(),
                 $this->sections,
             ),
             'statistics' => $this->statistics,

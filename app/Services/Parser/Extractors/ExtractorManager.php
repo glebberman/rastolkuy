@@ -39,7 +39,7 @@ readonly class ExtractorManager
 
             // Validate file before processing
             if (!$extractor->validate($filePath)) {
-                throw new InvalidArgumentException("File validation failed: {$filePath}");
+                throw new InvalidArgumentException("File validation failed: $filePath");
             }
 
             // Check if processing time might exceed timeout
@@ -170,7 +170,7 @@ readonly class ExtractorManager
             }
 
             if ($timeoutReached || (microtime(true) - $startTime) > $config->timeoutSeconds) {
-                throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
+                throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: $filePath");
             }
 
             throw $e;
@@ -186,7 +186,7 @@ readonly class ExtractorManager
         // Create a wrapper that periodically checks timeout
         $timeoutChecker = static function () use ($startTime, $config, $filePath): void {
             if ((microtime(true) - $startTime) > $config->timeoutSeconds) {
-                throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
+                throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: $filePath");
             }
         };
 
