@@ -16,9 +16,9 @@ use Illuminate\Support\Facades\Log;
 
 final readonly class StructureAnalyzer
 {
-    private readonly float $minConfidenceThreshold;
+    private float $minConfidenceThreshold;
 
-    private readonly int $maxAnalysisTimeSeconds;
+    private int $maxAnalysisTimeSeconds;
 
     public function __construct(
         private readonly SectionDetectorInterface $sectionDetector,

@@ -87,7 +87,7 @@ class SectionDetectorPatternTest extends TestCase
         // Создаем простой детектор для тестирования
         $detector = new SectionDetector(new AnchorGenerator());
 
-        // Используем рефлексию чтобы протестировать private метод
+        // Используем рефлексию, чтобы протестировать private метод
         $reflection = new ReflectionClass($detector);
         $method = $reflection->getMethod('flattenPatterns');
         $method->setAccessible(true);  // setAccessible returns void
