@@ -147,7 +147,7 @@ readonly class ExtractorManager
 
         // Set up timeout handling using signal alarm (if available)
         if (function_exists('pcntl_alarm') && function_exists('pcntl_signal')) {
-            pcntl_signal(SIGALRM, function () use (&$timeoutReached): void {
+            pcntl_signal(SIGALRM, static function () use (&$timeoutReached): void {
                 $timeoutReached = true;
             });
             pcntl_alarm($config->timeoutSeconds);
@@ -184,7 +184,7 @@ readonly class ExtractorManager
         float $startTime,
     ): ExtractedDocument {
         // Create a wrapper that periodically checks timeout
-        $timeoutChecker = function () use ($startTime, $config, $filePath): void {
+        $timeoutChecker = static function () use ($startTime, $config, $filePath): void {
             if ((microtime(true) - $startTime) > $config->timeoutSeconds) {
                 throw new RuntimeException("Extraction timeout exceeded ({$config->timeoutSeconds}s) for file: {$filePath}");
             }

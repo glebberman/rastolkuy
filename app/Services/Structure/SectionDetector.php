@@ -407,7 +407,7 @@ final class SectionDetector implements SectionDetectorInterface
         float $confidence,
     ): DocumentSection {
         $content = implode("\n", array_map(
-            fn (DocumentElement $el) => $el->getPlainText(),
+            static fn (DocumentElement $el) => $el->getPlainText(),
             $elements,
         ));
 
@@ -427,7 +427,7 @@ final class SectionDetector implements SectionDetectorInterface
             metadata: [
                 'detection_method' => 'header_based',
                 'element_types' => array_unique(array_map(
-                    fn (DocumentElement $el) => $el->type,
+                    static fn (DocumentElement $el) => $el->type,
                     $elements,
                 )),
             ],
@@ -456,7 +456,7 @@ final class SectionDetector implements SectionDetectorInterface
         }
 
         $content = implode("\n", array_map(
-            fn (DocumentElement $el) => $el->getPlainText(),
+            static fn (DocumentElement $el) => $el->getPlainText(),
             $elements,
         ));
 
@@ -481,7 +481,7 @@ final class SectionDetector implements SectionDetectorInterface
             metadata: [
                 'detection_method' => 'pattern_based',
                 'element_types' => array_unique(array_map(
-                    fn (DocumentElement $el) => $el->type,
+                    static fn (DocumentElement $el) => $el->type,
                     $elements,
                 )),
             ],

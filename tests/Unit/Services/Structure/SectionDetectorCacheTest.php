@@ -73,7 +73,8 @@ class SectionDetectorCacheTest extends TestCase
         // Результаты должны быть одинаковыми
         $this->assertEquals($sections1, $sections2);
 
-        // Кэш должен содержать записи
+        // Кэш должен расти между вызовами
+        $this->assertGreaterThanOrEqual($stats1['cache_size'], $stats2['cache_size']);
         $this->assertGreaterThan(0, $stats2['cache_size']);
     }
 

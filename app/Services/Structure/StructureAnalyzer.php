@@ -281,10 +281,8 @@ final readonly class StructureAnalyzer
      */
     private function replaceInStack(array &$stack, DocumentSection $oldSection, DocumentSection $newSection): void
     {
-        $stackCount = count($stack);
-
-        for ($i = 0; $i < $stackCount; ++$i) {
-            if ($stack[$i]->id === $oldSection->id) {
+        foreach ($stack as $i => $section) {
+            if ($section->id === $oldSection->id) {
                 $stack[$i] = $newSection;
                 break;
             }
@@ -296,10 +294,8 @@ final readonly class StructureAnalyzer
      */
     private function replaceInResult(array &$result, DocumentSection $oldSection, DocumentSection $newSection): void
     {
-        $resultCount = count($result);
-
-        for ($i = 0; $i < $resultCount; ++$i) {
-            if ($result[$i]->id === $oldSection->id) {
+        foreach ($result as $i => $section) {
+            if ($section->id === $oldSection->id) {
                 $result[$i] = $newSection;
 
                 return;

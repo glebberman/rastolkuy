@@ -147,7 +147,7 @@ class StructureAnalysisIntegrationTest extends TestCase
         $this->assertArrayHasKey('contract1', $results);
         $this->assertArrayHasKey('contract2', $results);
 
-        foreach ($results as $key => $result) {
+        foreach ($results as $result) {
             $this->assertNotNull($result);
             $this->assertGreaterThanOrEqual(0, $result->getSectionsCount());
             $this->assertGreaterThanOrEqual(0, $result->averageConfidence);
