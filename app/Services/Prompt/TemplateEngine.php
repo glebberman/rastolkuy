@@ -7,7 +7,7 @@ namespace App\Services\Prompt;
 use App\PromptTemplate;
 use App\Services\Prompt\Exceptions\PromptException;
 
-final readonly class TemplateEngine
+final class TemplateEngine
 {
     private const VARIABLE_PATTERN = '/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/';
     private const CONDITIONAL_PATTERN = '/\{\%\s*if\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\%\}(.*?)\{\%\s*endif\s*\%\}/s';
@@ -46,19 +46,19 @@ final readonly class TemplateEngine
 
         foreach ($requiredVars as $requiredVar) {
             if (!array_key_exists($requiredVar, $variables)) {
-                $errors[] = "Missing required variable: {$requiredVar}";
+                $errors[] = "Missing required variable: $requiredVar";
             }
         }
 
         foreach ($templateVars as $templateVar) {
             if (!in_array($templateVar, $requiredVars) && !in_array($templateVar, $optionalVars)) {
-                $warnings[] = "Variable {$templateVar} used in template but not declared in schema";
+                $warnings[] = "Variable $templateVar used in template but not declared in schema";
             }
         }
 
         foreach (array_keys($variables) as $variable) {
             if (!in_array($variable, $templateVars)) {
-                $warnings[] = "Variable {$variable} provided but not used in template";
+                $warnings[] = "Variable $variable provided but not used in template";
             }
         }
 
@@ -124,7 +124,7 @@ final readonly class TemplateEngine
 
         foreach ($requiredVars as $requiredVar) {
             if (!array_key_exists($requiredVar, $variables)) {
-                throw new PromptException("Missing required variable: {$requiredVar}");
+                throw new PromptException("Missing required variable: $requiredVar");
             }
         }
     }
@@ -133,7 +133,7 @@ final readonly class TemplateEngine
     {
         $result = preg_replace_callback(
             self::VARIABLE_PATTERN,
-            function ($matches) use ($variables) {
+            static function ($matches) use ($variables) {
                 $varName = $matches[1];
 
                 if (!array_key_exists($varName, $variables)) {
@@ -155,14 +155,18 @@ final readonly class TemplateEngine
             $content,
         );
         
-        return $result ?? '';
+        if ($result === null) {
+            throw new PromptException('Failed to process template variables: ' . preg_last_error_msg());
+        }
+        
+        return $result;
     }
 
     private function processConditionals(string $content, array $variables): string
     {
         $result = preg_replace_callback(
             self::CONDITIONAL_PATTERN,
-            function ($matches) use ($variables) {
+            static function ($matches) use ($variables) {
                 $varName = $matches[1];
                 $conditionalContent = $matches[2];
 
@@ -189,7 +193,11 @@ final readonly class TemplateEngine
             $content,
         );
         
-        return $result ?? '';
+        if ($result === null) {
+            throw new PromptException('Failed to process template conditionals: ' . preg_last_error_msg());
+        }
+        
+        return $result;
     }
 
     private function processLoops(string $content, array $variables): string
@@ -205,20 +213,24 @@ final readonly class TemplateEngine
                     return '';
                 }
 
-                $result = '';
+                $loopResult = '';
 
                 foreach ($variables[$arrayVar] as $item) {
                     $loopVariables = array_merge($variables, [$itemVar => $item]);
                     $processedContent = $this->processVariables($loopContent, $loopVariables);
-                    $result .= $processedContent;
+                    $loopResult .= $processedContent;
                 }
 
-                return $result;
+                return $loopResult;
             },
             $content,
         );
 
-        return $result ?? '';
+        if ($result === null) {
+            throw new PromptException('Failed to process template loops: ' . preg_last_error_msg());
+        }
+        
+        return $result;
     }
 
     private function generateDefaultSamples(PromptTemplate $template): array
@@ -251,6 +263,6 @@ final readonly class TemplateEngine
             'context' => 'Контекст документа',
         ];
 
-        return $sampleValues[$varName] ?? "Пример значения для {$varName}";
+        return $sampleValues[$varName] ?? "Пример значения для $varName";
     }
 }
