@@ -251,9 +251,9 @@ final readonly class StructureAnalyzer
                 }
             }
 
-            $lastStackItem = empty($stack) ? false : end($stack);
+            $lastStackItem = end($stack);
 
-            if (empty($stack) || $lastStackItem === false) {
+            if ($lastStackItem === false) {
                 // Корневая секция или проблема со стеком
                 $result[] = $section;
                 $stack[] = $section;
