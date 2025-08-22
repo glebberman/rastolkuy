@@ -9,10 +9,13 @@ use App\Services\Prompt\Exceptions\PromptException;
 
 final class TemplateEngine
 {
-    private const VARIABLE_PATTERN = '/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/';
-    private const CONDITIONAL_PATTERN = '/\{\%\s*if\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\%\}(.*?)\{\%\s*endif\s*\%\}/s';
-    private const LOOP_PATTERN = '/\{\%\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\%\}(.*?)\{\%\s*endfor\s*\%\}/s';
+    private const string VARIABLE_PATTERN = '/{{\\s*([a-zA-Z_][a-zA-Z0-9_]*)\\s*}}/';
+    private const string CONDITIONAL_PATTERN = '/{%\\s*if\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*%}(.*?){%\\s*endif\\s*%}/s';
+    private const string LOOP_PATTERN = '/{%\\s*for\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s+in\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*%}(.*?){%\\s*endfor\\s*%}/s';
 
+    /**
+     * @throws PromptException
+     */
     public function render(PromptTemplate $template, array $variables): string
     {
         $this->validateRequiredVariables($template, $variables);
@@ -26,6 +29,9 @@ final class TemplateEngine
         return trim($content);
     }
 
+    /**
+     * @throws PromptException
+     */
     public function renderDirect(string $templateContent, array $variables): string
     {
         $content = $this->processConditionals($templateContent, $variables);
@@ -51,13 +57,13 @@ final class TemplateEngine
         }
 
         foreach ($templateVars as $templateVar) {
-            if (!in_array($templateVar, $requiredVars) && !in_array($templateVar, $optionalVars)) {
+            if (!in_array($templateVar, $requiredVars, true) && !in_array($templateVar, $optionalVars)) {
                 $warnings[] = "Variable $templateVar used in template but not declared in schema";
             }
         }
 
         foreach (array_keys($variables) as $variable) {
-            if (!in_array($variable, $templateVars)) {
+            if (!in_array($variable, $templateVars, true)) {
                 $warnings[] = "Variable $variable provided but not used in template";
             }
         }
@@ -134,7 +140,7 @@ final class TemplateEngine
         $result = preg_replace_callback(
             self::VARIABLE_PATTERN,
             static function ($matches) use ($variables) {
-                $varName = $matches[1];
+                [, $varName] = $matches;
 
                 if (!array_key_exists($varName, $variables)) {
                     return $matches[0];
@@ -162,13 +168,15 @@ final class TemplateEngine
         return $result;
     }
 
+    /**
+     * @throws PromptException
+     */
     private function processConditionals(string $content, array $variables): string
     {
         $result = preg_replace_callback(
             self::CONDITIONAL_PATTERN,
             static function ($matches) use ($variables) {
-                $varName = $matches[1];
-                $conditionalContent = $matches[2];
+                [, $varName, $conditionalContent] = $matches;
 
                 $shouldInclude = false;
 
@@ -182,7 +190,7 @@ final class TemplateEngine
                     } elseif (is_string($value)) {
                         $shouldInclude = trim($value) !== '';
                     } elseif (is_numeric($value)) {
-                        $shouldInclude = $value != 0;
+                        $shouldInclude = $value !== 0;
                     } else {
                         $shouldInclude = $value !== null;
                     }
@@ -200,14 +208,15 @@ final class TemplateEngine
         return $result;
     }
 
+    /**
+     * @throws PromptException
+     */
     private function processLoops(string $content, array $variables): string
     {
         $result = preg_replace_callback(
             self::LOOP_PATTERN,
             function ($matches) use ($variables) {
-                $itemVar = $matches[1];
-                $arrayVar = $matches[2];
-                $loopContent = $matches[3];
+                [, $itemVar, $arrayVar, $loopContent] = $matches;
 
                 if (!array_key_exists($arrayVar, $variables) || !is_array($variables[$arrayVar])) {
                     return '';
