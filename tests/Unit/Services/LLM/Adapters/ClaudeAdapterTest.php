@@ -45,6 +45,10 @@ final class ClaudeAdapterTest extends TestCase
         $httpClientProperty->setAccessible(true);
         $httpClientProperty->setValue($this->adapter, new Client(['handler' => $handlerStack]));
 
+        // Clear cache in a test-safe way
+        if (app()->environment('testing')) {
+            \Illuminate\Support\Facades\Config::set('cache.default', 'array');
+        }
         Cache::flush();
     }
 

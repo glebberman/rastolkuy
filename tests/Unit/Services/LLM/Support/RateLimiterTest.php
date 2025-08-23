@@ -25,7 +25,10 @@ final class RateLimiterTest extends TestCase
             tokensPerHour: 10000,
         );
 
-        // Clear any cached data
+        // Clear any cached data - ensure using array cache for tests
+        if (app()->environment('testing')) {
+            \Illuminate\Support\Facades\Config::set('cache.default', 'array');
+        }
         Cache::flush();
     }
 
