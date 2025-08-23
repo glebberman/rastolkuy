@@ -53,7 +53,7 @@ final class LLMRequestTest extends TestCase
         );
 
         $this->assertEquals('Legal contract section', $request->content);
-        $this->assertStringContainsString('legal document translator', $request->systemPrompt);
+        $this->assertStringContainsString('legal document translator', $request->systemPrompt ?? '');
         $this->assertEquals('section_translation', $request->options['type']);
         $this->assertEquals('contract', $request->options['document_type']);
         $this->assertEquals(['jurisdiction' => 'US'], $request->options['context']);
@@ -78,7 +78,7 @@ final class LLMRequestTest extends TestCase
         foreach ($requests as $index => $request) {
             $this->assertInstanceOf(LLMRequest::class, $request);
             $this->assertEquals($sections[$index], $request->content);
-            $this->assertStringContainsString('legal document translator', $request->systemPrompt);
+            $this->assertStringContainsString('legal document translator', $request->systemPrompt ?? '');
             $this->assertEquals('batch_translation', $request->options['type']);
             $this->assertEquals('agreement', $request->options['document_type']);
             $this->assertEquals(['type' => 'employment'], $request->options['context']);

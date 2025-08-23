@@ -28,6 +28,10 @@ final class LLMServiceProvider extends ServiceProvider
         $this->app->singleton(LLMAdapterInterface::class, function (Application $app): LLMAdapterInterface {
             $defaultProvider = config('llm.default', 'claude');
 
+            if (!is_string($defaultProvider)) {
+                $defaultProvider = 'claude';
+            }
+            
             return match ($defaultProvider) {
                 'claude' => $this->createClaudeAdapter(),
                 default => throw new LLMException("Unsupported LLM provider: {$defaultProvider}"),
@@ -37,6 +41,9 @@ final class LLMServiceProvider extends ServiceProvider
         // Register rate limiter
         $this->app->singleton(RateLimiter::class, function (): RateLimiter {
             $provider = config('llm.default', 'claude');
+            if (!is_string($provider)) {
+                $provider = 'claude';
+            }
 
             return RateLimiter::forProvider($provider);
         });
@@ -49,6 +56,9 @@ final class LLMServiceProvider extends ServiceProvider
         // Register usage metrics
         $this->app->singleton(UsageMetrics::class, function (): UsageMetrics {
             $provider = config('llm.default', 'claude');
+            if (!is_string($provider)) {
+                $provider = 'claude';
+            }
 
             return new UsageMetrics($provider);
         });
@@ -105,18 +115,29 @@ final class LLMServiceProvider extends ServiceProvider
     private function createClaudeAdapter(): ClaudeAdapter
     {
         $config = config('llm.providers.claude', []);
+        if (!is_array($config)) {
+            $config = [];
+        }
 
         $apiKey = $config['api_key'] ?? '';
-
-        if (empty($apiKey)) {
+        if (!is_string($apiKey) || empty($apiKey)) {
             throw new LLMException('Claude API key is required but not configured');
+        }
+
+        $baseUrl = $config['base_url'] ?? 'https://api.anthropic.com/v1/messages';
+        if (!is_string($baseUrl)) {
+            $baseUrl = 'https://api.anthropic.com/v1/messages';
+        }
+        
+        $timeout = $config['timeout'] ?? 60;
+        if (!is_int($timeout)) {
+            $timeout = 60;
         }
 
         return new ClaudeAdapter(
             apiKey: $apiKey,
-            baseUrl: $config['base_url'] ?? 'https://api.anthropic.com/v1/messages',
-            timeoutSeconds: $config['timeout'] ?? 60,
-            config: $config,
+            baseUrl: $baseUrl,
+            timeoutSeconds: $timeout,
         );
     }
 }

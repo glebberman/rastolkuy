@@ -48,9 +48,18 @@ final class ClaudeAdapterTest extends TestCase
         Cache::flush();
     }
 
+    private function jsonEncode(array $data): string
+    {
+        $result = json_encode($data);
+        if ($result === false) {
+            throw new \RuntimeException('JSON encoding failed');
+        }
+        return $result;
+    }
+
     public function testExecutesSuccessfulRequest(): void
     {
-        $this->mockHandler->append(new Response(200, [], json_encode([
+        $this->mockHandler->append(new Response(200, [], $this->jsonEncode([
             'content' => [
                 ['type' => 'text', 'text' => 'This is a translation of the legal text.'],
             ],
@@ -79,7 +88,7 @@ final class ClaudeAdapterTest extends TestCase
 
     public function testHandlesMultipleContentBlocks(): void
     {
-        $this->mockHandler->append(new Response(200, [], json_encode([
+        $this->mockHandler->append(new Response(200, [], $this->jsonEncode([
             'content' => [
                 ['type' => 'text', 'text' => 'First part '],
                 ['type' => 'text', 'text' => 'second part.'],
@@ -191,12 +200,12 @@ final class ClaudeAdapterTest extends TestCase
     {
         // Mock responses for each request in the batch
         $this->mockHandler->append(
-            new Response(200, [], json_encode([
+            new Response(200, [], $this->jsonEncode([
                 'content' => [['type' => 'text', 'text' => 'Response 1']],
                 'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
                 'stop_reason' => 'end_turn',
             ])),
-            new Response(200, [], json_encode([
+            new Response(200, [], $this->jsonEncode([
                 'content' => [['type' => 'text', 'text' => 'Response 2']],
                 'usage' => ['input_tokens' => 15, 'output_tokens' => 8],
                 'stop_reason' => 'end_turn',
@@ -220,12 +229,13 @@ final class ClaudeAdapterTest extends TestCase
         $this->expectException(LLMException::class);
         $this->expectExceptionMessage('Invalid request at index 0');
 
+        // @phpstan-ignore-next-line Intentionally passing invalid types for testing
         $this->adapter->executeBatch(['not a request']);
     }
 
     public function testValidatesConnectionSuccess(): void
     {
-        $this->mockHandler->append(new Response(200, [], json_encode([
+        $this->mockHandler->append(new Response(200, [], $this->jsonEncode([
             'content' => [['type' => 'text', 'text' => 'test response']],
             'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
             'stop_reason' => 'end_turn',
@@ -297,7 +307,7 @@ final class ClaudeAdapterTest extends TestCase
     public function testCachesConnectionValidation(): void
     {
         // First call should make HTTP request
-        $this->mockHandler->append(new Response(200, [], json_encode([
+        $this->mockHandler->append(new Response(200, [], $this->jsonEncode([
             'content' => [['type' => 'text', 'text' => 'test']],
             'usage' => ['input_tokens' => 1, 'output_tokens' => 1],
         ])));

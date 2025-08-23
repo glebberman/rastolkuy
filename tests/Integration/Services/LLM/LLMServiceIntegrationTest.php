@@ -32,7 +32,7 @@ final class LLMServiceIntegrationTest extends TestCase
 
         $apiKey = env('CLAUDE_API_KEY');
 
-        if (empty($apiKey)) {
+        if (empty($apiKey) || !is_string($apiKey)) {
             $this->markTestSkipped('Claude API key not configured. Set CLAUDE_API_KEY environment variable to run integration tests.');
         }
 
@@ -173,8 +173,13 @@ final class LLMServiceIntegrationTest extends TestCase
         $this->assertArrayHasKey('metrics', $stats);
 
         $this->assertEquals('claude', $stats['provider']);
-        $this->assertArrayHasKey('totals', $stats['metrics']);
-        $this->assertGreaterThan(0, $stats['metrics']['totals']['requests']);
+        $this->assertIsArray($stats['metrics']);
+        if (is_array($stats['metrics'])) {
+            $this->assertArrayHasKey('totals', $stats['metrics']);
+            if (is_array($stats['metrics']['totals'])) {
+                $this->assertGreaterThan(0, $stats['metrics']['totals']['requests']);
+            }
+        }
     }
 
     /**
@@ -210,7 +215,9 @@ final class LLMServiceIntegrationTest extends TestCase
         );
 
         $restrictiveService = new LLMService(
-            adapter: $this->llmService->adapter ?? new ClaudeAdapter(env('CLAUDE_API_KEY')),
+            adapter: $this->llmService->adapter ?? new ClaudeAdapter(
+                apiKey: (string) env('CLAUDE_API_KEY', 'test-key'),
+            ),
             rateLimiter: $restrictiveRateLimiter,
             retryHandler: new RetryHandler(maxAttempts: 1),
             usageMetrics: new UsageMetrics('claude'),

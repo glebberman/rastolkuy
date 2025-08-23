@@ -47,7 +47,10 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
         public readonly array $options,
         public readonly ?string $callbackUrl = null,
     ) {
-        $this->onQueue(config('llm.queue.queue_name', 'llm-processing'));
+        $queueName = config('llm.queue.queue_name', 'llm-processing');
+        if (is_string($queueName)) {
+            $this->onQueue($queueName);
+        }
     }
 
     /**
@@ -162,6 +165,9 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
     ): string {
         $batchId = 'batch_' . uniqid() . '_' . now()->timestamp;
         $batchSize = config('llm.queue.batch_size', 10);
+        if (!is_int($batchSize) || $batchSize < 1) {
+            $batchSize = 10;
+        }
 
         // Split sections into chunks for processing
         $chunks = array_chunk($sections, $batchSize);
@@ -210,8 +216,10 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
     public static function getBatchResult(string $batchId): ?array
     {
         $cacheKey = "llm_batch_result:{$batchId}";
-
-        return cache()->get($cacheKey);
+        
+        $result = cache()->get($cacheKey);
+        
+        return is_array($result) ? $result : null;
     }
 
     /**
@@ -295,6 +303,10 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
     private function sendCallback(array $result): void
     {
         try {
+            if ($this->callbackUrl === null) {
+                return;
+            }
+            
             $client = new \GuzzleHttp\Client(['timeout' => 30]);
 
             $response = $client->post($this->callbackUrl, [

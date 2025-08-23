@@ -67,17 +67,19 @@ final class RetryHandlerTest extends TestCase
         $this->expectException(LLMRateLimitException::class);
         $this->expectExceptionMessage('Always fails');
 
-        $retryHandler->execute(
-            operation: function () use (&$callCount): string {
-                ++$callCount;
+        try {
+            $retryHandler->execute(
+                operation: function () use (&$callCount): string {
+                    ++$callCount;
 
-                throw new LLMRateLimitException('Always fails');
-            },
-            retryableExceptions: [LLMRateLimitException::class],
-            operationName: 'test operation',
-        );
-
-        $this->assertEquals(2, $callCount);
+                    throw new LLMRateLimitException('Always fails');
+                },
+                retryableExceptions: [LLMRateLimitException::class],
+                operationName: 'test operation',
+            );
+        } catch (LLMRateLimitException) {
+            $this->assertEquals(2, $callCount);
+        }
     }
 
     public function testDoesNotRetryNonRetryableException(): void
@@ -88,17 +90,19 @@ final class RetryHandlerTest extends TestCase
         $this->expectException(LLMException::class);
         $this->expectExceptionMessage('Non-retryable error');
 
-        $retryHandler->execute(
-            operation: function () use (&$callCount): string {
-                ++$callCount;
+        try {
+            $retryHandler->execute(
+                operation: function () use (&$callCount): string {
+                    ++$callCount;
 
-                throw new LLMException('Non-retryable error');
-            },
-            retryableExceptions: [LLMRateLimitException::class],
-            operationName: 'test operation',
-        );
-
-        $this->assertEquals(1, $callCount);
+                    throw new LLMException('Non-retryable error');
+                },
+                retryableExceptions: [LLMRateLimitException::class],
+                operationName: 'test operation',
+            );
+        } catch (LLMException) {
+            $this->assertEquals(1, $callCount);
+        }
     }
 
     public function testWrapsNonLlmExceptionInLlmException(): void
