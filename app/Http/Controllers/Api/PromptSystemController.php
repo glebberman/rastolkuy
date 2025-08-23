@@ -8,7 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\StorePromptSystemRequest;
 use App\Http\Requests\Api\UpdatePromptSystemRequest;
 use App\Http\Resources\PromptSystemResource;
-use App\PromptSystem;
+use App\Models\PromptSystem;
 use App\Services\Prompt\DTOs\CreatePromptSystemData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +30,7 @@ class PromptSystemController extends Controller
 
         if ($request->has('search')) {
             $search = $request->get('search');
+
             if (is_string($search)) {
                 $query->where(function ($q) use ($search): void {
                     $q->where('name', 'like', "%{$search}%")
@@ -77,10 +78,11 @@ class PromptSystemController extends Controller
         $promptSystem->update($request->validated());
 
         $freshPromptSystem = $promptSystem->fresh(['templates', 'executions']);
+
         if ($freshPromptSystem) {
             $freshPromptSystem->loadCount(['templates', 'executions']);
         }
-        
+
         return new PromptSystemResource($freshPromptSystem ?? $promptSystem);
     }
 

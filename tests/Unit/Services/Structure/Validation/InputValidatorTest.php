@@ -172,7 +172,7 @@ class InputValidatorTest extends TestCase
         $documents = [];
 
         for ($i = 0; $i < 101; ++$i) {
-            $documents["doc$i"] = $this->createValidDocument();
+            $documents["doc{$i}"] = $this->createValidDocument();
         }
 
         $this->expectException(InvalidArgumentException::class);

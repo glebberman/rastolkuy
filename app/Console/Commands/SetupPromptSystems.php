@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\PromptSystem;
-use App\PromptTemplate;
+use App\Models\PromptSystem;
+use App\Models\PromptTemplate;
 use App\Services\Prompt\SchemaManager;
 use Illuminate\Console\Command;
 

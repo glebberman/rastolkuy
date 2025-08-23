@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services\Prompt;
 
-use App\PromptTemplate;
+use App\Models\PromptTemplate;
 use App\Services\Prompt\Exceptions\PromptException;
 use App\Services\Prompt\TemplateEngine;
 use PHPUnit\Framework\TestCase;
@@ -19,6 +19,9 @@ class TemplateEngineTest extends TestCase
         $this->templateEngine = new TemplateEngine();
     }
 
+    /**
+     * @throws PromptException
+     */
     public function testCanRenderSimpleTemplate(): void
     {
         $template = $this->createMockTemplate('Hello {{ name }}!');
@@ -29,6 +32,9 @@ class TemplateEngineTest extends TestCase
         $this->assertEquals('Hello World!', $result);
     }
 
+    /**
+     * @throws PromptException
+     */
     public function testCanRenderTemplateWithConditionals(): void
     {
         $template = $this->createMockTemplate('Hello{% if name %}, {{ name }}{% endif %}!');
@@ -40,6 +46,9 @@ class TemplateEngineTest extends TestCase
         $this->assertEquals('Hello!', $result2);
     }
 
+    /**
+     * @throws PromptException
+     */
     public function testCanRenderTemplateWithLoops(): void
     {
         $template = $this->createMockTemplate('Items:{% for item in items %} {{ item }}{% endfor %}');
@@ -93,6 +102,9 @@ class TemplateEngineTest extends TestCase
         $this->assertEquals(['name', 'age'], $variables);
     }
 
+    /**
+     * @throws PromptException
+     */
     public function testCanRenderDirectTemplate(): void
     {
         $template = 'Hello {{ name }}!';
@@ -103,6 +115,9 @@ class TemplateEngineTest extends TestCase
         $this->assertEquals('Hello World!', $result);
     }
 
+    /**
+     * @throws PromptException
+     */
     public function testHandlesBooleanVariables(): void
     {
         $template = $this->createMockTemplate('Active: {{ active }}');
@@ -114,6 +129,9 @@ class TemplateEngineTest extends TestCase
         $this->assertEquals('Active: false', $result2);
     }
 
+    /**
+     * @throws PromptException
+     */
     public function testHandlesArrayVariables(): void
     {
         $template = $this->createMockTemplate('Tags: {{ tags }}');

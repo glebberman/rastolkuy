@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Prompt;
 
-use App\PromptSystem;
+use App\Models\PromptSystem;
 use App\Services\Prompt\Exceptions\PromptException;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -14,14 +14,17 @@ use JsonException;
 
 final readonly class ClaudeApiClient
 {
-    private const BASE_URL = 'https://api.anthropic.com/v1/messages';
-    private const DEFAULT_MODEL = 'claude-3-5-sonnet-20241022';
-    private const DEFAULT_MAX_TOKENS = 4096;
+    private const string BASE_URL = 'https://api.anthropic.com/v1/messages';
+    private const string DEFAULT_MODEL = 'claude-3-5-sonnet-20241022';
+    private const int DEFAULT_MAX_TOKENS = 4096;
 
     private Client $httpClient;
 
     private string $apiKey;
 
+    /**
+     * @throws PromptException
+     */
     public function __construct()
     {
         $apiKey = Config::get('services.claude.api_key');
@@ -79,8 +82,8 @@ final readonly class ClaudeApiClient
             $responseData = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
             $executionTime = (microtime(true) - $startTime) * 1000;
 
-            $usage = is_array($responseData) && isset($responseData['usage']) && is_array($responseData['usage']) 
-                ? $responseData['usage'] 
+            $usage = is_array($responseData) && isset($responseData['usage']) && is_array($responseData['usage'])
+                ? $responseData['usage']
                 : [];
 
             Log::info('Claude API response received', [

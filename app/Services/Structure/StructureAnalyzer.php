@@ -137,8 +137,9 @@ final readonly class StructureAnalyzer
     /**
      * @param array<ExtractedDocument> $documents
      *
+     * @throws Exception
+     *
      * @return array<string, StructureAnalysisResult>
-     * @throws \Exception
      */
     public function analyzeBatch(array $documents): array
     {

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Prompt;
 
-use App\PromptExecution;
-use App\PromptSystem;
-use App\PromptTemplate;
+use App\Models\PromptExecution;
+use App\Models\PromptSystem;
+use App\Models\PromptTemplate;
 use App\Services\Prompt\DTOs\PromptExecutionResult;
 use App\Services\Prompt\DTOs\PromptRenderRequest;
 use App\Services\Prompt\Exceptions\PromptException;
@@ -158,7 +158,7 @@ final readonly class PromptManager
         return $system;
     }
 
-    private function getTemplate(PromptSystem $system, ?string $templateName): PromptTemplate|null
+    private function getTemplate(PromptSystem $system, ?string $templateName): ?PromptTemplate
     {
         if ($templateName === null) {
             return null;
@@ -329,7 +329,7 @@ final readonly class PromptManager
     private function formatDocumentStructureForPrompt(array $sections): string
     {
         $formatted = "Структура документа с якорями:\n\n";
-        
+
         foreach ($sections as $section) {
             $formatted .= $this->formatSectionForPrompt($section, 0);
         }
@@ -346,7 +346,7 @@ final readonly class PromptManager
             $section['title'] ?? 'Untitled',
             $section['anchor'] ?? 'no-anchor',
             $section['start_position'] ?? 0,
-            $section['end_position'] ?? 0
+            $section['end_position'] ?? 0,
         );
 
         // Добавляем подсекции рекурсивно

@@ -173,11 +173,11 @@ class StructureAnalysisIntegrationTest extends TestCase
         $elements = [];
 
         for ($i = 1; $i <= 100; ++$i) {
-            $elements[] = new HeaderElement("Раздел $i", 1);
-            $elements[] = new ParagraphElement("Содержание раздела $i. " . str_repeat('Текст секции. ', 50));
+            $elements[] = new HeaderElement("Раздел {$i}", 1);
+            $elements[] = new ParagraphElement("Содержание раздела {$i}. " . str_repeat('Текст секции. ', 50));
 
             if ($i % 10 === 0) {
-                $elements[] = new HeaderElement("$i.1 Подраздел", 2);
+                $elements[] = new HeaderElement("{$i}.1 Подраздел", 2);
                 $elements[] = new ParagraphElement('Содержание подраздела. ' . str_repeat('Дополнительный текст. ', 30));
             }
         }

@@ -6,7 +6,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\ExecutePromptRequest;
-use App\PromptExecution;
+use App\Models\PromptExecution;
 use App\Services\Prompt\DTOs\PromptRenderRequest;
 use App\Services\Prompt\Exceptions\PromptException;
 use App\Services\Prompt\PromptManager;
@@ -158,7 +158,7 @@ class PromptExecutionController extends Controller
         try {
             $stats = $this->promptManager->getExecutionStats(
                 is_string($systemName) ? $systemName : '',
-                is_string($templateName) ? $templateName : null
+                is_string($templateName) ? $templateName : null,
             );
 
             return response()->json([

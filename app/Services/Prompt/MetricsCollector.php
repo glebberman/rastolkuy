@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Prompt;
 
-use App\PromptExecution;
-use App\PromptFeedback;
-use App\PromptSystem;
+use App\Models\PromptExecution;
+use App\Models\PromptFeedback;
+use App\Models\PromptSystem;
 use DateTime;
 
 final readonly class MetricsCollector
@@ -88,7 +88,7 @@ final readonly class MetricsCollector
             'execution_info' => [
                 'id' => $execution->id,
                 'execution_id' => $execution->execution_id,
-                'system' => $execution->promptSystem?->name ?? 'Unknown System',
+                'system' => $execution->promptSystem->name,
                 'template' => $execution->promptTemplate?->name,
                 'status' => $execution->status,
                 'created_at' => $execution->created_at,
@@ -148,7 +148,7 @@ final readonly class MetricsCollector
                 'slow_executions' => $slowExecutions->map(function ($exec) {
                     return [
                         'execution_id' => $exec->execution_id,
-                        'system' => $exec->promptSystem?->name ?? 'Unknown System',
+                        'system' => $exec->promptSystem->name,
                         'execution_time_ms' => $exec->execution_time_ms,
                         'created_at' => $exec->created_at,
                     ];
@@ -156,7 +156,7 @@ final readonly class MetricsCollector
                 'expensive_executions' => $expensiveExecutions->map(function ($exec) {
                     return [
                         'execution_id' => $exec->execution_id,
-                        'system' => $exec->promptSystem?->name ?? 'Unknown System',
+                        'system' => $exec->promptSystem->name,
                         'cost_usd' => $exec->cost_usd,
                         'tokens_used' => $exec->tokens_used,
                         'created_at' => $exec->created_at,
@@ -165,7 +165,7 @@ final readonly class MetricsCollector
                 'failed_executions' => $failedExecutions->map(function ($exec) {
                     return [
                         'execution_id' => $exec->execution_id,
-                        'system' => $exec->promptSystem?->name ?? 'Unknown System',
+                        'system' => $exec->promptSystem->name,
                         'error' => $exec->error_message,
                         'created_at' => $exec->created_at,
                     ];

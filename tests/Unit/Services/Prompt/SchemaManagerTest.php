@@ -6,7 +6,10 @@ namespace Tests\Unit\Services\Prompt;
 
 use App\Services\Prompt\Exceptions\PromptException;
 use App\Services\Prompt\SchemaManager;
+use Error;
+use Exception;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 
 class SchemaManagerTest extends TestCase
 {
@@ -227,7 +230,7 @@ class SchemaManagerTest extends TestCase
         ];
 
         // Тестируем через рефлексию
-        $reflection = new \ReflectionClass($this->schemaManager);
+        $reflection = new ReflectionClass($this->schemaManager);
         $method = $reflection->getMethod('generateSampleFromSchema');
         $method->setAccessible(true);
         $sample = $method->invoke($this->schemaManager, $schema);
@@ -242,16 +245,17 @@ class SchemaManagerTest extends TestCase
         // В unit тестах может не быть доступа к файловой системе
         // Проверяем что метод существует и возвращает null или array
         $result = null;
+
         try {
             $result = $this->schemaManager->getSchemaForPromptType('general');
-        } catch (\Exception|\Error $e) {
+        } catch (Exception|Error $e) {
             // base_path() или File facade может не работать в unit тестах
             $this->assertTrue(
-                str_contains($e->getMessage(), 'basePath') || 
-                str_contains($e->getMessage(), 'Target class [files] does not exist')
+                str_contains($e->getMessage(), 'basePath')
+                || str_contains($e->getMessage(), 'Target class [files] does not exist'),
             );
         }
-        
+
         if ($result !== null) {
             $this->assertIsArray($result);
         }
@@ -266,11 +270,11 @@ class SchemaManagerTest extends TestCase
             $this->fail('Expected exception was not thrown');
         } catch (PromptException $e) {
             $this->assertStringContainsString('Schema not found: non_existent_schema', $e->getMessage());
-        } catch (\Exception|\Error $e) {
+        } catch (Exception|Error $e) {
             // base_path() или File facade может не работать в unit тестах
             $this->assertTrue(
-                str_contains($e->getMessage(), 'basePath') || 
-                str_contains($e->getMessage(), 'Target class [files] does not exist')
+                str_contains($e->getMessage(), 'basePath')
+                || str_contains($e->getMessage(), 'Target class [files] does not exist'),
             );
         }
     }

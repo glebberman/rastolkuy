@@ -194,7 +194,7 @@ final class InputValidator
     {
         // TODO: Implement timeout functionality using $timeoutMs parameter
         unset($timeoutMs);
-        
+
         self::validateRegexPattern($pattern);
 
         // Ограничиваем длину входной строки

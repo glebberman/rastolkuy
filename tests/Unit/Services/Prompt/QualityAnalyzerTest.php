@@ -108,7 +108,7 @@ class QualityAnalyzerTest extends TestCase
         $this->assertArrayHasKey('readability_score', $complexMetrics);
         $this->assertIsFloat($readableMetrics['readability_score']);
         $this->assertIsFloat($complexMetrics['readability_score']);
-        
+
         // Проверяем что readable текст имеет не худший score чем complex
         $this->assertGreaterThanOrEqual($complexMetrics['readability_score'], $readableMetrics['readability_score']);
     }

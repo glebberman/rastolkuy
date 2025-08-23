@@ -25,7 +25,7 @@ class ElementClassifier
     public function classify(string $text, array $style = [], array $position = []): string
     {
         $text = trim($text);
-        
+
         // Position parameter reserved for future use (page numbers, coordinates, etc.)
         unset($position);
 

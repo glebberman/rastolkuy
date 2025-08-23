@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Prompt;
 
-use App\PromptTemplate;
+use App\Models\PromptTemplate;
 use App\Services\Prompt\Exceptions\PromptException;
 
 final class TemplateEngine
@@ -52,19 +52,19 @@ final class TemplateEngine
 
         foreach ($requiredVars as $requiredVar) {
             if (!array_key_exists($requiredVar, $variables)) {
-                $errors[] = "Missing required variable: $requiredVar";
+                $errors[] = "Missing required variable: {$requiredVar}";
             }
         }
 
         foreach ($templateVars as $templateVar) {
             if (!in_array($templateVar, $requiredVars, true) && !in_array($templateVar, $optionalVars)) {
-                $warnings[] = "Variable $templateVar used in template but not declared in schema";
+                $warnings[] = "Variable {$templateVar} used in template but not declared in schema";
             }
         }
 
         foreach (array_keys($variables) as $variable) {
             if (!in_array($variable, $templateVars, true)) {
-                $warnings[] = "Variable $variable provided but not used in template";
+                $warnings[] = "Variable {$variable} provided but not used in template";
             }
         }
 
@@ -130,7 +130,7 @@ final class TemplateEngine
 
         foreach ($requiredVars as $requiredVar) {
             if (!array_key_exists($requiredVar, $variables)) {
-                throw new PromptException("Missing required variable: $requiredVar");
+                throw new PromptException("Missing required variable: {$requiredVar}");
             }
         }
     }
@@ -160,11 +160,11 @@ final class TemplateEngine
             },
             $content,
         );
-        
+
         if ($result === null) {
             throw new PromptException('Failed to process template variables: ' . preg_last_error_msg());
         }
-        
+
         return $result;
     }
 
@@ -200,11 +200,11 @@ final class TemplateEngine
             },
             $content,
         );
-        
+
         if ($result === null) {
             throw new PromptException('Failed to process template conditionals: ' . preg_last_error_msg());
         }
-        
+
         return $result;
     }
 
@@ -238,7 +238,7 @@ final class TemplateEngine
         if ($result === null) {
             throw new PromptException('Failed to process template loops: ' . preg_last_error_msg());
         }
-        
+
         return $result;
     }
 
@@ -272,6 +272,6 @@ final class TemplateEngine
             'context' => 'Контекст документа',
         ];
 
-        return $sampleValues[$varName] ?? "Пример значения для $varName";
+        return $sampleValues[$varName] ?? "Пример значения для {$varName}";
     }
 }

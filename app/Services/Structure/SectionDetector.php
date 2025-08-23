@@ -355,6 +355,7 @@ final class SectionDetector implements SectionDetectorInterface
         // Проверяем кэш
         if (isset($this->patternCache[$cacheKey])) {
             $cachedResult = $this->patternCache[$cacheKey];
+
             return is_bool($cachedResult) ? $cachedResult : false;
         }
 
