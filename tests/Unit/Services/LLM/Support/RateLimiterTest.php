@@ -78,14 +78,13 @@ final class RateLimiterTest extends TestCase
         $this->assertEquals('test', $stats['provider']);
         $this->assertIsArray($stats['requests']);
         $this->assertIsArray($stats['tokens']);
-        if (is_array($stats['requests']) && is_array($stats['requests']['per_minute'])) {
-            $this->assertEquals(2, $stats['requests']['per_minute']['used']);
-            $this->assertEquals(3, $stats['requests']['per_minute']['remaining']);
-        }
-        if (is_array($stats['tokens']) && is_array($stats['tokens']['per_minute'])) {
-            $this->assertEquals(300, $stats['tokens']['per_minute']['used']);
-            $this->assertEquals(700, $stats['tokens']['per_minute']['remaining']);
-        }
+        $this->assertIsArray($stats['requests']['per_minute']);
+        $this->assertIsArray($stats['tokens']['per_minute']);
+        
+        $this->assertEquals(2, $stats['requests']['per_minute']['used']);
+        $this->assertEquals(3, $stats['requests']['per_minute']['remaining']);
+        $this->assertEquals(300, $stats['tokens']['per_minute']['used']);
+        $this->assertEquals(700, $stats['tokens']['per_minute']['remaining']);
     }
 
     public function testRecordsActualUsage(): void
@@ -103,17 +102,15 @@ final class RateLimiterTest extends TestCase
 
         $statsBeforeReset = $this->rateLimiter->getUsageStats();
         $this->assertIsArray($statsBeforeReset['requests']);
-        if (is_array($statsBeforeReset['requests']) && is_array($statsBeforeReset['requests']['per_minute'])) {
-            $this->assertEquals(1, $statsBeforeReset['requests']['per_minute']['used']);
-        }
+        $this->assertIsArray($statsBeforeReset['requests']['per_minute']);
+        $this->assertEquals(1, $statsBeforeReset['requests']['per_minute']['used']);
 
         $this->rateLimiter->reset();
 
         $statsAfterReset = $this->rateLimiter->getUsageStats();
         $this->assertIsArray($statsAfterReset['requests']);
-        if (is_array($statsAfterReset['requests']) && is_array($statsAfterReset['requests']['per_minute'])) {
-            $this->assertEquals(0, $statsAfterReset['requests']['per_minute']['used']);
-        }
+        $this->assertIsArray($statsAfterReset['requests']['per_minute']);
+        $this->assertEquals(0, $statsAfterReset['requests']['per_minute']['used']);
     }
 
     public function testCreatesRateLimiterForProvider(): void
@@ -134,12 +131,11 @@ final class RateLimiterTest extends TestCase
         $this->assertEquals('claude', $stats['provider']);
         $this->assertIsArray($stats['requests']);
         $this->assertIsArray($stats['tokens']);
-        if (is_array($stats['requests']) && is_array($stats['requests']['per_minute'])) {
-            $this->assertEquals(100, $stats['requests']['per_minute']['limit']);
-        }
-        if (is_array($stats['tokens']) && is_array($stats['tokens']['per_minute'])) {
-            $this->assertEquals(50000, $stats['tokens']['per_minute']['limit']);
-        }
+        $this->assertIsArray($stats['requests']['per_minute']);
+        $this->assertIsArray($stats['tokens']['per_minute']);
+        
+        $this->assertEquals(100, $stats['requests']['per_minute']['limit']);
+        $this->assertEquals(50000, $stats['tokens']['per_minute']['limit']);
     }
 
     public function testHandlesMissingProviderConfig(): void
@@ -150,9 +146,8 @@ final class RateLimiterTest extends TestCase
         $stats = $rateLimiter->getUsageStats();
         $this->assertEquals('unknown', $stats['provider']);
         $this->assertIsArray($stats['requests']);
-        if (is_array($stats['requests']) && is_array($stats['requests']['per_minute'])) {
-            $this->assertEquals(60, $stats['requests']['per_minute']['limit']); // Default
-        }
+        $this->assertIsArray($stats['requests']['per_minute']);
+        $this->assertEquals(60, $stats['requests']['per_minute']['limit']); // Default
     }
 
     public function testHourLimitsWorkIndependently(): void
@@ -166,18 +161,13 @@ final class RateLimiterTest extends TestCase
 
         $this->assertIsArray($stats['requests']);
         $this->assertIsArray($stats['tokens']);
-        if (is_array($stats['requests'])) {
-            $this->assertArrayHasKey('per_hour', $stats['requests']);
-            if (is_array($stats['requests']['per_hour'])) {
-                $this->assertEquals(1, $stats['requests']['per_hour']['used']);
-            }
-        }
-        if (is_array($stats['tokens'])) {
-            $this->assertArrayHasKey('per_hour', $stats['tokens']);
-            if (is_array($stats['tokens']['per_hour'])) {
-                $this->assertEquals(100, $stats['tokens']['per_hour']['used']);
-            }
-        }
+        $this->assertArrayHasKey('per_hour', $stats['requests']);
+        $this->assertArrayHasKey('per_hour', $stats['tokens']);
+        $this->assertIsArray($stats['requests']['per_hour']);
+        $this->assertIsArray($stats['tokens']['per_hour']);
+        
+        $this->assertEquals(1, $stats['requests']['per_hour']['used']);
+        $this->assertEquals(100, $stats['tokens']['per_hour']['used']);
     }
 
     public function testHandlesZeroTokenRequests(): void
@@ -188,12 +178,11 @@ final class RateLimiterTest extends TestCase
         $stats = $this->rateLimiter->getUsageStats();
         $this->assertIsArray($stats['requests']);
         $this->assertIsArray($stats['tokens']);
-        if (is_array($stats['requests']) && is_array($stats['requests']['per_minute'])) {
-            $this->assertEquals(1, $stats['requests']['per_minute']['used']);
-        }
-        if (is_array($stats['tokens']) && is_array($stats['tokens']['per_minute'])) {
-            $this->assertEquals(0, $stats['tokens']['per_minute']['used']);
-        }
+        $this->assertIsArray($stats['requests']['per_minute']);
+        $this->assertIsArray($stats['tokens']['per_minute']);
+        
+        $this->assertEquals(1, $stats['requests']['per_minute']['used']);
+        $this->assertEquals(0, $stats['tokens']['per_minute']['used']);
     }
 
     public function testPreventsNegativeRemainingCounts(): void
@@ -205,9 +194,9 @@ final class RateLimiterTest extends TestCase
 
         $stats = $this->rateLimiter->getUsageStats();
         $this->assertIsArray($stats['requests']);
-        if (is_array($stats['requests']) && is_array($stats['requests']['per_minute'])) {
-            $this->assertEquals(0, $stats['requests']['per_minute']['remaining']);
-            $this->assertGreaterThanOrEqual(0, $stats['requests']['per_minute']['remaining']);
-        }
+        $this->assertIsArray($stats['requests']['per_minute']);
+        
+        $this->assertEquals(0, $stats['requests']['per_minute']['remaining']);
+        $this->assertGreaterThanOrEqual(0, $stats['requests']['per_minute']['remaining']);
     }
 }

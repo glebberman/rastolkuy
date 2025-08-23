@@ -174,12 +174,9 @@ final class LLMServiceIntegrationTest extends TestCase
 
         $this->assertEquals('claude', $stats['provider']);
         $this->assertIsArray($stats['metrics']);
-        if (is_array($stats['metrics'])) {
-            $this->assertArrayHasKey('totals', $stats['metrics']);
-            if (is_array($stats['metrics']['totals'])) {
-                $this->assertGreaterThan(0, $stats['metrics']['totals']['requests']);
-            }
-        }
+        $this->assertArrayHasKey('totals', $stats['metrics']);
+        $this->assertIsArray($stats['metrics']['totals']);
+        $this->assertGreaterThan(0, $stats['metrics']['totals']['requests']);
     }
 
     /**

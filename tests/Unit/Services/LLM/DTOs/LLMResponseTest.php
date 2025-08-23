@@ -170,10 +170,8 @@ final class LLMResponseTest extends TestCase
         $this->assertEquals(0.001, $array['cost_usd']);
 
         $this->assertIsArray($array['performance']);
-        if (is_array($array['performance'])) {
-            $this->assertArrayHasKey('tokens_per_second', $array['performance']);
-            $this->assertArrayHasKey('cost_per_token', $array['performance']);
-        }
+        $this->assertArrayHasKey('tokens_per_second', $array['performance']);
+        $this->assertArrayHasKey('cost_per_token', $array['performance']);
     }
 
     public function testCreatesFromClaudeResponse(): void
