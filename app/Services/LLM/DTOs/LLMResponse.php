@@ -115,6 +115,7 @@ final readonly class LLMResponse
     {
         $content = '';
         $usage = $responseData['usage'] ?? [];
+
         if (!is_array($usage)) {
             $usage = [];
         }
@@ -134,7 +135,7 @@ final readonly class LLMResponse
         $cost = self::calculateClaudeCost(
             is_int($inputTokens) ? $inputTokens : 0,
             is_int($outputTokens) ? $outputTokens : 0,
-            $model
+            $model,
         );
 
         return new self(
@@ -173,8 +174,8 @@ final readonly class LLMResponse
             return 0.0;
         }
 
-        $inputCost = ($inputTokens / 1000000) * (float)($pricing['input_per_million'] ?? 0);
-        $outputCost = ($outputTokens / 1000000) * (float)($pricing['output_per_million'] ?? 0);
+        $inputCost = ($inputTokens / 1000000) * (float) ($pricing['input_per_million'] ?? 0);
+        $outputCost = ($outputTokens / 1000000) * (float) ($pricing['output_per_million'] ?? 0);
 
         return round($inputCost + $outputCost, 6);
     }

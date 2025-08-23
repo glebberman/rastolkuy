@@ -38,7 +38,7 @@ final class ClaudeAdapter implements LLMAdapterInterface
     public function __construct(
         private readonly string $apiKey,
         private readonly string $baseUrl = self::BASE_URL,
-        private readonly int    $timeoutSeconds = 60,
+        private readonly int $timeoutSeconds = 60,
     ) {
         $this->httpClient = new Client([
             'timeout' => $this->timeoutSeconds,
@@ -73,7 +73,7 @@ final class ClaudeAdapter implements LLMAdapterInterface
 
             $responseData = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
             $executionTime = (microtime(true) - $startTime) * 1000;
-            
+
             if (!is_array($responseData)) {
                 throw new LLMException('Invalid response format from Claude API');
             }
@@ -159,7 +159,7 @@ final class ClaudeAdapter implements LLMAdapterInterface
                 return false;
             }
         });
-        
+
         return is_bool($result) ? $result : false;
     }
 
@@ -171,11 +171,11 @@ final class ClaudeAdapter implements LLMAdapterInterface
     public function getSupportedModels(): array
     {
         $models = config('llm.models.claude', []);
-        
+
         if (!is_array($models)) {
             return [
                 'claude-3-5-sonnet-20241022',
-                'claude-3-5-haiku-20241022',  
+                'claude-3-5-haiku-20241022',
                 'claude-3-opus-20240229',
             ];
         }
@@ -184,7 +184,7 @@ final class ClaudeAdapter implements LLMAdapterInterface
             static function (array $modelConfig): string {
                 return is_string($modelConfig['id'] ?? null) ? $modelConfig['id'] : '';
             },
-            $models
+            $models,
         ));
     }
 
@@ -204,8 +204,8 @@ final class ClaudeAdapter implements LLMAdapterInterface
             return 0.0;
         }
 
-        $inputCost = ($inputTokens / 1000000) * (float)($pricing['input_per_million'] ?? 0);
-        $outputCost = ($outputTokens / 1000000) * (float)($pricing['output_per_million'] ?? 0);
+        $inputCost = ($inputTokens / 1000000) * (float) ($pricing['input_per_million'] ?? 0);
+        $outputCost = ($outputTokens / 1000000) * (float) ($pricing['output_per_million'] ?? 0);
 
         return round($inputCost + $outputCost, 6);
     }
@@ -259,6 +259,7 @@ final class ClaudeAdapter implements LLMAdapterInterface
         $statusCode = $e->getCode();
         $response = $e->getResponse();
         $responseBody = '';
+
         if ($response !== null) {
             $responseBody = $response->getBody()->getContents();
         }
@@ -275,6 +276,7 @@ final class ClaudeAdapter implements LLMAdapterInterface
                 throw LLMConnectionException::invalidApiKey(self::PROVIDER_NAME);
             case 429:
                 $headers = [];
+
                 if ($response !== null) {
                     $headers = $response->getHeaders();
                 }
@@ -317,18 +319,21 @@ final class ClaudeAdapter implements LLMAdapterInterface
     private function getDefaultModel(): string
     {
         $model = config('llm.providers.claude.default_model', 'claude-3-5-sonnet-20241022');
+
         return is_string($model) ? $model : 'claude-3-5-sonnet-20241022';
     }
 
     private function getDefaultMaxTokens(): int
     {
         $maxTokens = config('llm.providers.claude.max_tokens', 4096);
+
         return is_int($maxTokens) ? $maxTokens : 4096;
     }
 
     private function getDefaultTemperature(): float
     {
         $temperature = config('llm.providers.claude.temperature', 0.1);
-        return is_float($temperature) || is_int($temperature) ? (float)$temperature : 0.1;
+
+        return is_float($temperature) || is_int($temperature) ? (float) $temperature : 0.1;
     }
 }

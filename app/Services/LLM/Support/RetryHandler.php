@@ -7,6 +7,7 @@ namespace App\Services\LLM\Support;
 use App\Services\LLM\Exceptions\LLMException;
 use App\Services\LLM\Exceptions\LLMRateLimitException;
 use Closure;
+use Exception;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -100,7 +101,7 @@ final readonly class RetryHandler
         throw new LLMException(
             "Operation failed after {$this->maxAttempts} attempts: " . ($lastException?->getMessage() ?? 'Unknown error'),
             0,
-            $lastException instanceof \Exception ? $lastException : null,
+            $lastException instanceof Exception ? $lastException : null,
         );
     }
 
@@ -111,7 +112,7 @@ final readonly class RetryHandler
     {
         $maxAttempts = config('llm.providers.claude.max_retries', 3);
         $baseDelaySeconds = config('llm.providers.claude.retry_delay_seconds', 1);
-        
+
         return new self(
             maxAttempts: is_int($maxAttempts) ? $maxAttempts : 3,
             baseDelaySeconds: is_int($baseDelaySeconds) ? $baseDelaySeconds : 1,

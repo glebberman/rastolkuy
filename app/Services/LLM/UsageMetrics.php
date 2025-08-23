@@ -156,6 +156,7 @@ final readonly class UsageMetrics
         // Store in cache for recent access (keep for 24 hours)
         $cacheKey = 'llm_metrics:recent:' . now()->format('Y-m-d-H');
         $recentMetrics = Cache::get($cacheKey, []);
+
         if (!is_array($recentMetrics)) {
             $recentMetrics = [];
         }
@@ -198,7 +199,7 @@ final readonly class UsageMetrics
             'operation_types' => [],
             'models' => [],
         ]);
-        
+
         if (!is_array($aggregate)) {
             $aggregate = [
                 'date' => $dateKey,
@@ -219,21 +220,21 @@ final readonly class UsageMetrics
         }
 
         // Update counters
-        $aggregate['total_requests'] = (int)($aggregate['total_requests'] ?? 0) + 1;
+        $aggregate['total_requests'] = (int) ($aggregate['total_requests'] ?? 0) + 1;
 
         if ($metrics['success']) {
-            $aggregate['successful_requests'] = (int)($aggregate['successful_requests'] ?? 0) + 1;
+            $aggregate['successful_requests'] = (int) ($aggregate['successful_requests'] ?? 0) + 1;
             $totalTokens = $metrics['total_tokens'] ?? 0;
             $inputTokens = $metrics['input_tokens'] ?? 0;
             $outputTokens = $metrics['output_tokens'] ?? 0;
             $costUsd = $metrics['cost_usd'] ?? 0;
             $executionTime = $metrics['execution_time_ms'] ?? 0;
-            
-            $aggregate['total_tokens'] = (int)($aggregate['total_tokens'] ?? 0) + (is_numeric($totalTokens) ? (int)$totalTokens : 0);
-            $aggregate['total_input_tokens'] = (int)($aggregate['total_input_tokens'] ?? 0) + (is_numeric($inputTokens) ? (int)$inputTokens : 0);
-            $aggregate['total_output_tokens'] = (int)($aggregate['total_output_tokens'] ?? 0) + (is_numeric($outputTokens) ? (int)$outputTokens : 0);
-            $aggregate['total_cost_usd'] = (float)($aggregate['total_cost_usd'] ?? 0) + (is_numeric($costUsd) ? (float)$costUsd : 0.0);
-            $aggregate['total_execution_time_ms'] = (float)($aggregate['total_execution_time_ms'] ?? 0) + (is_numeric($executionTime) ? (float)$executionTime : 0.0);
+
+            $aggregate['total_tokens'] = (int) ($aggregate['total_tokens'] ?? 0) + (is_numeric($totalTokens) ? (int) $totalTokens : 0);
+            $aggregate['total_input_tokens'] = (int) ($aggregate['total_input_tokens'] ?? 0) + (is_numeric($inputTokens) ? (int) $inputTokens : 0);
+            $aggregate['total_output_tokens'] = (int) ($aggregate['total_output_tokens'] ?? 0) + (is_numeric($outputTokens) ? (int) $outputTokens : 0);
+            $aggregate['total_cost_usd'] = (float) ($aggregate['total_cost_usd'] ?? 0) + (is_numeric($costUsd) ? (float) $costUsd : 0.0);
+            $aggregate['total_execution_time_ms'] = (float) ($aggregate['total_execution_time_ms'] ?? 0) + (is_numeric($executionTime) ? (float) $executionTime : 0.0);
 
             // Calculate new average execution time
             if ($aggregate['successful_requests'] > 0) {
@@ -242,16 +243,18 @@ final readonly class UsageMetrics
 
             // Track models used
             $models = is_array($aggregate['models']) ? $aggregate['models'] : [];
+
             if ($metrics['model'] && !in_array($metrics['model'], $models, true)) {
                 $models[] = $metrics['model'];
                 $aggregate['models'] = $models;
             }
         } else {
-            $aggregate['failed_requests'] = (int)($aggregate['failed_requests'] ?? 0) + 1;
+            $aggregate['failed_requests'] = (int) ($aggregate['failed_requests'] ?? 0) + 1;
         }
 
         // Track document types
         $documentTypes = is_array($aggregate['document_types']) ? $aggregate['document_types'] : [];
+
         if ($metrics['document_type'] && !in_array($metrics['document_type'], $documentTypes, true)) {
             $documentTypes[] = $metrics['document_type'];
             $aggregate['document_types'] = $documentTypes;
@@ -259,6 +262,7 @@ final readonly class UsageMetrics
 
         // Track operation types
         $operationTypes = is_array($aggregate['operation_types']) ? $aggregate['operation_types'] : [];
+
         if ($metrics['operation_type'] && !in_array($metrics['operation_type'], $operationTypes, true)) {
             $operationTypes[] = $metrics['operation_type'];
             $aggregate['operation_types'] = $operationTypes;
@@ -325,6 +329,7 @@ final readonly class UsageMetrics
             $hourKey = now()->subHours($i)->format('Y-m-d-H');
             $cacheKey = 'llm_metrics:recent:' . $hourKey;
             $hourlyMetrics = Cache::get($cacheKey, []);
+
             if (!is_array($hourlyMetrics)) {
                 $hourlyMetrics = [];
             }
@@ -361,6 +366,7 @@ final readonly class UsageMetrics
     {
         $cacheKey = 'llm_metrics:recent:' . $hour;
         $hourlyMetrics = Cache::get($cacheKey, []);
+
         if (!is_array($hourlyMetrics)) {
             $hourlyMetrics = [];
         }
@@ -377,8 +383,8 @@ final readonly class UsageMetrics
         foreach ($hourlyMetrics as $metric) {
             if (is_array($metric) && ($metric['success'] ?? false)) {
                 ++$stats['successful_requests'];
-                $stats['total_tokens'] += (int)($metric['total_tokens'] ?? 0);
-                $stats['total_cost_usd'] += (float)($metric['cost_usd'] ?? 0);
+                $stats['total_tokens'] += (int) ($metric['total_tokens'] ?? 0);
+                $stats['total_cost_usd'] += (float) ($metric['cost_usd'] ?? 0);
             } else {
                 ++$stats['failed_requests'];
             }
@@ -407,7 +413,7 @@ final readonly class UsageMetrics
             'total_cost_usd' => 0,
             'avg_execution_time_ms' => 0,
         ]);
-        
+
         return is_array($metrics) ? $metrics : [];
     }
 }

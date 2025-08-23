@@ -79,9 +79,9 @@ return [
                 'context_window' => 200000,
                 'description' => 'Most capable model for complex tasks',
             ],
-            // Claude 4 Sonnet - Balanced performance  
+            // Claude 4 Sonnet - Balanced performance
             'sonnet-4' => [
-                'id' => 'claude-4-sonnet-20251205', 
+                'id' => 'claude-4-sonnet-20251205',
                 'name' => 'Claude Sonnet 4',
                 'context_window' => 200000,
                 'description' => 'Balanced performance and cost',
@@ -89,7 +89,7 @@ return [
             // Claude 3.5 Sonnet - Current production model
             'sonnet-3.5' => [
                 'id' => 'claude-3-5-sonnet-20241022',
-                'name' => 'Claude 3.5 Sonnet', 
+                'name' => 'Claude 3.5 Sonnet',
                 'context_window' => 200000,
                 'description' => 'Current production model with excellent performance',
             ],
@@ -97,7 +97,7 @@ return [
             'haiku-3.5' => [
                 'id' => 'claude-3-5-haiku-20241022',
                 'name' => 'Claude 3.5 Haiku',
-                'context_window' => 200000, 
+                'context_window' => 200000,
                 'description' => 'Fast and economical model for simple tasks',
             ],
             // Legacy models for compatibility
@@ -118,7 +118,7 @@ return [
     | Default model to use when none is specified.
     |
     */
-    
+
     'default_model' => env('LLM_DEFAULT_MODEL', 'claude-3-5-sonnet-20241022'),
 
     /*

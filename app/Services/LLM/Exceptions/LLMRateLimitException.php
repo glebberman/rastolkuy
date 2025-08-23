@@ -40,16 +40,17 @@ final class LLMRateLimitException extends LLMException
     public static function fromApiResponse(string $provider, array $responseHeaders = []): self
     {
         $retryAfterRaw = $responseHeaders['retry-after'] ?? $responseHeaders['Retry-After'] ?? null;
-        
+
         // Handle case where header might be an array
         $retryAfter = null;
+
         if ($retryAfterRaw !== null) {
             if (is_array($retryAfterRaw)) {
                 $retryAfter = reset($retryAfterRaw); // Get first value
             } else {
                 $retryAfter = $retryAfterRaw;
             }
-            
+
             // Ensure it's a string or number
             if (!is_scalar($retryAfter)) {
                 $retryAfter = null;
