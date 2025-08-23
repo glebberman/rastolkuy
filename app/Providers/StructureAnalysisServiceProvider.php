@@ -26,7 +26,7 @@ class StructureAnalysisServiceProvider extends ServiceProvider
         $this->app->singleton(StructureAnalyzer::class, function ($app) {
             return new StructureAnalyzer(
                 $app->make(SectionDetectorInterface::class),
-                $app->make(AnchorGeneratorInterface::class)
+                $app->make(AnchorGeneratorInterface::class),
             );
         });
 
@@ -42,7 +42,7 @@ class StructureAnalysisServiceProvider extends ServiceProvider
         // Публикация конфигурации (если нужно)
         if ($this->app->runningInConsole()) {
             $this->publishes([
-                __DIR__.'/../../config/structure_analysis.php' => config_path('structure_analysis.php'),
+                __DIR__ . '/../../config/structure_analysis.php' => config_path('structure_analysis.php'),
             ], 'structure-analysis-config');
         }
     }

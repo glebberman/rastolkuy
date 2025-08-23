@@ -26,6 +26,9 @@ class ElementClassifier
     {
         $text = trim($text);
 
+        // Position parameter reserved for future use (page numbers, coordinates, etc.)
+        unset($position);
+
         if (empty($text)) {
             return 'text';
         }
@@ -133,8 +136,8 @@ class ElementClassifier
         // Bold and larger than normal
         $boldMinFontSize = config('extractors.classification.bold_min_font_size', 12);
 
-        if (isset($style['font_weight']) && str_contains($style['font_weight'], 'bold') && 
-            isset($style['font_size']) && (int) $style['font_size'] >= $boldMinFontSize) {
+        if (isset($style['font_weight'], $style['font_size']) && (int) $style['font_size'] >= $boldMinFontSize
+            && str_contains($style['font_weight'], 'bold')) {
             return true;
         }
 

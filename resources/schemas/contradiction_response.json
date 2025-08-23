@@ -1,0 +1,207 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Contradiction Analysis Response Schema",
+  "description": "Схема для ответов системы анализа противоречий в юридических документах",
+  "required": [
+    "contradictions_found",
+    "analysis_summary"
+  ],
+  "properties": {
+    "contradictions_found": {
+      "type": "array",
+      "description": "Список найденных противоречий",
+      "items": {
+        "type": "object",
+        "required": ["id", "type", "description", "severity", "locations"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Уникальный идентификатор противоречия"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["logical", "legal", "terminological", "procedural", "temporal"],
+            "description": "Тип противоречия"
+          },
+          "description": {
+            "type": "string",
+            "description": "Описание противоречия простым языком"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Уровень критичности противоречия"
+          },
+          "locations": {
+            "type": "array",
+            "description": "Места в документе где обнаружено противоречие",
+            "items": {
+              "type": "object",
+              "required": ["section", "text_fragment"],
+              "properties": {
+                "section": {
+                  "type": "string",
+                  "description": "Название или номер раздела"
+                },
+                "text_fragment": {
+                  "type": "string",
+                  "description": "Фрагмент текста с противоречием"
+                },
+                "position": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "integer",
+                      "description": "Начальная позиция в тексте"
+                    },
+                    "end": {
+                      "type": "integer",
+                      "description": "Конечная позиция в тексте"
+                    }
+                  }
+                },
+                "anchor": {
+                  "type": "string",
+                  "description": "Якорь на место в документе где обнаружено противоречие"
+                },
+                "section_reference": {
+                  "type": "string",
+                  "description": "Ссылка на секцию документа"
+                }
+              }
+            }
+          },
+          "conflicting_statements": {
+            "type": "array",
+            "description": "Конфликтующие утверждения",
+            "items": {
+              "type": "object",
+              "required": ["statement", "location"],
+              "properties": {
+                "statement": {
+                  "type": "string",
+                  "description": "Конфликтующее утверждение"
+                },
+                "location": {
+                  "type": "string",
+                  "description": "Местоположение утверждения"
+                }
+              }
+            }
+          },
+          "resolution_suggestions": {
+            "type": "array",
+            "description": "Предложения по разрешению противоречия",
+            "items": {
+              "type": "string"
+            }
+          },
+          "legal_implications": {
+            "type": "array",
+            "description": "Правовые последствия противоречия",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "analysis_summary": {
+      "type": "object",
+      "description": "Сводка анализа противоречий",
+      "required": ["total_contradictions", "severity_distribution"],
+      "properties": {
+        "total_contradictions": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Общее количество найденных противоречий"
+        },
+        "severity_distribution": {
+          "type": "object",
+          "description": "Распределение противоречий по уровню критичности",
+          "properties": {
+            "critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "high": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "medium": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "low": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "type_distribution": {
+          "type": "object",
+          "description": "Распределение противоречий по типам",
+          "properties": {
+            "logical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "legal": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "terminological": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "procedural": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "temporal": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "overall_consistency_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Общая оценка согласованности документа (0-1)"
+        },
+        "recommendations": {
+          "type": "array",
+          "description": "Общие рекомендации по улучшению документа",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "methodology": {
+      "type": "object",
+      "description": "Информация о методологии анализа",
+      "properties": {
+        "analysis_approach": {
+          "type": "string",
+          "description": "Подход к анализу"
+        },
+        "confidence_level": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Уровень уверенности в результатах"
+        },
+        "limitations": {
+          "type": "array",
+          "description": "Ограничения анализа",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

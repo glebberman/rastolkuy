@@ -141,6 +141,7 @@ class EncodingDetector
     {
         // Check for extended ASCII characters
         $contentLength = strlen($content);
+
         for ($i = 0; $i < $contentLength; ++$i) {
             $byte = ord($content[$i]);
 

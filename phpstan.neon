@@ -46,7 +46,6 @@ parameters:
         - '_ide_helper_models.php'
         - '.phpstorm.meta.php'
 
-    # Type coverage
+    # Type coverage - используем только уникальные алиасы
     typeAliases:
-        Eloquent: 'Illuminate\Database\Eloquent\Model'
-        Collection: 'Illuminate\Support\Collection'
+        EloquentModel: 'Illuminate\Database\Eloquent\Model'

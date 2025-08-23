@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Translation Response Schema",
+  "description": "Схема для ответов системы перевода юридических документов",
+  "required": [
+    "simplified_text",
+    "translation_quality",
+    "legal_terms_preserved",
+    "section_translations"
+  ],
+  "properties": {
+    "simplified_text": {
+      "type": "string",
+      "description": "Упрощенный текст документа на понятном языке",
+      "minLength": 10
+    },
+    "translation_quality": {
+      "type": "object",
+      "description": "Оценка качества перевода",
+      "required": ["clarity_score", "completeness_score"],
+      "properties": {
+        "clarity_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Оценка ясности перевода (0-1)"
+        },
+        "completeness_score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Оценка полноты перевода (0-1)"
+        },
+        "readability_level": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced"],
+          "description": "Уровень сложности текста"
+        }
+      }
+    },
+    "legal_terms_preserved": {
+      "type": "array",
+      "description": "Список сохраненных юридических терминов с объяснениями",
+      "items": {
+        "type": "object",
+        "required": ["term", "explanation"],
+        "properties": {
+          "term": {
+            "type": "string",
+            "description": "Юридический термин"
+          },
+          "explanation": {
+            "type": "string",
+            "description": "Простое объяснение термина"
+          },
+          "context": {
+            "type": "string",
+            "description": "Контекст использования термина"
+          }
+        }
+      }
+    },
+    "section_translations": {
+      "type": "array",
+      "description": "Переводы секций документа с указанием якорей для вставки",
+      "items": {
+        "type": "object",
+        "required": ["anchor", "section_title", "translated_content"],
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "description": "Якорь секции куда вставляется перевод"
+          },
+          "section_title": {
+            "type": "string",
+            "description": "Название секции"
+          },
+          "translated_content": {
+            "type": "string",
+            "description": "Переведенное содержимое секции"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Краткое резюме секции"
+          }
+        }
+      }
+    },
+    "key_concepts": {
+      "type": "array",
+      "description": "Основные концепции документа",
+      "items": {
+        "type": "object",
+        "required": ["concept", "description"],
+        "properties": {
+          "concept": {
+            "type": "string",
+            "description": "Название концепции"
+          },
+          "description": {
+            "type": "string",
+            "description": "Объяснение концепции простым языком"
+          },
+          "importance": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Важность концепции"
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "description": "Предупреждения о потенциальных проблемах перевода",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Метаданные о процессе перевода",
+      "properties": {
+        "original_length": {
+          "type": "integer",
+          "description": "Длина оригинального текста"
+        },
+        "simplified_length": {
+          "type": "integer",
+          "description": "Длина упрощенного текста"
+        },
+        "complexity_reduction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Степень упрощения (0-1)"
+        }
+      }
+    }
+  }
+}

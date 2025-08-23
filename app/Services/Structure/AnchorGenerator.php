@@ -29,7 +29,7 @@ final class AnchorGenerator implements AnchorGeneratorInterface
     {
         /** @var array<string, mixed> $config */
         $config = Config::get('structure_analysis.anchor_generation', []);
-        
+
         // Безопасное извлечение строковых значений
         /** @var string $prefix */
         $prefix = $config['prefix'] ?? '<!-- SECTION_ANCHOR_';
@@ -37,7 +37,7 @@ final class AnchorGenerator implements AnchorGeneratorInterface
         $suffix = $config['suffix'] ?? ' -->';
         /** @var int $maxLength */
         $maxLength = $config['max_title_length'] ?? 50;
-        
+
         $this->anchorPrefix = $prefix;
         $this->anchorSuffix = $suffix;
         $this->maxTitleLength = $maxLength;
@@ -179,7 +179,7 @@ final class AnchorGenerator implements AnchorGeneratorInterface
 
         // Удаляем специальные символы, оставляем только буквы, цифры, пробелы и дефисы
         $title = preg_replace('/[^\w\s-]/u', '', $title) ?? '';
-        
+
         // Заменяем пробелы и дефисы на подчеркивания
         $title = preg_replace('/[\s-]+/', '_', $title) ?? '';
         $title = trim($title, '_');

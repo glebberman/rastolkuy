@@ -56,12 +56,12 @@ class SectionDetectorCacheTest extends TestCase
             ],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         // Очищаем кэш перед тестом
         $this->detector->clearPatternCache();
-        
+
         // Первый анализ - должен заполнить кэш
         $sections1 = $this->detector->detectSections($document);
         $stats1 = $this->detector->getCacheStats();
@@ -72,8 +72,9 @@ class SectionDetectorCacheTest extends TestCase
 
         // Результаты должны быть одинаковыми
         $this->assertEquals($sections1, $sections2);
-        
-        // Кэш должен содержать записи
+
+        // Кэш должен расти между вызовами
+        $this->assertGreaterThanOrEqual($stats1['cache_size'], $stats2['cache_size']);
         $this->assertGreaterThan(0, $stats2['cache_size']);
     }
 
@@ -87,7 +88,7 @@ class SectionDetectorCacheTest extends TestCase
             ],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         // Анализируем документ для заполнения кэша

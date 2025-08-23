@@ -54,7 +54,7 @@ class StructureAnalyzerHierarchyTest extends TestCase
 
         $this->analyzer = new StructureAnalyzer(
             new SectionDetector(new AnchorGenerator()),
-            new AnchorGenerator()
+            new AnchorGenerator(),
         );
     }
 
@@ -75,12 +75,11 @@ class StructureAnalyzerHierarchyTest extends TestCase
             ],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         $result = $this->analyzer->analyze($document);
         $sections = $result->sections;
-
 
         // Должно быть 2 корневых секции
         $this->assertCount(2, $sections);
@@ -117,7 +116,7 @@ class StructureAnalyzerHierarchyTest extends TestCase
             ],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         $result = $this->analyzer->analyze($document);
@@ -149,7 +148,7 @@ class StructureAnalyzerHierarchyTest extends TestCase
             elements: [],
             metadata: [],
             totalPages: 1,
-            extractionTime: 0.1
+            extractionTime: 0.1,
         );
 
         $result = $this->analyzer->analyze($document);
