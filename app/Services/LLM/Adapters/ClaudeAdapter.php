@@ -36,9 +36,9 @@ final class ClaudeAdapter implements LLMAdapterInterface
      * @param int $timeoutSeconds Request timeout in seconds
      */
     public function __construct(
-        private string $apiKey,
-        private string $baseUrl = self::BASE_URL,
-        private int $timeoutSeconds = 60,
+        private readonly string $apiKey,
+        private readonly string $baseUrl = self::BASE_URL,
+        private readonly int    $timeoutSeconds = 60,
     ) {
         $this->httpClient = new Client([
             'timeout' => $this->timeoutSeconds,
@@ -170,11 +170,22 @@ final class ClaudeAdapter implements LLMAdapterInterface
 
     public function getSupportedModels(): array
     {
-        return [
-            'claude-3-5-sonnet-20241022',
-            'claude-3-5-haiku-20241022',
-            'claude-3-opus-20240229',
-        ];
+        $models = config('llm.models.claude', []);
+        
+        if (!is_array($models)) {
+            return [
+                'claude-3-5-sonnet-20241022',
+                'claude-3-5-haiku-20241022',  
+                'claude-3-opus-20240229',
+            ];
+        }
+
+        return array_values(array_map(
+            static function (array $modelConfig): string {
+                return is_string($modelConfig['id'] ?? null) ? $modelConfig['id'] : '';
+            },
+            $models
+        ));
     }
 
     public function calculateCost(int $inputTokens, int $outputTokens, string $model): float
