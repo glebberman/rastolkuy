@@ -39,7 +39,8 @@ final readonly class DocumentProcessor
     public function processFile(
         string|UploadedFile $file,
         string $taskType = 'translation',
-        array $options = []
+        array $options = [],
+        bool $addAnchorAtStart = false
     ): string {
         $filePath = $file instanceof UploadedFile ? $file->getRealPath() : $file;
         
@@ -47,6 +48,7 @@ final readonly class DocumentProcessor
             'file_path' => $filePath,
             'task_type' => $taskType,
             'file_size' => is_string($file) ? filesize($file) : $file->getSize(),
+            'anchor_position' => $addAnchorAtStart ? 'start' : 'end',
         ]);
 
         try {
@@ -54,7 +56,7 @@ final readonly class DocumentProcessor
             $extractedDocument = $this->extractorManager->extract($filePath, ExtractionConfig::createDefault());
             
             // 2. Обрабатываем извлеченный документ
-            return $this->processExtractedDocument($extractedDocument, $taskType, $options);
+            return $this->processExtractedDocument($extractedDocument, $taskType, $options, $addAnchorAtStart);
             
         } catch (Exception $e) {
             Log::error('File processing failed', [
@@ -73,12 +75,14 @@ final readonly class DocumentProcessor
     public function processExtractedDocument(
         ExtractedDocument $extractedDocument,
         string $taskType = 'translation', 
-        array $options = []
+        array $options = [],
+        bool $addAnchorAtStart = false
     ): string {
         Log::info('Starting extracted document processing', [
             'task_type' => $taskType,
             'elements_count' => count($extractedDocument->elements),
             'document_path' => $extractedDocument->originalPath,
+            'anchor_position' => $addAnchorAtStart ? 'start' : 'end',
         ]);
 
         try {
@@ -91,12 +95,12 @@ final readonly class DocumentProcessor
                 ]);
                 
                 // Fallback: обрабатываем как простой текст
-                return $this->processPlainText($extractedDocument->getPlainText(), $taskType, $options);
+                return $this->processPlainText($extractedDocument->getPlainText(), $taskType, $options, $addAnchorAtStart);
             }
 
             // 2. Добавляем якоря к документу
             $originalContent = $extractedDocument->getPlainText();
-            $sectionsWithAnchors = $this->addAnchorsToDocument($originalContent, $structureResult->sections);
+            $sectionsWithAnchors = $this->addAnchorsToDocument($originalContent, $structureResult->sections, $addAnchorAtStart);
 
             // 3. Подготавливаем список якорей для валидации
             $anchorIds = $this->extractAnchorIds($structureResult->sections);
@@ -145,11 +149,13 @@ final readonly class DocumentProcessor
     public function processPlainText(
         string $documentContent,
         string $taskType = 'translation',
-        array $options = []
+        array $options = [],
+        bool $addAnchorAtStart = false
     ): string {
         Log::info('Starting plain text processing', [
             'task_type' => $taskType,
             'content_length' => mb_strlen($documentContent),
+            'anchor_position' => $addAnchorAtStart ? 'start' : 'end',
         ]);
 
         try {
@@ -170,7 +176,7 @@ final readonly class DocumentProcessor
             );
 
             // Используем общий процессор для извлеченных документов
-            return $this->processExtractedDocument($extractedDocument, $taskType, $options);
+            return $this->processExtractedDocument($extractedDocument, $taskType, $options, $addAnchorAtStart);
             
         } catch (Exception $e) {
             Log::error('Plain text processing failed', [
@@ -209,8 +215,9 @@ final readonly class DocumentProcessor
      * Добавляет якоря к документу для идентификации секций
      *
      * @param array<DocumentSection> $sections
+     * @param bool $addAnchorAtStart По умолчанию false (якорь в конце секции)
      */
-    private function addAnchorsToDocument(string $content, array $sections): string
+    private function addAnchorsToDocument(string $content, array $sections, bool $addAnchorAtStart = false): string
     {
         $documentWithAnchors = $content;
         
@@ -222,13 +229,18 @@ final readonly class DocumentProcessor
             // Используем существующий якорь секции (уже сгенерированный StructureAnalyzer)
             $anchor = $section->anchor;
             
-            // Вставляем якорь в начало секции
             $beforeSection = substr($documentWithAnchors, 0, $section->startPosition);
             $sectionContent = substr($documentWithAnchors, $section->startPosition, 
                 $section->endPosition - $section->startPosition);
             $afterSection = substr($documentWithAnchors, $section->endPosition);
 
-            $documentWithAnchors = $beforeSection . $anchor . "\n" . $sectionContent . $afterSection;
+            if ($addAnchorAtStart) {
+                // Вставляем якорь в начало секции
+                $documentWithAnchors = $beforeSection . $anchor . "\n" . $sectionContent . $afterSection;
+            } else {
+                // Вставляем якорь в конец секции (по умолчанию)
+                $documentWithAnchors = $beforeSection . $sectionContent . "\n" . $anchor . $afterSection;
+            }
         }
 
         return $documentWithAnchors;
