@@ -317,6 +317,17 @@ final readonly class LlmResponseParser
     {
         $anchors = [];
 
+        // Новый упрощенный формат - все схемы используют массив sections
+        if (isset($data['sections']) && is_array($data['sections'])) {
+            foreach ($data['sections'] as $section) {
+                if (isset($section['anchor']) && is_string($section['anchor'])) {
+                    $anchors[] = $section['anchor'];
+                }
+            }
+            return array_unique($anchors);
+        }
+
+        // Fallback для старого формата
         switch ($schemaType) {
             case 'translation':
                 if (isset($data['section_translations']) && is_array($data['section_translations'])) {
@@ -329,6 +340,7 @@ final readonly class LlmResponseParser
                 break;
 
             case 'contradiction':
+            case 'ambiguity':
                 if (isset($data['contradictions_found']) && is_array($data['contradictions_found'])) {
                     foreach ($data['contradictions_found'] as $contradiction) {
                         if (isset($contradiction['locations']) && is_array($contradiction['locations'])) {

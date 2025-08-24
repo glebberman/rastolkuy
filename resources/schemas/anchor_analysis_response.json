@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Anchor Analysis Response Schema", 
+  "description": "Упрощенная схема для анализа по якорям секций",
+  "required": ["sections"],
+  "properties": {
+    "sections": {
+      "type": "array",
+      "description": "Анализ секций документа с якорями",
+      "items": {
+        "type": "object",
+        "required": ["anchor", "content", "analysis_type"],
+        "properties": {
+          "anchor": {
+            "type": "string", 
+            "description": "Якорь секции которая анализируется",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "content": {
+            "type": "string",
+            "description": "Результат анализа секции",
+            "minLength": 1
+          },
+          "analysis_type": {
+            "type": "string",
+            "enum": ["contradiction", "ambiguity", "risk", "recommendation"],
+            "description": "Тип анализа"
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low"],
+            "description": "Уровень важности найденной проблемы"
+          },
+          "suggestions": {
+            "type": "array",
+            "description": "Предложения по улучшению",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "description": "Общая сводка анализа",
+      "properties": {
+        "total_issues": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "critical_issues": {
+          "type": "integer", 
+          "minimum": 0
+        },
+        "recommendations_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

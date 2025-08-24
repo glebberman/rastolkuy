@@ -298,6 +298,85 @@ final readonly class LLMService
     }
 
     /**
+     * Execute a general LLM request with custom prompt and options.
+     *
+     * @param string $prompt The prompt to send
+     * @param array<string, mixed> $options Options including model, temperature, etc.
+     *
+     * @throws LLMException
+     *
+     * @return LLMResponse The LLM response
+     */
+    public function generate(string $prompt, array $options = []): LLMResponse
+    {
+        $systemPrompt = is_string($options['system_prompt'] ?? null) ? $options['system_prompt'] : null;
+        $model = is_string($options['model'] ?? null) ? $options['model'] : null;
+        $maxTokens = is_int($options['max_tokens'] ?? null) ? $options['max_tokens'] : null;
+        $temperature = is_numeric($options['temperature'] ?? null) ? (float) $options['temperature'] : null;
+
+        $request = new LLMRequest(
+            content: $prompt,
+            systemPrompt: $systemPrompt,
+            model: $model,
+            maxTokens: $maxTokens,
+            temperature: $temperature,
+            options: $options,
+            metadata: [
+                'request_type' => 'general',
+                'created_at' => now()->toISOString(),
+            ],
+        );
+
+        Log::info('Starting general LLM request', [
+            'content_length' => mb_strlen($prompt),
+            'model' => $request->model ?? 'default',
+            'estimated_tokens' => $request->getEstimatedInputTokens(),
+        ]);
+
+        $startTime = microtime(true);
+
+        try {
+            // Check rate limits before making request
+            $this->rateLimiter->checkAndReserve($request->getEstimatedInputTokens());
+
+            // Execute request with retry logic
+            $response = $this->retryHandler->execute(
+                operation: fn () => $this->adapter->execute($request),
+                operationName: 'general LLM request',
+            );
+
+            // Record actual usage
+            $this->rateLimiter->recordUsage($response->getTotalTokens());
+            $this->usageMetrics->recordTranslation($response, 'general', 'prompt');
+
+            $executionTime = (microtime(true) - $startTime) * 1000;
+
+            Log::info('General LLM request completed', [
+                'content_length' => mb_strlen($prompt),
+                'response_length' => mb_strlen($response->content),
+                'execution_time_ms' => $executionTime,
+                'cost_usd' => $response->costUsd,
+                'model' => $response->model,
+            ]);
+
+            return $response;
+        } catch (LLMException $e) {
+            $executionTime = (microtime(true) - $startTime) * 1000;
+
+            Log::error('General LLM request failed', [
+                'content_length' => mb_strlen($prompt),
+                'execution_time_ms' => $executionTime,
+                'error' => $e->getMessage(),
+                'context' => $e->getContext(),
+            ]);
+
+            $this->usageMetrics->recordFailure($e, 'general', 'prompt');
+
+            throw $e;
+        }
+    }
+
+    /**
      * Get the default model for the current adapter.
      */
     private function getDefaultModel(): string

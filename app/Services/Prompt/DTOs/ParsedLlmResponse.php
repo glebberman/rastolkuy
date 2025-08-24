@@ -62,4 +62,61 @@ final readonly class ParsedLlmResponse
 
         return $current;
     }
+
+    /**
+     * Извлекает содержимое для конкретного якоря из ответа
+     */
+    public function getContentByAnchor(string $anchor): ?string
+    {
+        // Новый упрощенный формат
+        if (isset($this->parsedData['sections']) && is_array($this->parsedData['sections'])) {
+            foreach ($this->parsedData['sections'] as $section) {
+                if (isset($section['anchor'], $section['content']) 
+                    && $section['anchor'] === $anchor) {
+                    return $section['content'];
+                }
+            }
+        }
+
+        // Fallback для старого формата
+        if (isset($this->parsedData['section_translations']) && is_array($this->parsedData['section_translations'])) {
+            foreach ($this->parsedData['section_translations'] as $section) {
+                if (isset($section['anchor'], $section['translated_content']) 
+                    && $section['anchor'] === $anchor) {
+                    return $section['translated_content'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Возвращает все пары якорь => содержимое
+     */
+    public function getAnchorContentMap(): array
+    {
+        $map = [];
+
+        // Новый упрощенный формат
+        if (isset($this->parsedData['sections']) && is_array($this->parsedData['sections'])) {
+            foreach ($this->parsedData['sections'] as $section) {
+                if (isset($section['anchor'], $section['content'])) {
+                    $map[$section['anchor']] = $section['content'];
+                }
+            }
+            return $map;
+        }
+
+        // Fallback для старого формата
+        if (isset($this->parsedData['section_translations']) && is_array($this->parsedData['section_translations'])) {
+            foreach ($this->parsedData['section_translations'] as $section) {
+                if (isset($section['anchor'], $section['translated_content'])) {
+                    $map[$section['anchor']] = $section['translated_content'];
+                }
+            }
+        }
+
+        return $map;
+    }
 }

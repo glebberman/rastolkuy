@@ -7,6 +7,8 @@ namespace App\Services\Prompt;
 use App\Models\PromptExecution;
 use App\Models\PromptSystem;
 use App\Models\PromptTemplate;
+use App\Services\LLM\Exceptions\LLMException;
+use App\Services\LLM\LLMService;
 use App\Services\Prompt\DTOs\PromptExecutionResult;
 use App\Services\Prompt\DTOs\PromptRenderRequest;
 use App\Services\Prompt\Exceptions\PromptException;
@@ -19,7 +21,7 @@ final readonly class PromptManager
 {
     public function __construct(
         private TemplateEngine $templateEngine,
-        private ClaudeApiClient $claudeApiClient,
+        private LLMService $llmService,
         private QualityAnalyzer $qualityAnalyzer,
     ) {
     }
@@ -50,9 +52,14 @@ final readonly class PromptManager
 
             $execution = $this->createExecution($promptSystem, $template, $executionId, $renderedPrompt, $enrichedVariables);
 
-            $llmResponse = $this->claudeApiClient->execute($promptSystem, $renderedPrompt, $request->options);
+            // Prepare options for LLM service
+            $llmOptions = array_merge($request->options, [
+                'system_prompt' => $promptSystem->system_prompt,
+            ]);
 
-            $qualityMetrics = $this->qualityAnalyzer->analyze($llmResponse['content'] ?? '', $promptSystem->schema);
+            $llmResponse = $this->llmService->generate($renderedPrompt, $llmOptions);
+
+            $qualityMetrics = $this->qualityAnalyzer->analyze($llmResponse->content, $promptSystem->schema);
 
             $result = $this->completeExecution($execution, $llmResponse, $qualityMetrics, $startTime);
 
@@ -63,6 +70,11 @@ final readonly class PromptManager
             ]);
 
             return $result;
+        } catch (LLMException $e) {
+            $this->handleExecutionError($executionId, $e, $startTime);
+            
+            // Wrap LLM exception in PromptException for consistency
+            throw new PromptException("LLM request failed: {$e->getMessage()}", previous: $e);
         } catch (Exception $e) {
             $this->handleExecutionError($executionId, $e, $startTime);
 
@@ -196,18 +208,18 @@ final readonly class PromptManager
 
     private function completeExecution(
         PromptExecution $execution,
-        array $llmResponse,
+        \App\Services\LLM\DTOs\LLMResponse $llmResponse,
         array $qualityMetrics,
         float $startTime,
     ): PromptExecutionResult {
         $executionTime = (microtime(true) - $startTime) * 1000;
 
         $execution->update([
-            'llm_response' => $llmResponse['content'] ?? '',
-            'model_used' => $llmResponse['model'] ?? null,
-            'tokens_used' => $llmResponse['tokens'] ?? null,
+            'llm_response' => $llmResponse->content,
+            'model_used' => $llmResponse->model,
+            'tokens_used' => $llmResponse->getTotalTokens(),
             'execution_time_ms' => $executionTime,
-            'cost_usd' => $llmResponse['cost'] ?? null,
+            'cost_usd' => $llmResponse->costUsd,
             'status' => 'success',
             'quality_metrics' => $qualityMetrics,
             'completed_at' => now(),
@@ -215,12 +227,12 @@ final readonly class PromptManager
 
         return new PromptExecutionResult(
             executionId: $execution->execution_id,
-            response: $llmResponse['content'] ?? '',
+            response: $llmResponse->content,
             executionTimeMs: $executionTime,
-            tokensUsed: $llmResponse['tokens'] ?? 0,
-            costUsd: $llmResponse['cost'] ?? 0.0,
+            tokensUsed: $llmResponse->getTotalTokens(),
+            costUsd: $llmResponse->costUsd,
             qualityMetrics: $qualityMetrics,
-            metadata: $llmResponse['metadata'] ?? [],
+            metadata: $llmResponse->metadata,
         );
     }
 
