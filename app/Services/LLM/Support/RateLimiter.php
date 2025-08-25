@@ -149,7 +149,7 @@ final readonly class RateLimiter
     public static function forProvider(string $provider): self
     {
         $config = config("llm.rate_limiting.{$provider}", []);
-        
+
         if (!is_array($config)) {
             $config = [];
         }

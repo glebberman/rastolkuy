@@ -48,6 +48,7 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
         public readonly ?string $callbackUrl = null,
     ) {
         $queueName = config('llm.queue.queue_name', 'llm-processing');
+
         if (is_string($queueName)) {
             $this->onQueue($queueName);
         }
@@ -165,6 +166,7 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
     ): string {
         $batchId = 'batch_' . uniqid() . '_' . now()->timestamp;
         $batchSize = config('llm.queue.batch_size', 10);
+
         if (!is_int($batchSize) || $batchSize < 1) {
             $batchSize = 10;
         }
@@ -216,9 +218,9 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
     public static function getBatchResult(string $batchId): ?array
     {
         $cacheKey = "llm_batch_result:{$batchId}";
-        
+
         $result = cache()->get($cacheKey);
-        
+
         return is_array($result) ? $result : null;
     }
 
@@ -306,7 +308,7 @@ final class ProcessLLMBatchTranslationJob implements ShouldQueue
             if ($this->callbackUrl === null) {
                 return;
             }
-            
+
             $client = new \GuzzleHttp\Client(['timeout' => 30]);
 
             $response = $client->post($this->callbackUrl, [

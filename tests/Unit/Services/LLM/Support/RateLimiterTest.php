@@ -83,7 +83,7 @@ final class RateLimiterTest extends TestCase
         $this->assertIsArray($stats['tokens']);
         $this->assertIsArray($stats['requests']['per_minute']);
         $this->assertIsArray($stats['tokens']['per_minute']);
-        
+
         $this->assertEquals(2, $stats['requests']['per_minute']['used']);
         $this->assertEquals(3, $stats['requests']['per_minute']['remaining']);
         $this->assertEquals(300, $stats['tokens']['per_minute']['used']);
@@ -136,7 +136,7 @@ final class RateLimiterTest extends TestCase
         $this->assertIsArray($stats['tokens']);
         $this->assertIsArray($stats['requests']['per_minute']);
         $this->assertIsArray($stats['tokens']['per_minute']);
-        
+
         $this->assertEquals(100, $stats['requests']['per_minute']['limit']);
         $this->assertEquals(50000, $stats['tokens']['per_minute']['limit']);
     }
@@ -168,7 +168,7 @@ final class RateLimiterTest extends TestCase
         $this->assertArrayHasKey('per_hour', $stats['tokens']);
         $this->assertIsArray($stats['requests']['per_hour']);
         $this->assertIsArray($stats['tokens']['per_hour']);
-        
+
         $this->assertEquals(1, $stats['requests']['per_hour']['used']);
         $this->assertEquals(100, $stats['tokens']['per_hour']['used']);
     }
@@ -183,7 +183,7 @@ final class RateLimiterTest extends TestCase
         $this->assertIsArray($stats['tokens']);
         $this->assertIsArray($stats['requests']['per_minute']);
         $this->assertIsArray($stats['tokens']['per_minute']);
-        
+
         $this->assertEquals(1, $stats['requests']['per_minute']['used']);
         $this->assertEquals(0, $stats['tokens']['per_minute']['used']);
     }
@@ -198,7 +198,7 @@ final class RateLimiterTest extends TestCase
         $stats = $this->rateLimiter->getUsageStats();
         $this->assertIsArray($stats['requests']);
         $this->assertIsArray($stats['requests']['per_minute']);
-        
+
         $this->assertEquals(0, $stats['requests']['per_minute']['remaining']);
         $this->assertGreaterThanOrEqual(0, $stats['requests']['per_minute']['remaining']);
     }

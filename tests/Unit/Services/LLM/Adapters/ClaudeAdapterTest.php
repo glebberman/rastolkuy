@@ -18,6 +18,7 @@ use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Cache;
 use ReflectionClass;
+use RuntimeException;
 use Tests\TestCase;
 
 final class ClaudeAdapterTest extends TestCase
@@ -50,15 +51,6 @@ final class ClaudeAdapterTest extends TestCase
             \Illuminate\Support\Facades\Config::set('cache.default', 'array');
         }
         Cache::flush();
-    }
-
-    private function jsonEncode(array $data): string
-    {
-        $result = json_encode($data);
-        if ($result === false) {
-            throw new \RuntimeException('JSON encoding failed');
-        }
-        return $result;
     }
 
     public function testExecutesSuccessfulRequest(): void
@@ -326,5 +318,16 @@ final class ClaudeAdapterTest extends TestCase
 
         // MockHandler should have only been called once
         $this->assertEquals(0, $this->mockHandler->count());
+    }
+
+    private function jsonEncode(array $data): string
+    {
+        $result = json_encode($data);
+
+        if ($result === false) {
+            throw new RuntimeException('JSON encoding failed');
+        }
+
+        return $result;
     }
 }

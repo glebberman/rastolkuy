@@ -49,6 +49,7 @@ final class ProcessLLMTranslationJob implements ShouldQueue
         public readonly ?string $callbackUrl = null,
     ) {
         $queueName = config('llm.queue.queue_name', 'llm-processing');
+
         if (is_string($queueName)) {
             $this->onQueue($queueName);
         }
@@ -184,9 +185,9 @@ final class ProcessLLMTranslationJob implements ShouldQueue
     public static function getResult(string $jobId): ?array
     {
         $cacheKey = "llm_job_result:{$jobId}";
-        
+
         $result = cache()->get($cacheKey);
-        
+
         return is_array($result) ? $result : null;
     }
 
@@ -264,7 +265,7 @@ final class ProcessLLMTranslationJob implements ShouldQueue
             if ($this->callbackUrl === null) {
                 return;
             }
-            
+
             $response = $client->post($this->callbackUrl, [
                 'json' => $result,
                 'headers' => [

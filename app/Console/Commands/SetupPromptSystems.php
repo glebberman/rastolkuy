@@ -40,7 +40,7 @@ class SetupPromptSystems extends Command
         $this->info('Creating translation system...');
 
         $schemaManager = app(SchemaManager::class);
-        $schema = $schemaManager->getSchema('translation_response');
+        $schema = $schemaManager->getSchema('anchor_translation_response');
 
         $system = PromptSystem::create([
             'name' => 'legal_translation',
@@ -63,34 +63,44 @@ class SetupPromptSystems extends Command
         PromptTemplate::create([
             'prompt_system_id' => $system->id,
             'name' => 'basic_translation',
-            'template' => 'Переведи следующий юридический документ в простой, понятный язык по секциям:
+            'template' => 'Переведи следующий юридический документ в простой, понятный язык по секциям.
 
+ДОКУМЕНТ:
 {{ document }}
 
-{% if document_structure %}
-Структура документа с якорями для вставки переводов:
-{{ document_structure }}
+{% if anchor_list %}
+ВАЖНО: В документе есть якоря секций. Ответь в формате JSON:
+{
+  "sections": [
+    {"anchor": "anchor_id", "content": "переведенный текст", "type": "translation"},
+    ...
+  ]
+}
 
-ВАЖНО: Для каждой секции создай перевод с указанием якоря куда должен быть вставлен переведенный текст. Используй массив section_translations в ответе.
+Доступные якоря: {{ anchor_list }}
+
+Переведи каждую секцию отдельно, указав правильный якорь.
+{% else %}
+Ответь в формате JSON:
+{
+  "sections": [
+    {"anchor": "section_1", "content": "переведенный текст", "type": "translation"}
+  ]
+}
 {% endif %}
 
 Требования:
 - Переведи каждую секцию документа отдельно
-- Объясни сложные термины простыми словами в общем списке legal_terms_preserved
+- Объясни сложные юридические термины простыми словами
 - Сохрани важную правовую информацию
-- Для каждой секции укажи соответствующий якорь для вставки перевода
-- Создай краткое резюме каждой секции
+- Используй понятный язык для обычного человека
 
-{% if target_language %}
-Целевой уровень сложности: {{ target_language }}
-{% endif %}
-
-{% if preserve_terms %}
-Сохрани оригинальные юридические термины с объяснениями в отдельном списке.
+{% if target_audience %}
+Целевая аудитория: {{ target_audience }}
 {% endif %}',
             'required_variables' => ['document'],
-            'optional_variables' => ['target_language', 'preserve_terms', 'document_structure'],
-            'description' => 'Базовый шаблон для перевода юридических документов',
+            'optional_variables' => ['anchor_list', 'target_audience'],
+            'description' => 'Базовый шаблон для перевода юридических документов в JSON формате',
         ]);
 
         $this->line('  ✓ Translation system created');
@@ -101,7 +111,7 @@ class SetupPromptSystems extends Command
         $this->info('Creating contradiction analysis system...');
 
         $schemaManager = app(SchemaManager::class);
-        $schema = $schemaManager->getSchema('contradiction_response');
+        $schema = $schemaManager->getSchema('anchor_analysis_response');
 
         $system = PromptSystem::create([
             'name' => 'contradiction_analyzer',
@@ -123,15 +133,30 @@ class SetupPromptSystems extends Command
         PromptTemplate::create([
             'prompt_system_id' => $system->id,
             'name' => 'full_contradiction_analysis',
-            'template' => 'Проанализируй следующий юридический документ на предмет противоречий:
+            'template' => 'Проанализируй следующий юридический документ на предмет противоречий.
 
+ДОКУМЕНТ:
 {{ document }}
 
-{% if document_structure %}
-Структура документа с якорями:
-{{ document_structure }}
+{% if anchor_list %}
+ВАЖНО: В документе есть якоря секций. Ответь в формате JSON:
+{
+  "sections": [
+    {"anchor": "anchor_id", "content": "найденное противоречие", "analysis_type": "contradiction", "severity": "high"},
+    ...
+  ]
+}
 
-ВАЖНО: Для локаций противоречий указывай якоря секций где они обнаружены.
+Доступные якоря: {{ anchor_list }}
+
+Проанализируй каждую секцию отдельно, указав правильный якорь.
+{% else %}
+Ответь в формате JSON:
+{
+  "sections": [
+    {"anchor": "section_1", "content": "найденное противоречие", "analysis_type": "contradiction", "severity": "medium"}
+  ]
+}
 {% endif %}
 
 Найди и опиши:
@@ -142,21 +167,17 @@ class SetupPromptSystems extends Command
 5. Временные противоречия
 
 Для каждого найденного противоречия укажи:
-- Тип противоречия
-- Местоположение в документе с указанием якоря секции
-- Уровень критичности
-- Предложения по устранению
+- Тип противоречия в analysis_type
+- Уровень критичности в severity (critical, high, medium, low)
+- Описание противоречия в content
+- Предложения по устранению в suggestions (массив строк)
 
 {% if context %}
 Дополнительный контекст: {{ context }}
-{% endif %}
-
-{% if focus_areas %}
-Особое внимание обрати на: {{ focus_areas }}
 {% endif %}',
             'required_variables' => ['document'],
-            'optional_variables' => ['context', 'focus_areas', 'document_structure'],
-            'description' => 'Полный анализ противоречий в документе',
+            'optional_variables' => ['anchor_list', 'context'],
+            'description' => 'Полный анализ противоречий в JSON формате',
         ]);
 
         $this->line('  ✓ Contradiction analysis system created');
@@ -167,7 +188,7 @@ class SetupPromptSystems extends Command
         $this->info('Creating ambiguity analysis system...');
 
         $schemaManager = app(SchemaManager::class);
-        $schema = $schemaManager->getSchema('ambiguity_response');
+        $schema = $schemaManager->getSchema('anchor_analysis_response');
 
         $system = PromptSystem::create([
             'name' => 'ambiguity_detector',
@@ -189,15 +210,30 @@ class SetupPromptSystems extends Command
         PromptTemplate::create([
             'prompt_system_id' => $system->id,
             'name' => 'comprehensive_ambiguity_check',
-            'template' => 'Проанализируй следующий юридический документ на предмет неоднозначностей:
+            'template' => 'Проанализируй следующий юридический документ на предмет неоднозначностей.
 
+ДОКУМЕНТ:  
 {{ document }}
 
-{% if document_structure %}
-Структура документа с якорями:
-{{ document_structure }}
+{% if anchor_list %}
+ВАЖНО: В документе есть якоря секций. Ответь в формате JSON:
+{
+  "sections": [
+    {"anchor": "anchor_id", "content": "найденная неоднозначность", "analysis_type": "ambiguity", "severity": "medium"},
+    ...
+  ]
+}
 
-ВАЖНО: Для локаций неоднозначностей указывай в каких секциях они найдены.
+Доступные якоря: {{ anchor_list }}
+
+Проанализируй каждую секцию отдельно, указав правильный якорь.
+{% else %}
+Ответь в формате JSON:
+{
+  "sections": [
+    {"anchor": "section_1", "content": "найденная неоднозначность", "analysis_type": "ambiguity", "severity": "medium"}
+  ]
+}
 {% endif %}
 
 Найди и опиши:
@@ -209,22 +245,17 @@ class SetupPromptSystems extends Command
 6. Условные неоднозначности
 
 Для каждой неоднозначности укажи:
-- Тип неоднозначности
-- Возможные интерпретации
-- Уровень риска
-- Предложения по улучшению
-- Местоположение в секции документа
+- Тип неоднозначности в analysis_type
+- Возможные интерпретации в content
+- Уровень риска в severity (critical, high, medium, low)
+- Предложения по улучшению в suggestions (массив строк)
 
 {% if legal_context %}
 Правовой контекст: {{ legal_context }}
-{% endif %}
-
-{% if priority_sections %}
-Приоритетные разделы для анализа: {{ priority_sections }}
 {% endif %}',
             'required_variables' => ['document'],
-            'optional_variables' => ['legal_context', 'priority_sections', 'document_structure'],
-            'description' => 'Комплексная проверка неоднозначностей',
+            'optional_variables' => ['anchor_list', 'legal_context'],
+            'description' => 'Комплексная проверка неоднозначностей в JSON формате',
         ]);
 
         $this->line('  ✓ Ambiguity analysis system created');

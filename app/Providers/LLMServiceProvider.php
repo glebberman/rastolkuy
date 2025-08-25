@@ -31,7 +31,7 @@ final class LLMServiceProvider extends ServiceProvider
             if (!is_string($defaultProvider)) {
                 $defaultProvider = 'claude';
             }
-            
+
             return match ($defaultProvider) {
                 'claude' => $this->createClaudeAdapter(),
                 default => throw new LLMException("Unsupported LLM provider: {$defaultProvider}"),
@@ -41,6 +41,7 @@ final class LLMServiceProvider extends ServiceProvider
         // Register rate limiter
         $this->app->singleton(RateLimiter::class, function (): RateLimiter {
             $provider = config('llm.default', 'claude');
+
             if (!is_string($provider)) {
                 $provider = 'claude';
             }
@@ -56,6 +57,7 @@ final class LLMServiceProvider extends ServiceProvider
         // Register usage metrics
         $this->app->singleton(UsageMetrics::class, function (): UsageMetrics {
             $provider = config('llm.default', 'claude');
+
             if (!is_string($provider)) {
                 $provider = 'claude';
             }
@@ -115,21 +117,25 @@ final class LLMServiceProvider extends ServiceProvider
     private function createClaudeAdapter(): ClaudeAdapter
     {
         $config = config('llm.providers.claude', []);
+
         if (!is_array($config)) {
             $config = [];
         }
 
         $apiKey = $config['api_key'] ?? '';
+
         if (!is_string($apiKey) || empty($apiKey)) {
             throw new LLMException('Claude API key is required but not configured');
         }
 
         $baseUrl = $config['base_url'] ?? 'https://api.anthropic.com/v1/messages';
+
         if (!is_string($baseUrl)) {
             $baseUrl = 'https://api.anthropic.com/v1/messages';
         }
-        
+
         $timeout = $config['timeout'] ?? 60;
+
         if (!is_int($timeout)) {
             $timeout = 60;
         }

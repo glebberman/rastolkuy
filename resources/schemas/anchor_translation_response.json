@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "title": "Anchor Translation Response Schema",
+  "description": "Упрощенная схема для переводов по якорям секций",
+  "required": ["sections"],
+  "properties": {
+    "sections": {
+      "type": "array",
+      "description": "Переводы секций документа с якорями",
+      "items": {
+        "type": "object",
+        "required": ["anchor", "content"],
+        "properties": {
+          "anchor": {
+            "type": "string",
+            "description": "Якорь секции куда вставляется перевод",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+          },
+          "content": {
+            "type": "string",
+            "description": "Переведенное содержимое секции",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "enum": ["translation", "analysis", "summary", "warning"],
+            "description": "Тип содержимого",
+            "default": "translation"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Дополнительные метаданные",
+      "properties": {
+        "total_sections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "processing_time": {
+          "type": "number",
+          "minimum": 0
+        },
+        "model_used": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
