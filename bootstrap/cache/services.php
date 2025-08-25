@@ -35,7 +35,8 @@
     31 => 'Spatie\\MediaLibrary\\MediaLibraryServiceProvider',
     32 => 'Spatie\\Permission\\PermissionServiceProvider',
     33 => 'Spatie\\QueryBuilder\\QueryBuilderServiceProvider',
-    34 => 'App\\Providers\\StructureAnalysisServiceProvider',
+    34 => 'App\\Providers\\AuthServiceProvider',
+    35 => 'App\\Providers\\StructureAnalysisServiceProvider',
   ),
   'eager' => 
   array (
@@ -58,7 +59,8 @@
     16 => 'Spatie\\MediaLibrary\\MediaLibraryServiceProvider',
     17 => 'Spatie\\Permission\\PermissionServiceProvider',
     18 => 'Spatie\\QueryBuilder\\QueryBuilderServiceProvider',
-    19 => 'App\\Providers\\StructureAnalysisServiceProvider',
+    19 => 'App\\Providers\\AuthServiceProvider',
+    20 => 'App\\Providers\\StructureAnalysisServiceProvider',
   ),
   'deferred' => 
   array (

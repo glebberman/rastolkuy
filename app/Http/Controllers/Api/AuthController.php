@@ -14,6 +14,7 @@ use App\Http\Resources\Api\UserResource;
 use App\Services\AuthService;
 use Exception;
 use Illuminate\Auth\Events\Verified;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,6 +22,8 @@ use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class AuthController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly AuthService $authService,
     ) {
@@ -31,6 +34,8 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request): JsonResponse
     {
+        $this->authorize('auth.register');
+
         try {
             $user = $this->authService->register($request);
 
@@ -51,6 +56,8 @@ class AuthController extends Controller
      */
     public function login(LoginRequest $request): JsonResponse
     {
+        $this->authorize('auth.login');
+
         try {
             $result = $this->authService->login($request);
 
@@ -79,6 +86,8 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
+        $this->authorize('auth.logout');
+
         /** @var \App\Models\User|null $user */
         $user = $request->user();
 
@@ -104,6 +113,8 @@ class AuthController extends Controller
      */
     public function user(Request $request): JsonResponse
     {
+        $this->authorize('auth.user');
+
         /** @var \App\Models\User|null $user */
         $user = $request->user();
 
@@ -125,6 +136,8 @@ class AuthController extends Controller
      */
     public function updateUser(UpdateUserRequest $request): JsonResponse
     {
+        $this->authorize('auth.updateUser');
+
         try {
             $user = $this->authService->updateUser($request);
 
@@ -145,6 +158,8 @@ class AuthController extends Controller
      */
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
+        $this->authorize('auth.forgotPassword');
+
         try {
             $this->authService->sendPasswordResetEmail($request);
 
@@ -164,6 +179,8 @@ class AuthController extends Controller
      */
     public function resetPassword(ResetPasswordRequest $request): JsonResponse
     {
+        $this->authorize('auth.resetPassword');
+
         try {
             $this->authService->resetPassword($request);
 
@@ -188,6 +205,8 @@ class AuthController extends Controller
      */
     public function verifyEmail(EmailVerificationRequest $request): JsonResponse
     {
+        $this->authorize('auth.verifyEmail');
+
         /** @var \App\Models\User|null $user */
         $user = $request->user();
 
@@ -218,6 +237,8 @@ class AuthController extends Controller
      */
     public function resendVerification(Request $request): JsonResponse
     {
+        $this->authorize('auth.resendVerification');
+
         /** @var \App\Models\User|null $user */
         $user = $request->user();
 
@@ -247,6 +268,8 @@ class AuthController extends Controller
      */
     public function refreshToken(Request $request): JsonResponse
     {
+        $this->authorize('auth.refreshToken');
+
         try {
             /** @var \App\Models\User|null $user */
             $user = $request->user();

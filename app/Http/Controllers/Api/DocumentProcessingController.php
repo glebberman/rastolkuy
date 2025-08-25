@@ -9,6 +9,7 @@ use App\Http\Requests\ProcessDocumentRequest;
 use App\Http\Resources\DocumentProcessingResource;
 use App\Services\DocumentProcessingService;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -17,6 +18,8 @@ use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class DocumentProcessingController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
         private readonly DocumentProcessingService $documentProcessingService,
     ) {
@@ -27,6 +30,8 @@ class DocumentProcessingController extends Controller
      */
     public function store(ProcessDocumentRequest $request): JsonResponse
     {
+        $this->authorize('create', \App\Models\DocumentProcessing::class);
+
         try {
             $documentProcessing = $this->documentProcessingService->uploadAndProcess($request);
 
@@ -61,6 +66,8 @@ class DocumentProcessingController extends Controller
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('view', $documentProcessing);
+
         return response()->json([
             'message' => 'Статус обработки документа',
             'data' => new DocumentProcessingResource($documentProcessing),
@@ -80,6 +87,8 @@ class DocumentProcessingController extends Controller
                 'message' => 'Документ с указанным идентификатором не найден',
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
+
+        $this->authorize('view', $documentProcessing);
 
         if (!$documentProcessing->isCompleted()) {
             return response()->json([
@@ -110,6 +119,8 @@ class DocumentProcessingController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', \App\Models\DocumentProcessing::class);
+
         $filters = [
             'status' => $request->get('status'),
             'task_type' => $request->get('task_type'),
@@ -148,6 +159,8 @@ class DocumentProcessingController extends Controller
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('cancel', $documentProcessing);
+
         try {
             $this->documentProcessingService->cancelProcessing($documentProcessing);
 
@@ -178,6 +191,8 @@ class DocumentProcessingController extends Controller
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('delete', $documentProcessing);
+
         $this->documentProcessingService->deleteProcessing($documentProcessing);
 
         return response()->json([
@@ -190,6 +205,8 @@ class DocumentProcessingController extends Controller
      */
     public function stats(): JsonResponse
     {
+        $this->authorize('stats', \App\Models\DocumentProcessing::class);
+
         $stats = $this->documentProcessingService->getStatistics();
 
         return response()->json([

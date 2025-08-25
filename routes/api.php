@@ -57,39 +57,48 @@ Route::prefix('auth')->group(function (): void {
 |
 */
 
-Route::prefix('v1/documents')->group(function (): void {
-    // Загрузить документ для обработки
-    Route::post('/', [DocumentProcessingController::class, 'store'])
-        ->name('api.documents.store');
+Route::prefix('v1/documents')
+    ->middleware(['auth:sanctum'])
+    ->group(function (): void {
+        // Загрузить документ для обработки
+        Route::post('/', [DocumentProcessingController::class, 'store'])
+            ->middleware('permission:documents.create')
+            ->name('api.documents.store');
 
-    // Получить статус обработки по UUID
-    Route::get('{uuid}/status', [DocumentProcessingController::class, 'show'])
-        ->name('api.documents.status')
-        ->where('uuid', '[0-9a-f-]{36}');
+        // Получить статус обработки по UUID
+        Route::get('{uuid}/status', [DocumentProcessingController::class, 'show'])
+            ->middleware('permission:documents.view')
+            ->name('api.documents.status')
+            ->where('uuid', '[0-9a-f-]{36}');
 
-    // Получить результат обработки по UUID
-    Route::get('{uuid}/result', [DocumentProcessingController::class, 'result'])
-        ->name('api.documents.result')
-        ->where('uuid', '[0-9a-f-]{36}');
+        // Получить результат обработки по UUID
+        Route::get('{uuid}/result', [DocumentProcessingController::class, 'result'])
+            ->middleware('permission:documents.view')
+            ->name('api.documents.result')
+            ->where('uuid', '[0-9a-f-]{36}');
 
-    // Отменить обработку документа (если pending)
-    Route::post('{uuid}/cancel', [DocumentProcessingController::class, 'cancel'])
-        ->name('api.documents.cancel')
-        ->where('uuid', '[0-9a-f-]{36}');
+        // Отменить обработку документа (если pending)
+        Route::post('{uuid}/cancel', [DocumentProcessingController::class, 'cancel'])
+            ->middleware('permission:documents.cancel')
+            ->name('api.documents.cancel')
+            ->where('uuid', '[0-9a-f-]{36}');
 
-    // Удалить запись об обработке
-    Route::delete('{uuid}', [DocumentProcessingController::class, 'destroy'])
-        ->name('api.documents.destroy')
-        ->where('uuid', '[0-9a-f-]{36}');
+        // Удалить запись об обработке
+        Route::delete('{uuid}', [DocumentProcessingController::class, 'destroy'])
+            ->middleware('permission:documents.delete')
+            ->name('api.documents.destroy')
+            ->where('uuid', '[0-9a-f-]{36}');
 
-    // Административные роуты
-    Route::prefix('admin')->group(function (): void {
-        // Список всех обработок с фильтрацией и пагинацией
-        Route::get('/', [DocumentProcessingController::class, 'index'])
-            ->name('api.documents.admin.index');
+        // Административные роуты
+        Route::prefix('admin')
+            ->middleware('role:admin')
+            ->group(function (): void {
+                // Список всех обработок с фильтрацией и пагинацией
+                Route::get('/', [DocumentProcessingController::class, 'index'])
+                    ->name('api.documents.admin.index');
 
-        // Статистика обработок
-        Route::get('stats', [DocumentProcessingController::class, 'stats'])
-            ->name('api.documents.admin.stats');
+                // Статистика обработок
+                Route::get('stats', [DocumentProcessingController::class, 'stats'])
+                    ->name('api.documents.admin.stats');
+            });
     });
-});

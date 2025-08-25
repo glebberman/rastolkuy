@@ -37,6 +37,9 @@ class AuthService
             'password' => Hash::make($validated['password']),
         ]);
 
+        // Assign default customer role to new users
+        $user->assignRole('customer');
+
         // Send email verification
         event(new Registered($user));
 

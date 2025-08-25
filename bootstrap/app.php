@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RateLimitMiddleware;
+use App\Http\Middleware\RoleMiddleware;
+use App\Providers\AuthServiceProvider;
 use App\Providers\StructureAnalysisServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -16,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withProviders([
+        AuthServiceProvider::class,
         StructureAnalysisServiceProvider::class,
     ])
     ->withMiddleware(function (Middleware $middleware) {
@@ -26,6 +30,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'custom.throttle' => RateLimitMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

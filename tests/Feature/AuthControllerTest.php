@@ -18,6 +18,7 @@ class AuthControllerTest extends TestCase
     {
         parent::setUp();
         Mail::fake();
+        $this->artisan('db:seed', ['--class' => 'RoleAndPermissionSeeder']);
     }
 
     public function testUserCanRegister(): void
@@ -134,6 +135,7 @@ class AuthControllerTest extends TestCase
     public function testAuthenticatedUserCanGetProfile(): void
     {
         $user = User::factory()->create();
+        $user->assignRole('customer');
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeaders([
@@ -164,6 +166,7 @@ class AuthControllerTest extends TestCase
             'name' => 'Old Name',
             'email' => 'old@example.com',
         ]);
+        $user->assignRole('customer');
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeaders([
@@ -183,6 +186,7 @@ class AuthControllerTest extends TestCase
     public function testUserCanLogout(): void
     {
         $user = User::factory()->create();
+        $user->assignRole('customer');
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeaders([
@@ -198,6 +202,7 @@ class AuthControllerTest extends TestCase
     public function testUserCanRefreshToken(): void
     {
         $user = User::factory()->create();
+        $user->assignRole('customer');
         $token = $user->createToken('test-token')->plainTextToken;
 
         $response = $this->withHeaders([
