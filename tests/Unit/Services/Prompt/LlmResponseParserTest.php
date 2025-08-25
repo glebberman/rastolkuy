@@ -229,9 +229,7 @@ class LlmResponseParserTest extends TestCase
         $this->assertArrayHasKey('translation_quality', $result->parsedData); // Пустой объект должен быть добавлен
     }
 
-    /**
-     * @dataProvider validationRulesProvider
-     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('validationRulesProvider')]
     public function testAppliesValidationRules(array $data, array $rules, bool $shouldHaveErrors): void
     {
         $rawResponse = json_encode($data);
