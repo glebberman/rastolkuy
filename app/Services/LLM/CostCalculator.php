@@ -7,7 +7,7 @@ namespace App\Services\LLM;
 class CostCalculator
 {
     /**
-     * Рассчитать стоимость использования LLM
+     * Рассчитать стоимость использования LLM.
      */
     public function calculateCost(int $inputTokens, int $outputTokens, ?string $model = null): float
     {
@@ -16,10 +16,10 @@ class CostCalculator
             $defaultModel = config('llm.default_model', 'claude-3-5-sonnet-20241022');
             $model = is_string($defaultModel) ? $defaultModel : 'claude-3-5-sonnet-20241022';
         }
-        
+
         // Получаем цены из конфигурации
         $pricing = config("llm.pricing.{$model}");
-        
+
         if (!is_array($pricing) || !isset($pricing['input_per_million'], $pricing['output_per_million'])) {
             // Fallback к базовым ценам Claude 3.5 Sonnet, если модель не найдена
             $pricing = [
@@ -35,12 +35,12 @@ class CostCalculator
     }
 
     /**
-     * Получить информацию о ценах для модели
+     * Получить информацию о ценах для модели.
      */
     public function getPricingInfo(string $model): array
     {
         $pricing = config("llm.pricing.{$model}");
-        
+
         if (!is_array($pricing) || !isset($pricing['input_per_million'], $pricing['output_per_million'])) {
             return [
                 'model' => $model,
@@ -59,16 +59,16 @@ class CostCalculator
     }
 
     /**
-     * Получить все доступные модели с ценами
+     * Получить все доступные модели с ценами.
      */
     public function getAllPricing(): array
     {
         $allPricing = config('llm.pricing', []);
-        
+
         if (!is_array($allPricing)) {
             return [];
         }
-        
+
         return array_map(static function ($pricing, $model) {
             if (!is_array($pricing) || !isset($pricing['input_per_million'], $pricing['output_per_million'])) {
                 return [
@@ -77,7 +77,7 @@ class CostCalculator
                     'output_per_million' => null,
                 ];
             }
-            
+
             return [
                 'model' => $model,
                 'input_per_million' => (float) $pricing['input_per_million'],
@@ -87,7 +87,7 @@ class CostCalculator
     }
 
     /**
-     * Оценить количество токенов на основе текста
+     * Оценить количество токенов на основе текста.
      */
     public function estimateTokens(string $text): int
     {
@@ -97,7 +97,7 @@ class CostCalculator
     }
 
     /**
-     * Оценить количество токенов на основе размера файла
+     * Оценить количество токенов на основе размера файла.
      */
     public function estimateTokensFromFileSize(int $fileSizeBytes): int
     {

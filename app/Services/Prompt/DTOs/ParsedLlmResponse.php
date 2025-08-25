@@ -64,14 +64,14 @@ final readonly class ParsedLlmResponse
     }
 
     /**
-     * Извлекает содержимое для конкретного якоря из ответа
+     * Извлекает содержимое для конкретного якоря из ответа.
      */
     public function getContentByAnchor(string $anchor): ?string
     {
         // Новый упрощенный формат
         if (isset($this->parsedData['sections']) && is_array($this->parsedData['sections'])) {
             foreach ($this->parsedData['sections'] as $section) {
-                if (isset($section['anchor'], $section['content']) 
+                if (isset($section['anchor'], $section['content'])
                     && $section['anchor'] === $anchor) {
                     return $section['content'];
                 }
@@ -81,7 +81,7 @@ final readonly class ParsedLlmResponse
         // Fallback для старого формата
         if (isset($this->parsedData['section_translations']) && is_array($this->parsedData['section_translations'])) {
             foreach ($this->parsedData['section_translations'] as $section) {
-                if (isset($section['anchor'], $section['translated_content']) 
+                if (isset($section['anchor'], $section['translated_content'])
                     && $section['anchor'] === $anchor) {
                     return $section['translated_content'];
                 }
@@ -92,7 +92,7 @@ final readonly class ParsedLlmResponse
     }
 
     /**
-     * Возвращает все пары якорь => содержимое
+     * Возвращает все пары якорь => содержимое.
      */
     public function getAnchorContentMap(): array
     {
@@ -105,6 +105,7 @@ final readonly class ParsedLlmResponse
                     $map[$section['anchor']] = $section['content'];
                 }
             }
+
             return $map;
         }
 

@@ -11,17 +11,19 @@ use App\Services\DocumentProcessingService;
 use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class DocumentProcessingController extends Controller
 {
     public function __construct(
-        private readonly DocumentProcessingService $documentProcessingService
-    ) {}
+        private readonly DocumentProcessingService $documentProcessingService,
+    ) {
+    }
 
     /**
-     * Загрузить документ и инициировать его обработку
+     * Загрузить документ и инициировать его обработку.
      */
     public function store(ProcessDocumentRequest $request): JsonResponse
     {
@@ -32,13 +34,11 @@ class DocumentProcessingController extends Controller
                 'message' => 'Документ загружен и поставлен в очередь на обработку',
                 'data' => new DocumentProcessingResource($documentProcessing),
             ], ResponseAlias::HTTP_CREATED);
-
         } catch (RuntimeException $e) {
             return response()->json([
                 'error' => 'Failed to store uploaded file',
                 'message' => 'Не удалось сохранить загруженный файл',
             ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
-
         } catch (Exception $e) {
             return response()->json([
                 'error' => 'Document upload failed',
@@ -48,7 +48,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Получить статус обработки документа
+     * Получить статус обработки документа.
      */
     public function show(string $uuid): JsonResponse
     {
@@ -68,7 +68,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Получить результат обработки документа
+     * Получить результат обработки документа.
      */
     public function result(string $uuid): JsonResponse
     {
@@ -106,7 +106,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Получить список всех обработок (для админ панели)
+     * Получить список всех обработок (для админ панели).
      */
     public function index(Request $request): JsonResponse
     {
@@ -116,7 +116,7 @@ class DocumentProcessingController extends Controller
         ];
 
         $perPageRaw = $request->input('per_page', 20);
-        $perPage = is_numeric($perPageRaw) ? (int)$perPageRaw : 20;
+        $perPage = is_numeric($perPageRaw) ? (int) $perPageRaw : 20;
 
         $documentProcessings = $this->documentProcessingService->getFilteredList($filters, $perPage);
 
@@ -135,7 +135,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Отменить обработку документа (если она еще не началась)
+     * Отменить обработку документа (если она еще не началась).
      */
     public function cancel(string $uuid): JsonResponse
     {
@@ -155,8 +155,7 @@ class DocumentProcessingController extends Controller
                 'message' => 'Обработка документа отменена',
                 'data' => new DocumentProcessingResource($documentProcessing),
             ]);
-
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return response()->json([
                 'error' => 'Cannot cancel',
                 'message' => $e->getMessage(),
@@ -166,7 +165,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Удалить запись об обработке документа
+     * Удалить запись об обработке документа.
      */
     public function destroy(string $uuid): JsonResponse
     {

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
- * Модель для отслеживания обработки документов
+ * Модель для отслеживания обработки документов.
  *
  * @property int $id
  * @property string $uuid Уникальный идентификатор задачи
@@ -22,7 +22,7 @@ use Illuminate\Support\Carbon;
  * @property string $task_type Тип задачи (translation, contradiction, ambiguity)
  * @property array<string, mixed> $options Опции обработки
  * @property bool $anchor_at_start Позиция якорей (true = начало, false = конец)
- * @property 'pending'|'processing'|'completed'|'failed' $status Статус обработки
+ * @property 'completed'|'failed'|'pending'|'processing' $status Статус обработки
  * @property string|null $result Результат обработки
  * @property array<string, mixed>|null $error_details Детали ошибки
  * @property array<string, mixed>|null $processing_metadata Метаданные обработки
@@ -36,7 +36,23 @@ use Illuminate\Support\Carbon;
  */
 class DocumentProcessing extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory;
+    use SoftDeletes;
+
+    /**
+     * Возможные статусы обработки.
+     */
+    public const string STATUS_PENDING = 'pending';
+    public const string STATUS_PROCESSING = 'processing';
+    public const string STATUS_COMPLETED = 'completed';
+    public const string STATUS_FAILED = 'failed';
+
+    /**
+     * Возможные типы задач.
+     */
+    public const string TASK_TRANSLATION = 'translation';
+    public const string TASK_CONTRADICTION = 'contradiction';
+    public const string TASK_AMBIGUITY = 'ambiguity';
 
     protected $fillable = [
         'uuid',
@@ -73,22 +89,7 @@ class DocumentProcessing extends Model
     ];
 
     /**
-     * Возможные статусы обработки
-     */
-    public const string STATUS_PENDING = 'pending';
-    public const string STATUS_PROCESSING = 'processing';
-    public const string STATUS_COMPLETED = 'completed';
-    public const string STATUS_FAILED = 'failed';
-
-    /**
-     * Возможные типы задач
-     */
-    public const string TASK_TRANSLATION = 'translation';
-    public const string TASK_CONTRADICTION = 'contradiction';
-    public const string TASK_AMBIGUITY = 'ambiguity';
-
-    /**
-     * Проверяет, завершена ли обработка
+     * Проверяет, завершена ли обработка.
      */
     public function isCompleted(): bool
     {
@@ -96,7 +97,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Проверяет, провалилась ли обработка
+     * Проверяет, провалилась ли обработка.
      */
     public function isFailed(): bool
     {
@@ -104,7 +105,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Проверяет, в процессе ли обработка
+     * Проверяет, в процессе ли обработка.
      */
     public function isProcessing(): bool
     {
@@ -112,7 +113,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Проверяет, ожидает ли обработка
+     * Проверяет, ожидает ли обработка.
      */
     public function isPending(): bool
     {
@@ -120,7 +121,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Отмечает начало обработки
+     * Отмечает начало обработки.
      */
     public function markAsProcessing(): void
     {
@@ -131,7 +132,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Отмечает успешное завершение обработки
+     * Отмечает успешное завершение обработки.
      */
     public function markAsCompleted(string $result, array $metadata = [], ?float $costUsd = null): void
     {
@@ -148,7 +149,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Отмечает провал обработки
+     * Отмечает провал обработки.
      */
     public function markAsFailed(string $error, array $errorDetails = []): void
     {
@@ -163,7 +164,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Получает прогресс обработки в процентах
+     * Получает прогресс обработки в процентах.
      */
     public function getProgressPercentage(): int
     {
@@ -176,7 +177,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Получает человекочитаемое описание статуса
+     * Получает человекочитаемое описание статуса.
      */
     public function getStatusDescription(): string
     {
@@ -189,7 +190,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Получает человекочитаемое описание типа задачи
+     * Получает человекочитаемое описание типа задачи.
      */
     public function getTaskTypeDescription(): string
     {
@@ -202,7 +203,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Скоуп для получения завершенных обработок
+     * Скоуп для получения завершенных обработок.
      */
     public function scopeCompleted(Builder $query): Builder
     {
@@ -210,7 +211,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Скоуп для получения активных обработок
+     * Скоуп для получения активных обработок.
      */
     public function scopeActive(Builder $query): Builder
     {
@@ -218,7 +219,7 @@ class DocumentProcessing extends Model
     }
 
     /**
-     * Скоуп для получения проваленных обработок
+     * Скоуп для получения проваленных обработок.
      */
     public function scopeFailed(Builder $query): Builder
     {

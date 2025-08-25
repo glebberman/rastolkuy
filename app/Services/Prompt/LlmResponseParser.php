@@ -324,6 +324,7 @@ final readonly class LlmResponseParser
                     $anchors[] = $section['anchor'];
                 }
             }
+
             return array_unique($anchors);
         }
 

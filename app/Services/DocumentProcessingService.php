@@ -8,36 +8,38 @@ use App\Http\Requests\ProcessDocumentRequest;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\DocumentProcessing;
 use App\Services\LLM\CostCalculator;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use InvalidArgumentException;
+use RuntimeException;
 
 class DocumentProcessingService
 {
     public function __construct(
-        private readonly CostCalculator $costCalculator
-    ) {}
-    
+        private readonly CostCalculator $costCalculator,
+    ) {
+    }
+
     /**
-     * Загрузить документ и инициировать его обработку
+     * Загрузить документ и инициировать его обработку.
      */
     public function uploadAndProcess(ProcessDocumentRequest $request): DocumentProcessing
     {
         $file = $request->file('file');
         $uuid = Str::uuid()->toString();
-        
+
         // Генерируем уникальное имя файла
         $originalName = $file->getClientOriginalName();
         $extension = $file->getClientOriginalExtension();
         $filename = $uuid . '.' . $extension;
-        
+
         // Сохраняем файл
         $filePath = $file->storeAs('documents', $filename, 'local');
-        
+
         if (!$filePath) {
-            throw new \RuntimeException('Failed to store uploaded file');
+            throw new RuntimeException('Failed to store uploaded file');
         }
 
         // Создаем запись в базе данных
@@ -69,7 +71,7 @@ class DocumentProcessingService
     }
 
     /**
-     * Получить документ по UUID
+     * Получить документ по UUID.
      */
     public function getByUuid(string $uuid): ?DocumentProcessing
     {
@@ -77,7 +79,7 @@ class DocumentProcessingService
     }
 
     /**
-     * Получить список документов с фильтрацией и пагинацией
+     * Получить список документов с фильтрацией и пагинацией.
      */
     public function getFilteredList(array $filters = [], int $perPage = 20): LengthAwarePaginator
     {
@@ -103,13 +105,13 @@ class DocumentProcessingService
     }
 
     /**
-     * Отменить обработку документа
+     * Отменить обработку документа.
      */
     public function cancelProcessing(DocumentProcessing $documentProcessing): void
     {
         if (!$documentProcessing->isPending()) {
-            throw new \InvalidArgumentException(
-                'Нельзя отменить обработку в текущем статусе: ' . $documentProcessing->getStatusDescription()
+            throw new InvalidArgumentException(
+                'Нельзя отменить обработку в текущем статусе: ' . $documentProcessing->getStatusDescription(),
             );
         }
 
@@ -129,7 +131,7 @@ class DocumentProcessingService
     }
 
     /**
-     * Удалить запись об обработке документа
+     * Удалить запись об обработке документа.
      */
     public function deleteProcessing(DocumentProcessing $documentProcessing): void
     {
@@ -177,15 +179,15 @@ class DocumentProcessingService
     }
 
     /**
-     * Получить предварительную оценку стоимости обработки
+     * Получить предварительную оценку стоимости обработки.
      */
     public function estimateProcessingCost(int $fileSizeBytes, ?string $model = null): array
     {
         $estimatedInputTokens = $this->costCalculator->estimateTokensFromFileSize($fileSizeBytes);
         // Для оценки output токенов используем коэффициент 1.5x от input (эмпирический)
-        $estimatedOutputTokens = intval($estimatedInputTokens * 1.5);
+        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5);
         $estimatedCost = $this->costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
-        
+
         return [
             'estimated_input_tokens' => $estimatedInputTokens,
             'estimated_output_tokens' => $estimatedOutputTokens,
@@ -197,11 +199,12 @@ class DocumentProcessingService
     }
 
     /**
-     * Получить модель по умолчанию
+     * Получить модель по умолчанию.
      */
     private function getDefaultModel(): string
     {
         $defaultModel = config('llm.default_model', 'claude-3-5-sonnet-20241022');
+
         return is_string($defaultModel) ? $defaultModel : 'claude-3-5-sonnet-20241022';
     }
 
