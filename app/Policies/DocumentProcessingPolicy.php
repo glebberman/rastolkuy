@@ -96,7 +96,7 @@ class DocumentProcessingPolicy
         return $user->hasPermissionTo('documents.cancel')
                && ($user->hasPermissionTo('documents.view-admin')
                 || ($this->isOwner($user, $documentProcessing)
-                 && in_array($documentProcessing->status, [DocumentProcessing::STATUS_PENDING, DocumentProcessing::STATUS_PROCESSING])));
+                 && in_array($documentProcessing->status, [DocumentProcessing::STATUS_PENDING, DocumentProcessing::STATUS_PROCESSING], true)));
     }
 
     /**
