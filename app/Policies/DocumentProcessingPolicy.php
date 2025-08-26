@@ -110,14 +110,9 @@ class DocumentProcessingPolicy
 
     /**
      * Check if the user is the owner of the document processing.
-     *
-     * Note: Currently DocumentProcessing doesn't have user_id field.
-     * This is a placeholder for when user ownership is implemented.
      */
     private function isOwner(User $user, DocumentProcessing $documentProcessing): bool
     {
-        // TODO: Implement user ownership check when user_id field is added to DocumentProcessing
-        // For now, assume all authenticated users can access documents they create
-        return true;
+        return $user->id === $documentProcessing->user_id;
     }
 }

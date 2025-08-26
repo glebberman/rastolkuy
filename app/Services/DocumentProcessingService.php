@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Http\Requests\ProcessDocumentRequest;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\DocumentProcessing;
+use App\Models\User;
 use App\Services\LLM\CostCalculator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +26,7 @@ class DocumentProcessingService
     /**
      * Загрузить документ и инициировать его обработку.
      */
-    public function uploadAndProcess(ProcessDocumentRequest $request): DocumentProcessing
+    public function uploadAndProcess(ProcessDocumentRequest $request, User $user): DocumentProcessing
     {
         $file = $request->file('file');
         $uuid = Str::uuid()->toString();
@@ -44,6 +45,7 @@ class DocumentProcessingService
 
         // Создаем запись в базе данных
         $documentProcessing = DocumentProcessing::create([
+            'user_id' => $user->id,
             'uuid' => $uuid,
             'original_filename' => $originalName,
             'file_path' => $filePath,

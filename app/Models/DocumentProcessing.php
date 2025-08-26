@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -14,6 +15,7 @@ use Illuminate\Support\Carbon;
  * Модель для отслеживания обработки документов.
  *
  * @property int $id
+ * @property int $user_id ID пользователя-владельца документа
  * @property string $uuid Уникальный идентификатор задачи
  * @property string $original_filename Оригинальное название файла
  * @property string $file_path Путь к загруженному файлу
@@ -55,6 +57,7 @@ class DocumentProcessing extends Model
     public const string TASK_AMBIGUITY = 'ambiguity';
 
     protected $fillable = [
+        'user_id',
         'uuid',
         'original_filename',
         'file_path',
@@ -224,5 +227,21 @@ class DocumentProcessing extends Model
     public function scopeFailed(Builder $query): Builder
     {
         return $query->where('status', self::STATUS_FAILED);
+    }
+
+    /**
+     * Получает пользователя-владельца документа.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Скоуп для получения документов конкретного пользователя.
+     */
+    public function scopeForUser(Builder $query, User $user): Builder
+    {
+        return $query->where('user_id', $user->id);
     }
 }

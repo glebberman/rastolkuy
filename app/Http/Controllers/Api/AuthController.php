@@ -11,6 +11,7 @@ use App\Http\Requests\Api\RegisterRequest;
 use App\Http\Requests\Api\ResetPasswordRequest;
 use App\Http\Requests\Api\UpdateUserRequest;
 use App\Http\Resources\Api\UserResource;
+use App\Services\AuditService;
 use App\Services\AuthService;
 use Exception;
 use Illuminate\Auth\Events\Verified;
@@ -26,6 +27,7 @@ class AuthController extends Controller
 
     public function __construct(
         private readonly AuthService $authService,
+        private readonly AuditService $auditService,
     ) {
     }
 
@@ -140,6 +142,10 @@ class AuthController extends Controller
 
         try {
             $user = $this->authService->updateUser($request);
+
+            /** @var \App\Models\User $currentUser */
+            $currentUser = $request->user();
+            $this->auditService->logUserDataAccess($currentUser, $user, 'profile_update');
 
             return response()->json([
                 'message' => 'Профиль обновлен успешно',

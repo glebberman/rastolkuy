@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProcessDocumentRequest;
 use App\Http\Resources\DocumentProcessingResource;
+use App\Services\AuditService;
 use App\Services\DocumentProcessingService;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -22,6 +23,7 @@ class DocumentProcessingController extends Controller
 
     public function __construct(
         private readonly DocumentProcessingService $documentProcessingService,
+        private readonly AuditService $auditService,
     ) {
     }
 
@@ -33,7 +35,11 @@ class DocumentProcessingController extends Controller
         $this->authorize('create', \App\Models\DocumentProcessing::class);
 
         try {
-            $documentProcessing = $this->documentProcessingService->uploadAndProcess($request);
+            /** @var \App\Models\User $user */
+            $user = $request->user();
+            $documentProcessing = $this->documentProcessingService->uploadAndProcess($request, $user);
+
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'upload');
 
             return response()->json([
                 'message' => 'Документ загружен и поставлен в очередь на обработку',
@@ -67,6 +73,10 @@ class DocumentProcessingController extends Controller
         }
 
         $this->authorize('view', $documentProcessing);
+
+        /** @var \App\Models\User $user */
+        $user = request()->user();
+        $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'view');
 
         return response()->json([
             'message' => 'Статус обработки документа',
