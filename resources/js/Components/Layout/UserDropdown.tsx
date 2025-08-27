@@ -2,6 +2,7 @@ import React from 'react';
 import { Link, router } from '@inertiajs/react';
 import { User } from '@/Types';
 import { IconUser, IconSettings, IconLogout, IconShield } from '@tabler/icons-react';
+import { authService } from '@/Utils/auth';
 import { route } from '@/Utils/route';
 
 interface Props {
@@ -9,8 +10,15 @@ interface Props {
 }
 
 export default function UserDropdown({ user }: Props) {
-    const handleLogout = () => {
-        router.post(route('logout'));
+    const handleLogout = async () => {
+        try {
+            await authService.logout();
+            router.visit('/');
+        } catch (error) {
+            console.error('Logout error:', error);
+            // Force redirect even if API call fails
+            router.visit('/');
+        }
     };
 
     const getInitials = (name: string): string => {

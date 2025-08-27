@@ -1,5 +1,5 @@
-import React from 'react';
-import { Head, Link } from '@inertiajs/react';
+import React, { useEffect, useState } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
 import { 
     IconPlus, 
     IconFile, 
@@ -11,6 +11,7 @@ import {
     IconCurrencyDollar
 } from '@tabler/icons-react';
 import AppLayout from '../Layouts/AppLayout';
+import { authService } from '@/Utils/auth';
 
 interface DashboardProps {
     recentDocuments: Array<{
@@ -29,6 +30,50 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ recentDocuments = [], stats }: DashboardProps) {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const checkAuth = async () => {
+            if (!authService.isAuthenticated()) {
+                router.visit('/login');
+                return;
+            }
+
+            try {
+                await authService.getCurrentUser();
+                setIsAuthenticated(true);
+            } catch (error) {
+                router.visit('/login');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        checkAuth();
+    }, []);
+
+    if (isLoading) {
+        return (
+            <AppLayout title="Загрузка...">
+                <div className="page-wrapper">
+                    <div className="page-body">
+                        <div className="container-xl">
+                            <div className="text-center">
+                                <div className="spinner-border" role="status">
+                                    <span className="visually-hidden">Загрузка...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    if (!isAuthenticated) {
+        return null;
+    }
     const getStatusIcon = (status: string) => {
         switch (status) {
             case 'completed':

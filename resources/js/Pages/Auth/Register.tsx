@@ -1,5 +1,5 @@
-import React, { FormEvent } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import React, { FormEvent, useState } from 'react';
+import { Link, router } from '@inertiajs/react';
 import { IconGavel } from '@tabler/icons-react';
 import AuthLayout from '@/Layouts/AuthLayout';
 import AuthHeader from '@/Components/Auth/AuthHeader';
@@ -7,22 +7,37 @@ import AuthFooter from '@/Components/Auth/AuthFooter';
 import FormInput from '@/Components/Form/FormInput';
 import PasswordInput from '@/Components/Form/PasswordInput';
 import SubmitButton from '@/Components/Form/SubmitButton';
-import { RegisterForm } from '@/Types';
+import { authService, RegisterData } from '@/Utils/auth';
 import { route } from '@/Utils/route';
 
 export default function Register() {
-    
-    const { data, setData, post, processing, errors } = useForm<RegisterForm>({
+    const [data, setData] = useState<RegisterData>({
         name: '',
         email: '',
         password: '',
         password_confirmation: '',
         terms: false,
     });
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const handleSubmit = (e: FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        post(route('register'));
+        setProcessing(true);
+        setErrors({});
+
+        try {
+            await authService.register(data);
+            router.visit('/dashboard');
+        } catch (error: any) {
+            if (error.errors) {
+                setErrors(error.errors);
+            } else {
+                setErrors({ email: error.message || 'Ошибка регистрации' });
+            }
+        } finally {
+            setProcessing(false);
+        }
     };
 
     return (
@@ -41,7 +56,7 @@ export default function Register() {
                             id="name"
                             label="Имя"
                             value={data.name}
-                            onChange={(value) => setData('name', value)}
+                            onChange={(value) => setData({ ...data, name: value })}
                             placeholder="Ваше имя"
                             error={errors.name}
                             required
@@ -53,7 +68,7 @@ export default function Register() {
                             label="Email"
                             type="email"
                             value={data.email}
-                            onChange={(value) => setData('email', value)}
+                            onChange={(value) => setData({ ...data, email: value })}
                             placeholder="user@example.com"
                             error={errors.email}
                             required
@@ -63,7 +78,7 @@ export default function Register() {
                             id="password"
                             label="Пароль"
                             value={data.password}
-                            onChange={(value) => setData('password', value)}
+                            onChange={(value) => setData({ ...data, password: value })}
                             placeholder="Минимум 8 символов"
                             error={errors.password}
                             required
@@ -73,7 +88,7 @@ export default function Register() {
                             id="password_confirmation"
                             label="Подтверждение пароля"
                             value={data.password_confirmation}
-                            onChange={(value) => setData('password_confirmation', value)}
+                            onChange={(value) => setData({ ...data, password_confirmation: value })}
                             placeholder="Повторите пароль"
                             error={errors.password_confirmation}
                             required
@@ -85,7 +100,7 @@ export default function Register() {
                                 className={`form-check-input ${errors.terms ? 'is-invalid' : ''}`}
                                 id="terms"
                                 checked={data.terms}
-                                onChange={(e) => setData('terms', e.target.checked)}
+                                onChange={(e) => setData({ ...data, terms: e.target.checked })}
                                 required
                             />
                             <label className="form-check-label" htmlFor="terms">

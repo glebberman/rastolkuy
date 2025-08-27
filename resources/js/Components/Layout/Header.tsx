@@ -1,13 +1,26 @@
-import React from 'react';
-import { Link, usePage } from '@inertiajs/react';
-import { PageProps, User } from '@/Types';
+import React, { useEffect, useState } from 'react';
+import { Link } from '@inertiajs/react';
+import { User } from '@/Types';
 import ThemeSwitcher from '@/Components/UI/ThemeSwitcher';
 import UserDropdown from '@/Components/Layout/UserDropdown';
 import { IconGavel } from '@tabler/icons-react';
+import { authService } from '@/Utils/auth';
 import { route } from '@/Utils/route';
 
 export default function Header() {
-    const { auth } = usePage<PageProps<Record<string, unknown>>>().props;
+    const [user, setUser] = useState<User | null>(null);
+
+    useEffect(() => {
+        const currentUser = authService.getUser();
+        setUser(currentUser);
+
+        // If user is logged in but not loaded, try to fetch from API
+        if (authService.isAuthenticated() && !currentUser) {
+            authService.getCurrentUser()
+                .then(setUser)
+                .catch(() => setUser(null));
+        }
+    }, []);
 
     return (
         <header className="navbar navbar-expand-lg navbar-light bg-white border-bottom">
@@ -34,7 +47,7 @@ export default function Header() {
                 {/* Navigation */}
                 <div className="collapse navbar-collapse" id="navbarNav">
                     <nav className="navbar-nav me-auto">
-                        {auth.user && (
+                        {user && (
                             <>
                                 <Link
                                     className="nav-link"
@@ -48,34 +61,6 @@ export default function Header() {
                                 >
                                     Документы
                                 </Link>
-                                {auth.user.roles?.includes('admin') && (
-                                    <div className="nav-item dropdown">
-                                        <button
-                                            className="nav-link dropdown-toggle"
-                                            data-bs-toggle="dropdown"
-                                            aria-expanded="false"
-                                        >
-                                            Администрирование
-                                        </button>
-                                        <ul className="dropdown-menu">
-                                            <li>
-                                                <Link className="dropdown-item" href="/admin/users">
-                                                    Пользователи
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link className="dropdown-item" href="/admin/documents">
-                                                    Документы
-                                                </Link>
-                                            </li>
-                                            <li>
-                                                <Link className="dropdown-item" href="/admin/statistics">
-                                                    Статистика
-                                                </Link>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                )}
                             </>
                         )}
                     </nav>
@@ -84,8 +69,8 @@ export default function Header() {
                     <div className="d-flex align-items-center gap-3">
                         <ThemeSwitcher />
                         
-                        {auth.user ? (
-                            <UserDropdown user={auth.user} />
+                        {user ? (
+                            <UserDropdown user={user} />
                         ) : (
                             <div className="d-flex align-items-center gap-2">
                                 <Link

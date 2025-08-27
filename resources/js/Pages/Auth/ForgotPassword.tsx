@@ -1,22 +1,39 @@
-import React, { FormEvent } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import React, { FormEvent, useState } from 'react';
+import { Link } from '@inertiajs/react';
 import { IconMail } from '@tabler/icons-react';
 import AuthLayout from '@/Layouts/AuthLayout';
 import AuthHeader from '@/Components/Auth/AuthHeader';
 import AuthFooter from '@/Components/Auth/AuthFooter';
 import FormInput from '@/Components/Form/FormInput';
 import SubmitButton from '@/Components/Form/SubmitButton';
-import { ForgotPasswordForm } from '@/Types';
+import { authService } from '@/Utils/auth';
 import { route } from '@/Utils/route';
 
 export default function ForgotPassword() {
-    const { data, setData, post, processing, errors, wasSuccessful } = useForm<ForgotPasswordForm>({
-        email: '',
-    });
+    const [email, setEmail] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const [wasSuccessful, setWasSuccessful] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
-    const handleSubmit = (e: FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        post(route('password.email'));
+        setProcessing(true);
+        setErrors({});
+
+        try {
+            const response = await authService.forgotPassword(email);
+            setWasSuccessful(true);
+            setSuccessMessage(response.message);
+        } catch (error: any) {
+            if (error.errors) {
+                setErrors(error.errors);
+            } else {
+                setErrors({ email: error.message || 'Ошибка отправки письма' });
+            }
+        } finally {
+            setProcessing(false);
+        }
     };
 
     return (
@@ -38,8 +55,7 @@ export default function ForgotPassword() {
                                 Письмо отправлено!
                             </h6>
                             <p className="mb-0">
-                                Мы отправили ссылку для восстановления пароля на ваш email. 
-                                Проверьте почту и следуйте инструкциям в письме.
+                                {successMessage || 'Мы отправили ссылку для восстановления пароля на ваш email. Проверьте почту и следуйте инструкциям в письме.'}
                             </p>
                             <hr />
                             <p className="mb-0 small text-muted">
@@ -53,8 +69,8 @@ export default function ForgotPassword() {
                                     id="email"
                                     label="Email адрес"
                                     type="email"
-                                    value={data.email}
-                                    onChange={(value) => setData('email', value)}
+                                    value={email}
+                                    onChange={(value) => setEmail(value)}
                                     placeholder="user@example.com"
                                     error={errors.email}
                                     required

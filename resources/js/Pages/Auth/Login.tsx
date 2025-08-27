@@ -1,5 +1,5 @@
-import React, { FormEvent } from 'react';
-import { Head, Link, useForm } from '@inertiajs/react';
+import React, { FormEvent, useState } from 'react';
+import { Link, router } from '@inertiajs/react';
 import { IconGavel } from '@tabler/icons-react';
 import AuthLayout from '@/Layouts/AuthLayout';
 import AuthHeader from '@/Components/Auth/AuthHeader';
@@ -7,19 +7,35 @@ import AuthFooter from '@/Components/Auth/AuthFooter';
 import FormInput from '@/Components/Form/FormInput';
 import PasswordInput from '@/Components/Form/PasswordInput';
 import SubmitButton from '@/Components/Form/SubmitButton';
-import { LoginForm } from '@/Types';
+import { authService, LoginData } from '@/Utils/auth';
 import { route } from '@/Utils/route';
 
 export default function Login() {
-    const { data, setData, post, processing, errors } = useForm<LoginForm>({
+    const [data, setData] = useState<LoginData>({
         email: '',
         password: '',
         remember: false,
     });
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const handleSubmit = (e: FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
-        post(route('login'));
+        setProcessing(true);
+        setErrors({});
+
+        try {
+            await authService.login(data);
+            router.visit('/dashboard');
+        } catch (error: any) {
+            if (error.errors) {
+                setErrors(error.errors);
+            } else {
+                setErrors({ email: error.message || 'Ошибка входа в систему' });
+            }
+        } finally {
+            setProcessing(false);
+        }
     };
 
     return (
@@ -38,7 +54,7 @@ export default function Login() {
                             label="Email"
                             type="email"
                             value={data.email}
-                            onChange={(value) => setData('email', value)}
+                            onChange={(value) => setData({ ...data, email: value })}
                             placeholder="user@example.com"
                             error={errors.email}
                             required
@@ -49,7 +65,7 @@ export default function Login() {
                             id="password"
                             label="Пароль"
                             value={data.password}
-                            onChange={(value) => setData('password', value)}
+                            onChange={(value) => setData({ ...data, password: value })}
                             placeholder="Введите пароль"
                             error={errors.password}
                             required
@@ -60,8 +76,8 @@ export default function Login() {
                                 type="checkbox"
                                 className="form-check-input"
                                 id="remember"
-                                checked={data.remember}
-                                onChange={(e) => setData('remember', e.target.checked)}
+                                checked={data.remember || false}
+                                onChange={(e) => setData({ ...data, remember: e.target.checked })}
                             />
                             <label className="form-check-label" htmlFor="remember">
                                 Запомнить меня
