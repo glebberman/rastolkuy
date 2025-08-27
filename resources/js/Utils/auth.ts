@@ -101,10 +101,27 @@ class AuthService {
 
             return data;
         } catch (error: any) {
+            // Log technical error details to console for debugging
+            console.error('Login error:', error);
+            
             if (error.response?.data) {
-                throw error.response.data as ApiErrorResponse;
+                const apiError = error.response.data as ApiErrorResponse;
+                // Log API error details
+                console.error('API Error Details:', apiError);
+                
+                // Return user-friendly error message
+                throw {
+                    ...apiError,
+                    message: apiError.message || 'Неверный email или пароль'
+                };
             }
-            throw new Error('Ошибка соединения с сервером');
+            
+            // For network/connection errors, show generic message
+            throw {
+                success: false,
+                error: 'CONNECTION_ERROR',
+                message: 'Проблема с соединением. Попробуйте позже.'
+            };
         }
     }
 
@@ -123,10 +140,27 @@ class AuthService {
 
             return data;
         } catch (error: any) {
+            // Log technical error details to console for debugging
+            console.error('Registration error:', error);
+            
             if (error.response?.data) {
-                throw error.response.data as ApiErrorResponse;
+                const apiError = error.response.data as ApiErrorResponse;
+                // Log API error details
+                console.error('API Error Details:', apiError);
+                
+                // Return user-friendly error message
+                throw {
+                    ...apiError,
+                    message: apiError.message || 'Ошибка регистрации'
+                };
             }
-            throw new Error('Ошибка соединения с сервером');
+            
+            // For network/connection errors, show generic message
+            throw {
+                success: false,
+                error: 'CONNECTION_ERROR',
+                message: 'Проблема с соединением. Попробуйте позже.'
+            };
         }
     }
 
@@ -163,10 +197,27 @@ class AuthService {
             const response = await axios.post('/api/auth/forgot-password', { email });
             return response.data;
         } catch (error: any) {
+            // Log technical error details to console for debugging
+            console.error('Forgot password error:', error);
+            
             if (error.response?.data) {
-                throw error.response.data as ApiErrorResponse;
+                const apiError = error.response.data as ApiErrorResponse;
+                // Log API error details
+                console.error('API Error Details:', apiError);
+                
+                // Return user-friendly error message
+                throw {
+                    ...apiError,
+                    message: apiError.message || 'Ошибка отправки письма'
+                };
             }
-            throw new Error('Ошибка соединения с сервером');
+            
+            // For network/connection errors, show generic message
+            throw {
+                success: false,
+                error: 'CONNECTION_ERROR',
+                message: 'Проблема с соединением. Попробуйте позже.'
+            };
         }
     }
 

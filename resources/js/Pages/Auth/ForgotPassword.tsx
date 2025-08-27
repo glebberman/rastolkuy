@@ -26,9 +26,17 @@ export default function ForgotPassword() {
             setWasSuccessful(true);
             setSuccessMessage(response.message);
         } catch (error: any) {
-            if (error.errors) {
-                setErrors(error.errors);
+            // Handle Laravel validation errors (field-specific)
+            if (error.errors && typeof error.errors === 'object') {
+                const formattedErrors: Record<string, string> = {};
+                for (const [field, messages] of Object.entries(error.errors)) {
+                    if (Array.isArray(messages)) {
+                        formattedErrors[field] = messages[0];
+                    }
+                }
+                setErrors(formattedErrors);
             } else {
+                // Handle general API errors
                 setErrors({ email: error.message || 'Ошибка отправки письма' });
             }
         } finally {
