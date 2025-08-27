@@ -8,6 +8,7 @@ import FormInput from '@/Components/Form/FormInput';
 import PasswordInput from '@/Components/Form/PasswordInput';
 import SubmitButton from '@/Components/Form/SubmitButton';
 import { RegisterForm } from '@/Types';
+import { route } from '@/Utils/route';
 
 export default function Register() {
     
@@ -21,7 +22,7 @@ export default function Register() {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post('/register');
+        post(route('register'));
     };
 
     return (
@@ -116,7 +117,7 @@ export default function Register() {
                 <AuthFooter 
                     text="Уже есть аккаунт?"
                     linkText="Войти"
-                    linkHref="/login"
+                    linkHref={route('login')}
                 />
             </div>
         </AuthLayout>

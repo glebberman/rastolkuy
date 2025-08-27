@@ -23,6 +23,7 @@
         "@tabler/core": "^1.4.0",
         "@tabler/icons-react": "^3.34.1",
         "bootstrap": "^5.3.8",
-        "sass": "^1.91.0"
+        "sass": "^1.91.0",
+        "ziggy-js": "^2.5.3"
     }
 }

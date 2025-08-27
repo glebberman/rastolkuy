@@ -8,6 +8,7 @@ import FormInput from '@/Components/Form/FormInput';
 import PasswordInput from '@/Components/Form/PasswordInput';
 import SubmitButton from '@/Components/Form/SubmitButton';
 import { LoginForm } from '@/Types';
+import { route } from '@/Utils/route';
 
 export default function Login() {
     const { data, setData, post, processing, errors } = useForm<LoginForm>({
@@ -18,7 +19,7 @@ export default function Login() {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post('/login');
+        post(route('login'));
     };
 
     return (
@@ -75,7 +76,7 @@ export default function Login() {
                         </SubmitButton>
 
                         <div className="text-center">
-                            <Link href="/forgot-password" className="text-decoration-none">
+                            <Link href={route('password.request')} className="text-decoration-none">
                                 Забыли пароль?
                             </Link>
                         </div>
@@ -85,7 +86,7 @@ export default function Login() {
                 <AuthFooter 
                     text="Нет аккаунта?"
                     linkText="Зарегистрироваться"
-                    linkHref="/register"
+                    linkHref={route('register')}
                 />
             </div>
         </AuthLayout>

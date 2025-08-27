@@ -7,6 +7,7 @@ import AuthFooter from '@/Components/Auth/AuthFooter';
 import FormInput from '@/Components/Form/FormInput';
 import SubmitButton from '@/Components/Form/SubmitButton';
 import { ForgotPasswordForm } from '@/Types';
+import { route } from '@/Utils/route';
 
 export default function ForgotPassword() {
     const { data, setData, post, processing, errors, wasSuccessful } = useForm<ForgotPasswordForm>({
@@ -15,7 +16,7 @@ export default function ForgotPassword() {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post('/forgot-password');
+        post(route('password.email'));
     };
 
     return (
@@ -71,7 +72,7 @@ export default function ForgotPassword() {
                     )}
 
                     <div className="text-center">
-                        <Link href="/login" className="text-decoration-none">
+                        <Link href={route('login')} className="text-decoration-none">
                             ← Вернуться к входу
                         </Link>
                     </div>
@@ -80,7 +81,7 @@ export default function ForgotPassword() {
                 <AuthFooter 
                     text="Нет аккаунта?"
                     linkText="Зарегистрироваться"
-                    linkHref="/register"
+                    linkHref={route('register')}
                 />
             </div>
         </AuthLayout>

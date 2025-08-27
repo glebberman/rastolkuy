@@ -23,6 +23,13 @@ export interface PageProps<T extends Record<string, unknown> = Record<string, un
         info?: string;
         warning?: string;
     };
+    ziggy: {
+        routes: Record<string, any>;
+        url: string;
+        port: number | null;
+        defaults: Record<string, any>;
+        location: string;
+    };
 }
 
 export type PagePropsWithData<T> = PageProps & T;
@@ -116,4 +123,6 @@ declare global {
     interface Window {
         axios: typeof import('axios').default;
     }
+    
+    var route: (name?: string, params?: any, absolute?: boolean) => string;
 }

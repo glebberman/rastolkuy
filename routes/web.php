@@ -10,14 +10,29 @@ Route::middleware('guest')->group(function () {
     Route::get('login', function () {
         return Inertia::render('Auth/Login');
     })->name('login');
+    
+    Route::post('login', function () {
+        // Login logic will be implemented later
+        return redirect()->route('dashboard');
+    });
 
     Route::get('register', function () {
         return Inertia::render('Auth/Register');
     })->name('register');
+    
+    Route::post('register', function () {
+        // Register logic will be implemented later
+        return redirect()->route('dashboard');
+    });
 
     Route::get('forgot-password', function () {
         return Inertia::render('Auth/ForgotPassword');
     })->name('password.request');
+    
+    Route::post('forgot-password', function () {
+        // Forgot password logic will be implemented later
+        return back()->with('status', 'Password reset link sent!');
+    })->name('password.email');
 });
 
 // Dashboard Routes
