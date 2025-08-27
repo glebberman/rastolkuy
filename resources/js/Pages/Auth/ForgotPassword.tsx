@@ -1,8 +1,12 @@
 import React, { FormEvent } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { IconGavel, IconLoader2, IconMail } from '@tabler/icons-react';
-import AuthLayout from '../../Layouts/AuthLayout';
-import { ForgotPasswordForm } from '../../Types';
+import { IconMail } from '@tabler/icons-react';
+import AuthLayout from '@/Layouts/AuthLayout';
+import AuthHeader from '@/Components/Auth/AuthHeader';
+import AuthFooter from '@/Components/Auth/AuthFooter';
+import FormInput from '@/Components/Form/FormInput';
+import SubmitButton from '@/Components/Form/SubmitButton';
+import { ForgotPasswordForm } from '@/Types';
 
 export default function ForgotPassword() {
     const { data, setData, post, processing, errors, wasSuccessful } = useForm<ForgotPasswordForm>({
@@ -17,19 +21,12 @@ export default function ForgotPassword() {
     return (
         <AuthLayout title="Восстановление пароля">
             <div className="auth-card card">
-                {/* Header */}
-                <div className="auth-header">
-                    <div className="text-center mb-3">
-                        <div className="d-inline-flex align-items-center justify-content-center rounded-circle bg-info text-white mb-3" 
-                             style={{ width: '64px', height: '64px' }}>
-                            <IconMail size={32} />
-                        </div>
-                    </div>
-                    <h1 className="auth-title">Забыли пароль?</h1>
-                    <p className="auth-subtitle">
-                        Введите ваш email, и мы отправим ссылку для восстановления пароля
-                    </p>
-                </div>
+                <AuthHeader 
+                    icon={<IconMail size={32} />}
+                    title="Забыли пароль?"
+                    subtitle="Введите ваш email, и мы отправим ссылку для восстановления пароля"
+                    iconBgColor="bg-info"
+                />
 
                 {/* Form */}
                 <div className="auth-form">
@@ -51,38 +48,25 @@ export default function ForgotPassword() {
                     ) : (
                         <form onSubmit={handleSubmit}>
                             <div className="mb-4">
-                                <label htmlFor="email" className="form-label">Email адрес</label>
-                                <input
-                                    type="email"
-                                    className={`form-control ${errors.email ? 'is-invalid' : ''}`}
+                                <FormInput
                                     id="email"
+                                    label="Email адрес"
+                                    type="email"
                                     value={data.email}
-                                    onChange={(e) => setData('email', e.target.value)}
+                                    onChange={(value) => setData('email', value)}
                                     placeholder="user@example.com"
+                                    error={errors.email}
                                     required
                                     autoFocus
                                 />
-                                {errors.email && (
-                                    <div className="invalid-feedback">
-                                        {errors.email}
-                                    </div>
-                                )}
                             </div>
 
-                            <button
-                                type="submit"
-                                className="btn btn-primary w-100 mb-3"
-                                disabled={processing}
+                            <SubmitButton
+                                isLoading={processing}
+                                loadingText="Отправка письма..."
                             >
-                                {processing ? (
-                                    <>
-                                        <IconLoader2 className="me-2 spinner-border spinner-border-sm" />
-                                        Отправка письма...
-                                    </>
-                                ) : (
-                                    'Отправить ссылку для восстановления'
-                                )}
-                            </button>
+                                Отправить ссылку для восстановления
+                            </SubmitButton>
                         </form>
                     )}
 
@@ -93,15 +77,11 @@ export default function ForgotPassword() {
                     </div>
                 </div>
 
-                {/* Footer */}
-                <div className="auth-footer">
-                    <p>
-                        Нет аккаунта?{' '}
-                        <Link href="/register" className="text-decoration-none">
-                            Зарегистрироваться
-                        </Link>
-                    </p>
-                </div>
+                <AuthFooter 
+                    text="Нет аккаунта?"
+                    linkText="Зарегистрироваться"
+                    linkHref="/register"
+                />
             </div>
         </AuthLayout>
     );

@@ -1,12 +1,15 @@
-import React, { useState, FormEvent } from 'react';
+import React, { FormEvent } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { IconEye, IconEyeOff, IconGavel, IconLoader2 } from '@tabler/icons-react';
-import AuthLayout from '../../Layouts/AuthLayout';
-import { LoginForm } from '../../Types';
+import { IconGavel } from '@tabler/icons-react';
+import AuthLayout from '@/Layouts/AuthLayout';
+import AuthHeader from '@/Components/Auth/AuthHeader';
+import AuthFooter from '@/Components/Auth/AuthFooter';
+import FormInput from '@/Components/Form/FormInput';
+import PasswordInput from '@/Components/Form/PasswordInput';
+import SubmitButton from '@/Components/Form/SubmitButton';
+import { LoginForm } from '@/Types';
 
 export default function Login() {
-    const [showPassword, setShowPassword] = useState(false);
-    
     const { data, setData, post, processing, errors } = useForm<LoginForm>({
         email: '',
         password: '',
@@ -21,68 +24,35 @@ export default function Login() {
     return (
         <AuthLayout title="Вход в систему">
             <div className="auth-card card">
-                {/* Header */}
-                <div className="auth-header">
-                    <div className="text-center mb-3">
-                        <div className="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary text-white mb-3" 
-                             style={{ width: '64px', height: '64px' }}>
-                            <IconGavel size={32} />
-                        </div>
-                    </div>
-                    <h1 className="auth-title">Добро пожаловать!</h1>
-                    <p className="auth-subtitle">Войдите в свой аккаунт для продолжения</p>
-                </div>
+                <AuthHeader 
+                    icon={<IconGavel size={32} />}
+                    title="Добро пожаловать!"
+                    subtitle="Войдите в свой аккаунт для продолжения"
+                />
 
-                {/* Form */}
                 <div className="auth-form">
                     <form onSubmit={handleSubmit}>
-                        <div className="mb-3">
-                            <label htmlFor="email" className="form-label">Email</label>
-                            <input
-                                type="email"
-                                className={`form-control ${errors.email ? 'is-invalid' : ''}`}
-                                id="email"
-                                value={data.email}
-                                onChange={(e) => setData('email', e.target.value)}
-                                placeholder="user@example.com"
-                                required
-                                autoFocus
-                            />
-                            {errors.email && (
-                                <div className="invalid-feedback">
-                                    {errors.email}
-                                </div>
-                            )}
-                        </div>
+                        <FormInput
+                            id="email"
+                            label="Email"
+                            type="email"
+                            value={data.email}
+                            onChange={(value) => setData('email', value)}
+                            placeholder="user@example.com"
+                            error={errors.email}
+                            required
+                            autoFocus
+                        />
 
-                        <div className="mb-3">
-                            <label htmlFor="password" className="form-label">Пароль</label>
-                            <div className="position-relative">
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    className={`form-control ${errors.password ? 'is-invalid' : ''}`}
-                                    id="password"
-                                    value={data.password}
-                                    onChange={(e) => setData('password', e.target.value)}
-                                    placeholder="Введите пароль"
-                                    required
-                                />
-                                <button
-                                    type="button"
-                                    className="btn btn-link position-absolute top-50 end-0 translate-middle-y pe-3 text-muted"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    tabIndex={-1}
-                                    style={{ border: 'none', background: 'none' }}
-                                >
-                                    {showPassword ? <IconEyeOff size={20} /> : <IconEye size={20} />}
-                                </button>
-                            </div>
-                            {errors.password && (
-                                <div className="invalid-feedback d-block">
-                                    {errors.password}
-                                </div>
-                            )}
-                        </div>
+                        <PasswordInput
+                            id="password"
+                            label="Пароль"
+                            value={data.password}
+                            onChange={(value) => setData('password', value)}
+                            placeholder="Введите пароль"
+                            error={errors.password}
+                            required
+                        />
 
                         <div className="mb-3 form-check">
                             <input
@@ -97,20 +67,12 @@ export default function Login() {
                             </label>
                         </div>
 
-                        <button
-                            type="submit"
-                            className="btn btn-primary w-100 mb-3"
-                            disabled={processing}
+                        <SubmitButton
+                            isLoading={processing}
+                            loadingText="Вход в систему..."
                         >
-                            {processing ? (
-                                <>
-                                    <IconLoader2 className="me-2 spinner-border spinner-border-sm" />
-                                    Вход в систему...
-                                </>
-                            ) : (
-                                'Войти'
-                            )}
-                        </button>
+                            Войти
+                        </SubmitButton>
 
                         <div className="text-center">
                             <Link href="/forgot-password" className="text-decoration-none">
@@ -120,15 +82,11 @@ export default function Login() {
                     </form>
                 </div>
 
-                {/* Footer */}
-                <div className="auth-footer">
-                    <p>
-                        Нет аккаунта?{' '}
-                        <Link href="/register" className="text-decoration-none">
-                            Зарегистрироваться
-                        </Link>
-                    </p>
-                </div>
+                <AuthFooter 
+                    text="Нет аккаунта?"
+                    linkText="Зарегистрироваться"
+                    linkHref="/register"
+                />
             </div>
         </AuthLayout>
     );
