@@ -1,0 +1,120 @@
+// Theme switcher component styles
+
+.theme-switcher {
+  position: relative;
+}
+
+.theme-switcher-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--bs-body-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.theme-switcher-btn:hover {
+  background: rgba(var(--bs-body-color-rgb), 0.1);
+  color: var(--bs-primary);
+}
+
+.theme-switcher-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(var(--bs-primary-rgb), 0.25);
+}
+
+.theme-switcher-icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  transition: transform 0.2s ease;
+}
+
+.theme-switcher-btn:hover .theme-switcher-icon {
+  transform: scale(1.1);
+}
+
+// Animation for theme switching
+.theme-transition * {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease !important;
+}
+
+// Sun icon for light theme
+.sun-icon {
+  display: block;
+}
+
+[data-bs-theme="dark"] .sun-icon {
+  display: none;
+}
+
+// Moon icon for dark theme  
+.moon-icon {
+  display: none;
+}
+
+[data-bs-theme="dark"] .moon-icon {
+  display: block;
+}
+
+// Auto icon for system theme
+.auto-icon {
+  display: none;
+}
+
+.theme-auto .auto-icon {
+  display: block;
+}
+
+.theme-auto .sun-icon,
+.theme-auto .moon-icon {
+  display: none;
+}
+
+// Theme switcher dropdown (if using dropdown)
+.theme-switcher-dropdown {
+  min-width: 150px;
+  padding: 0.5rem 0;
+}
+
+.theme-switcher-item {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--bs-body-color);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s ease;
+}
+
+.theme-switcher-item:hover {
+  background: var(--bs-secondary-bg);
+  color: var(--bs-primary);
+}
+
+.theme-switcher-item.active {
+  background: rgba(var(--bs-primary-rgb), 0.1);
+  color: var(--bs-primary);
+  font-weight: 500;
+}
+
+.theme-switcher-item-icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+// Smooth transitions
+html {
+  transition: color-scheme 0.3s ease;
+}
+
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
