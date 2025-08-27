@@ -7,33 +7,27 @@ use Inertia\Inertia;
 
 // Authentication Routes
 Route::middleware('guest')->group(function () {
-    Route::get('login', function () {
-        return Inertia::render('Auth/Login');
-    })->name('login');
+    Route::get('login', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'create'])
+        ->name('login');
     
-    Route::post('login', function () {
-        // Login logic will be implemented later
-        return redirect()->route('dashboard');
-    });
+    Route::post('login', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'store']);
 
-    Route::get('register', function () {
-        return Inertia::render('Auth/Register');
-    })->name('register');
+    Route::get('register', [\App\Http\Controllers\Auth\RegisteredUserController::class, 'create'])
+        ->name('register');
     
-    Route::post('register', function () {
-        // Register logic will be implemented later
-        return redirect()->route('dashboard');
-    });
+    Route::post('register', [\App\Http\Controllers\Auth\RegisteredUserController::class, 'store']);
 
-    Route::get('forgot-password', function () {
-        return Inertia::render('Auth/ForgotPassword');
-    })->name('password.request');
+    Route::get('forgot-password', [\App\Http\Controllers\Auth\PasswordResetLinkController::class, 'create'])
+        ->name('password.request');
     
-    Route::post('forgot-password', function () {
-        // Forgot password logic will be implemented later
-        return back()->with('status', 'Password reset link sent!');
-    })->name('password.email');
+    Route::post('forgot-password', [\App\Http\Controllers\Auth\PasswordResetLinkController::class, 'store'])
+        ->name('password.email');
 });
+
+// Logout route
+Route::post('logout', [\App\Http\Controllers\Auth\AuthenticatedSessionController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout');
 
 // Dashboard Routes
 Route::middleware('auth')->group(function () {

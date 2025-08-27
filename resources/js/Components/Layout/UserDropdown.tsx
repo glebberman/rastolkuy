@@ -1,7 +1,8 @@
 import React from 'react';
 import { Link, router } from '@inertiajs/react';
-import { User } from '../../Types';
+import { User } from '@/Types';
 import { IconUser, IconSettings, IconLogout, IconShield } from '@tabler/icons-react';
+import { route } from '@/Utils/route';
 
 interface Props {
     user: User;
@@ -9,7 +10,7 @@ interface Props {
 
 export default function UserDropdown({ user }: Props) {
     const handleLogout = () => {
-        router.post('/logout');
+        router.post(route('logout'));
     };
 
     const getInitials = (name: string): string => {
