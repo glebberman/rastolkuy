@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @property-read DocumentProcessing $resource
+ * @property DocumentProcessing $resource
  */
 class DocumentProcessingResource extends JsonResource
 {

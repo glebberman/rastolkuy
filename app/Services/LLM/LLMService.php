@@ -301,7 +301,7 @@ final readonly class LLMService
      * Execute a general LLM request with custom prompt and options.
      *
      * @param string $prompt The prompt to send
-     * @param array<string, mixed> $options Options including model, temperature, etc.
+     * @param array<string, mixed> $options options including model, temperature, etc
      *
      * @throws LLMException
      *

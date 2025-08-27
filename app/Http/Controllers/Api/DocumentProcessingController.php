@@ -7,38 +7,49 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\ProcessDocumentRequest;
 use App\Http\Resources\DocumentProcessingResource;
+use App\Services\AuditService;
 use App\Services\DocumentProcessingService;
 use Exception;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class DocumentProcessingController extends Controller
 {
+    use AuthorizesRequests;
+
     public function __construct(
-        private readonly DocumentProcessingService $documentProcessingService
-    ) {}
+        private readonly DocumentProcessingService $documentProcessingService,
+        private readonly AuditService $auditService,
+    ) {
+    }
 
     /**
-     * Загрузить документ и инициировать его обработку
+     * Загрузить документ и инициировать его обработку.
      */
     public function store(ProcessDocumentRequest $request): JsonResponse
     {
+        $this->authorize('create', \App\Models\DocumentProcessing::class);
+
         try {
-            $documentProcessing = $this->documentProcessingService->uploadAndProcess($request);
+            /** @var \App\Models\User $user */
+            $user = $request->user();
+            $documentProcessing = $this->documentProcessingService->uploadAndProcess($request, $user);
+
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'upload');
 
             return response()->json([
                 'message' => 'Документ загружен и поставлен в очередь на обработку',
                 'data' => new DocumentProcessingResource($documentProcessing),
             ], ResponseAlias::HTTP_CREATED);
-
         } catch (RuntimeException $e) {
             return response()->json([
                 'error' => 'Failed to store uploaded file',
                 'message' => 'Не удалось сохранить загруженный файл',
             ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
-
         } catch (Exception $e) {
             return response()->json([
                 'error' => 'Document upload failed',
@@ -48,7 +59,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Получить статус обработки документа
+     * Получить статус обработки документа.
      */
     public function show(string $uuid): JsonResponse
     {
@@ -61,6 +72,12 @@ class DocumentProcessingController extends Controller
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('view', $documentProcessing);
+
+        /** @var \App\Models\User $user */
+        $user = request()->user();
+        $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'view');
+
         return response()->json([
             'message' => 'Статус обработки документа',
             'data' => new DocumentProcessingResource($documentProcessing),
@@ -68,7 +85,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Получить результат обработки документа
+     * Получить результат обработки документа.
      */
     public function result(string $uuid): JsonResponse
     {
@@ -80,6 +97,8 @@ class DocumentProcessingController extends Controller
                 'message' => 'Документ с указанным идентификатором не найден',
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
+
+        $this->authorize('view', $documentProcessing);
 
         if (!$documentProcessing->isCompleted()) {
             return response()->json([
@@ -106,17 +125,19 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Получить список всех обработок (для админ панели)
+     * Получить список всех обработок (для админ панели).
      */
     public function index(Request $request): JsonResponse
     {
+        $this->authorize('viewAny', \App\Models\DocumentProcessing::class);
+
         $filters = [
             'status' => $request->get('status'),
             'task_type' => $request->get('task_type'),
         ];
 
         $perPageRaw = $request->input('per_page', 20);
-        $perPage = is_numeric($perPageRaw) ? (int)$perPageRaw : 20;
+        $perPage = is_numeric($perPageRaw) ? (int) $perPageRaw : 20;
 
         $documentProcessings = $this->documentProcessingService->getFilteredList($filters, $perPage);
 
@@ -135,7 +156,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Отменить обработку документа (если она еще не началась)
+     * Отменить обработку документа (если она еще не началась).
      */
     public function cancel(string $uuid): JsonResponse
     {
@@ -148,6 +169,8 @@ class DocumentProcessingController extends Controller
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
 
+        $this->authorize('cancel', $documentProcessing);
+
         try {
             $this->documentProcessingService->cancelProcessing($documentProcessing);
 
@@ -155,8 +178,7 @@ class DocumentProcessingController extends Controller
                 'message' => 'Обработка документа отменена',
                 'data' => new DocumentProcessingResource($documentProcessing),
             ]);
-
-        } catch (\InvalidArgumentException $e) {
+        } catch (InvalidArgumentException $e) {
             return response()->json([
                 'error' => 'Cannot cancel',
                 'message' => $e->getMessage(),
@@ -166,7 +188,7 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Удалить запись об обработке документа
+     * Удалить запись об обработке документа.
      */
     public function destroy(string $uuid): JsonResponse
     {
@@ -178,6 +200,8 @@ class DocumentProcessingController extends Controller
                 'message' => 'Документ с указанным идентификатором не найден',
             ], ResponseAlias::HTTP_NOT_FOUND);
         }
+
+        $this->authorize('delete', $documentProcessing);
 
         $this->documentProcessingService->deleteProcessing($documentProcessing);
 
@@ -191,6 +215,8 @@ class DocumentProcessingController extends Controller
      */
     public function stats(): JsonResponse
     {
+        $this->authorize('stats', \App\Models\DocumentProcessing::class);
+
         $stats = $this->documentProcessingService->getStatistics();
 
         return response()->json([

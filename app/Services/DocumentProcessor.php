@@ -34,16 +34,16 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Обрабатывает файл документа (PDF, DOCX, TXT)
+     * Обрабатывает файл документа (PDF, DOCX, TXT).
      */
     public function processFile(
         string|UploadedFile $file,
         string $taskType = 'translation',
         array $options = [],
-        bool $addAnchorAtStart = false
+        bool $addAnchorAtStart = false,
     ): string {
         $filePath = $file instanceof UploadedFile ? $file->getRealPath() : $file;
-        
+
         Log::info('Starting file processing', [
             'file_path' => $filePath,
             'task_type' => $taskType,
@@ -54,17 +54,16 @@ final readonly class DocumentProcessor
         try {
             // 1. Извлекаем содержимое и структуру файла
             $extractedDocument = $this->extractorManager->extract($filePath, ExtractionConfig::createDefault());
-            
+
             // 2. Обрабатываем извлеченный документ
             return $this->processExtractedDocument($extractedDocument, $taskType, $options, $addAnchorAtStart);
-            
         } catch (Exception $e) {
             Log::error('File processing failed', [
                 'file_path' => $filePath,
                 'task_type' => $taskType,
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw new InvalidArgumentException("Failed to process file: {$e->getMessage()}", previous: $e);
         }
     }
@@ -74,9 +73,9 @@ final readonly class DocumentProcessor
      */
     public function processExtractedDocument(
         ExtractedDocument $extractedDocument,
-        string $taskType = 'translation', 
+        string $taskType = 'translation',
         array $options = [],
-        bool $addAnchorAtStart = false
+        bool $addAnchorAtStart = false,
     ): string {
         Log::info('Starting extracted document processing', [
             'task_type' => $taskType,
@@ -88,12 +87,12 @@ final readonly class DocumentProcessor
         try {
             // 1. Анализируем структуру документа
             $structureResult = $this->structureAnalyzer->analyze($extractedDocument);
-            
+
             if (!$structureResult->isSuccessful()) {
                 Log::warning('Structure analysis failed, using fallback processing', [
                     'warnings' => $structureResult->warnings,
                 ]);
-                
+
                 // Fallback: обрабатываем как простой текст
                 return $this->processPlainText($extractedDocument->getPlainText(), $taskType, $options, $addAnchorAtStart);
             }
@@ -116,7 +115,7 @@ final readonly class DocumentProcessor
                     'errors' => $parsedResponse->errors,
                     'warnings' => $parsedResponse->warnings,
                 ]);
-                
+
                 // Возвращаем документ с якорями если парсинг провалился
                 return $sectionsWithAnchors;
             }
@@ -131,26 +130,25 @@ final readonly class DocumentProcessor
             ]);
 
             return $processedDocument;
-            
         } catch (Exception $e) {
             Log::error('Document processing failed', [
                 'document_path' => $extractedDocument->originalPath,
                 'task_type' => $taskType,
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw new InvalidArgumentException("Document processing failed: {$e->getMessage()}", previous: $e);
         }
     }
 
     /**
-     * Обрабатывает простой текст (fallback для случаев когда нет файла)
+     * Обрабатывает простой текст (fallback для случаев когда нет файла).
      */
     public function processPlainText(
         string $documentContent,
         string $taskType = 'translation',
         array $options = [],
-        bool $addAnchorAtStart = false
+        bool $addAnchorAtStart = false,
     ): string {
         Log::info('Starting plain text processing', [
             'task_type' => $taskType,
@@ -163,56 +161,57 @@ final readonly class DocumentProcessor
             $textElement = new TextElement(
                 content: $documentContent,
                 position: [],
-                metadata: ['source' => 'plain_text']
+                metadata: ['source' => 'plain_text'],
             );
-            
+
             $extractedDocument = new ExtractedDocument(
                 originalPath: 'plain_text_input',
                 mimeType: 'text/plain',
                 elements: [$textElement],
                 metadata: ['processing_mode' => 'plain_text'],
                 totalPages: 1,
-                extractionTime: 0.0
+                extractionTime: 0.0,
             );
 
             // Используем общий процессор для извлеченных документов
             return $this->processExtractedDocument($extractedDocument, $taskType, $options, $addAnchorAtStart);
-            
         } catch (Exception $e) {
             Log::error('Plain text processing failed', [
                 'task_type' => $taskType,
                 'content_length' => mb_strlen($documentContent),
                 'error' => $e->getMessage(),
             ]);
-            
+
             throw new InvalidArgumentException("Plain text processing failed: {$e->getMessage()}", previous: $e);
         }
     }
 
     /**
-     * Извлекает ID якорей из секций документа
+     * Извлекает ID якорей из секций документа.
      *
      * @param array<DocumentSection> $sections
+     *
      * @return array<string>
      */
     private function extractAnchorIds(array $sections): array
     {
         $anchorIds = [];
-        
+
         foreach ($sections as $section) {
             if ($section instanceof DocumentSection) {
                 $anchorId = $this->anchorGenerator->extractAnchorId($section->anchor);
+
                 if ($anchorId !== null) {
                     $anchorIds[] = $anchorId;
                 }
             }
         }
-        
+
         return $anchorIds;
     }
 
     /**
-     * Добавляет якоря к документу для идентификации секций
+     * Добавляет якоря к документу для идентификации секций.
      *
      * @param array<DocumentSection> $sections
      * @param bool $addAnchorAtStart По умолчанию false (якорь в конце секции)
@@ -220,18 +219,21 @@ final readonly class DocumentProcessor
     private function addAnchorsToDocument(string $content, array $sections, bool $addAnchorAtStart = false): string
     {
         $documentWithAnchors = $content;
-        
+
         // Сортируем секции по позиции в убывающем порядке для корректной вставки якорей
-        $sortedSections = array_filter($sections, fn($s) => $s instanceof DocumentSection);
-        usort($sortedSections, fn($a, $b) => $b->startPosition <=> $a->startPosition);
+        $sortedSections = array_filter($sections, fn ($s) => $s instanceof DocumentSection);
+        usort($sortedSections, fn ($a, $b) => $b->startPosition <=> $a->startPosition);
 
         foreach ($sortedSections as $section) {
             // Используем существующий якорь секции (уже сгенерированный StructureAnalyzer)
             $anchor = $section->anchor;
-            
+
             $beforeSection = substr($documentWithAnchors, 0, $section->startPosition);
-            $sectionContent = substr($documentWithAnchors, $section->startPosition, 
-                $section->endPosition - $section->startPosition);
+            $sectionContent = substr(
+                $documentWithAnchors,
+                $section->startPosition,
+                $section->endPosition - $section->startPosition,
+            );
             $afterSection = substr($documentWithAnchors, $section->endPosition);
 
             if ($addAnchorAtStart) {
@@ -247,7 +249,7 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Отправляет документ с якорями в LLM для обработки
+     * Отправляет документ с якорями в LLM для обработки.
      *
      * @param array<string> $anchorIds
      */
@@ -273,7 +275,7 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Определяет оптимальные настройки модели для задачи
+     * Определяет оптимальные настройки модели для задачи.
      */
     private function getModelOptions(string $taskType, int $contentLength, array $userOptions): array
     {
@@ -297,14 +299,14 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Строит промпт для LLM в зависимости от типа задачи
+     * Строит промпт для LLM в зависимости от типа задачи.
      *
      * @param array<string> $anchorIds
      */
     private function buildPrompt(string $content, string $taskType, array $anchorIds, array $options): string
     {
         $anchorList = implode(', ', $anchorIds);
-        
+
         switch ($taskType) {
             case 'translation':
                 return "Переведи следующий юридический документ в простой, понятный язык по секциям.
@@ -367,11 +369,11 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Парсит и валидирует ответ LLM
+     * Парсит и валидирует ответ LLM.
      *
      * @param array<string> $anchorIds
      */
-    private function parseAndValidateResponse(string $response, array $anchorIds, string $taskType): \App\Services\Prompt\DTOs\ParsedLlmResponse
+    private function parseAndValidateResponse(string $response, array $anchorIds, string $taskType): Prompt\DTOs\ParsedLlmResponse
     {
         $request = new LlmParsingRequest(
             rawResponse: $response,
@@ -385,27 +387,28 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Заменяет якоря в документе на обработанное LLM содержимое
+     * Заменяет якоря в документе на обработанное LLM содержимое.
      */
-    private function replaceAnchorsWithContent(string $documentWithAnchors, \App\Services\Prompt\DTOs\ParsedLlmResponse $parsedResponse): string
+    private function replaceAnchorsWithContent(string $documentWithAnchors, Prompt\DTOs\ParsedLlmResponse $parsedResponse): string
     {
         $processedDocument = $documentWithAnchors;
         $anchorContentMap = $parsedResponse->getAnchorContentMap();
 
         if (empty($anchorContentMap)) {
             Log::warning('No anchor content found in LLM response');
+
             return $processedDocument;
         }
 
         foreach ($anchorContentMap as $anchorId => $content) {
             // Находим полный якорь в документе
             $fullAnchor = $this->findFullAnchorInDocument($processedDocument, $anchorId);
-            
+
             if ($fullAnchor !== null) {
                 // Формируем замену в зависимости от типа содержимого
                 $replacement = $this->formatReplacementContent($fullAnchor, $content, $parsedResponse->schemaType);
                 $processedDocument = str_replace($fullAnchor, $replacement, $processedDocument);
-                
+
                 Log::debug('Replaced anchor with content', [
                     'anchor_id' => $anchorId,
                     'content_length' => mb_strlen($content),
@@ -421,29 +424,30 @@ final readonly class DocumentProcessor
     }
 
     /**
-     * Форматирует замену якоря в зависимости от типа обработки
+     * Форматирует замену якоря в зависимости от типа обработки.
      */
     private function formatReplacementContent(string $anchor, string $content, ?string $taskType): string
     {
-        $label = match($taskType) {
+        $label = match ($taskType) {
             'translation' => '**[Переведено]:**',
             'contradiction' => '**[Найдено противоречие]:**',
             'ambiguity' => '**[Найдена неоднозначность]:**',
             default => '**[Обработано]:**',
         };
-        
+
         return "{$anchor}\n\n{$label} {$content}\n";
     }
 
     /**
-     * Находит полный якорь в документе по его ID
+     * Находит полный якорь в документе по его ID.
      */
     private function findFullAnchorInDocument(string $document, string $anchorId): ?string
     {
         $anchors = $this->anchorGenerator->findAnchorsInText($document);
-        
+
         foreach ($anchors as $anchor) {
             $extractedId = $this->anchorGenerator->extractAnchorId($anchor);
+
             if ($extractedId === $anchorId) {
                 return $anchor;
             }

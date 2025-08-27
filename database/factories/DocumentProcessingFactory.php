@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Database\Factories;
 
 use App\Models\DocumentProcessing;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -42,8 +43,9 @@ class DocumentProcessingFactory extends Factory
 
         $fileExtensions = ['pdf', 'docx', 'doc', 'txt'];
         $extension = $this->faker->randomElement($fileExtensions);
-        
+
         return [
+            'user_id' => User::factory(),
             'uuid' => Str::uuid()->toString(),
             'original_filename' => $this->faker->word() . '_contract.' . $extension,
             'file_path' => 'documents/' . Str::uuid()->toString() . '.' . $extension,
@@ -72,18 +74,18 @@ class DocumentProcessingFactory extends Factory
     }
 
     /**
-     * Состояние для завершенной обработки
+     * Состояние для завершенной обработки.
      */
     public function completed(): static
     {
         return $this->state(function (array $attributes) {
             $startedAt = $this->faker->dateTimeBetween('-1 week', '-1 hour');
             $completedAt = $this->faker->dateTimeBetween($startedAt, 'now');
-            
+
             $taskType = is_string($attributes['task_type']) ? $attributes['task_type'] : DocumentProcessing::TASK_TRANSLATION;
             $options = is_array($attributes['options']) ? $attributes['options'] : [];
             $model = is_string($options['model'] ?? null) ? $options['model'] : 'claude-3-5-sonnet-20241022';
-            
+
             return [
                 'status' => DocumentProcessing::STATUS_COMPLETED,
                 'result' => $this->generateSampleResult($taskType),
@@ -101,13 +103,13 @@ class DocumentProcessingFactory extends Factory
     }
 
     /**
-     * Состояние для неудачной обработки
+     * Состояние для неудачной обработки.
      */
     public function failed(): static
     {
         return $this->state(function (array $attributes) {
             $startedAt = $this->faker->dateTimeBetween('-1 week', '-1 hour');
-            
+
             return [
                 'status' => DocumentProcessing::STATUS_FAILED,
                 'error_details' => [
@@ -127,7 +129,7 @@ class DocumentProcessingFactory extends Factory
     }
 
     /**
-     * Состояние для обрабатываемого документа
+     * Состояние для обрабатываемого документа.
      */
     public function processing(): static
     {
@@ -145,11 +147,11 @@ class DocumentProcessingFactory extends Factory
     }
 
     /**
-     * Генерация примера результата обработки
+     * Генерация примера результата обработки.
      */
     private function generateSampleResult(string $taskType): string
     {
-        $result = match($taskType) {
+        $result = match ($taskType) {
             DocumentProcessing::TASK_TRANSLATION => json_encode([
                 'translated_sections' => [
                     [
@@ -165,7 +167,7 @@ class DocumentProcessingFactory extends Factory
                 'contradictions_found' => [
                     [
                         'section1' => 'Пункт 2.1',
-                        'section2' => 'Пункт 5.3', 
+                        'section2' => 'Пункт 5.3',
                         'description' => 'Противоречие в сроках выполнения работ',
                         'severity' => 'high',
                     ],
@@ -185,7 +187,7 @@ class DocumentProcessingFactory extends Factory
             ], JSON_UNESCAPED_UNICODE),
             default => json_encode(['result' => 'Обработка завершена'], JSON_UNESCAPED_UNICODE),
         };
-        
+
         return $result !== false ? $result : '{"error": "Failed to encode result"}';
     }
 }

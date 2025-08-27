@@ -18,13 +18,17 @@ use Illuminate\Support\Facades\Storage;
 
 class ProcessDocumentJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable;
+    use InteractsWithQueue;
+    use Queueable;
+    use SerializesModels;
 
     public int $timeout = 600; // 10 минут максимум на обработку
+
     public int $maxExceptions = 3; // Максимум 3 попытки
 
     public function __construct(
-        private int $documentProcessingId
+        private int $documentProcessingId,
     ) {
         // Устанавливаем очередь в зависимости от важности
         $this->onQueue('document-processing');
@@ -38,6 +42,7 @@ class ProcessDocumentJob implements ShouldQueue
             Log::error('Document processing record not found', [
                 'document_processing_id' => $this->documentProcessingId,
             ]);
+
             return;
         }
 
@@ -46,6 +51,7 @@ class ProcessDocumentJob implements ShouldQueue
                 'uuid' => $documentProcessing->uuid,
                 'status' => $documentProcessing->status,
             ]);
+
             return;
         }
 
@@ -54,6 +60,7 @@ class ProcessDocumentJob implements ShouldQueue
             $documentProcessing->markAsFailed('File not found', [
                 'file_path' => $documentProcessing->file_path,
             ]);
+
             return;
         }
 
@@ -75,7 +82,7 @@ class ProcessDocumentJob implements ShouldQueue
                 file: $fullFilePath,
                 taskType: $documentProcessing->task_type,
                 options: $documentProcessing->options ?? [],
-                addAnchorAtStart: $documentProcessing->anchor_at_start
+                addAnchorAtStart: $documentProcessing->anchor_at_start,
             );
 
             // Извлекаем метаданные (примерная стоимость и статистика)
@@ -85,7 +92,7 @@ class ProcessDocumentJob implements ShouldQueue
             $documentProcessing->markAsCompleted(
                 result: $result,
                 metadata: $metadata,
-                costUsd: $metadata['estimated_cost_usd'] ?? null
+                costUsd: $metadata['estimated_cost_usd'] ?? null,
             );
 
             Log::info('Document processing completed successfully', [
@@ -93,7 +100,6 @@ class ProcessDocumentJob implements ShouldQueue
                 'processing_time' => $documentProcessing->processing_time_seconds,
                 'result_length' => mb_strlen($result),
             ]);
-
         } catch (Exception $e) {
             Log::error('Document processing failed', [
                 'uuid' => $documentProcessing->uuid,
@@ -108,7 +114,7 @@ class ProcessDocumentJob implements ShouldQueue
                     'file' => $e->getFile(),
                     'line' => $e->getLine(),
                     'trace' => $e->getTraceAsString(),
-                ]
+                ],
             );
 
             // Пробрасываем исключение для retry механизма
@@ -117,7 +123,32 @@ class ProcessDocumentJob implements ShouldQueue
     }
 
     /**
-     * Извлекает метаданные обработки для сохранения статистики
+     * Обработка провала задачи.
+     */
+    public function failed(Exception $exception): void
+    {
+        $documentProcessing = DocumentProcessing::find($this->documentProcessingId);
+
+        if ($documentProcessing && !$documentProcessing->isFailed()) {
+            $documentProcessing->markAsFailed(
+                error: 'Job failed after maximum retries: ' . $exception->getMessage(),
+                errorDetails: [
+                    'exception_class' => get_class($exception),
+                    'attempts' => $this->attempts(),
+                    'failed_at' => now()->toISOString(),
+                ],
+            );
+        }
+
+        Log::error('ProcessDocumentJob failed permanently', [
+            'document_processing_id' => $this->documentProcessingId,
+            'attempts' => $this->attempts(),
+            'error' => $exception->getMessage(),
+        ]);
+    }
+
+    /**
+     * Извлекает метаданные обработки для сохранения статистики.
      */
     private function extractProcessingMetadata(string $result, DocumentProcessing $documentProcessing, CostCalculator $costCalculator): array
     {
@@ -131,6 +162,7 @@ class ProcessDocumentJob implements ShouldQueue
         $estimatedInputTokens = $costCalculator->estimateTokensFromFileSize($documentProcessing->file_size);
         $estimatedOutputTokens = $costCalculator->estimateTokens($result);
         $modelUsed = null;
+
         if (isset($documentProcessing->options['model']) && is_string($documentProcessing->options['model'])) {
             $modelUsed = $documentProcessing->options['model'];
         }
@@ -157,30 +189,5 @@ class ProcessDocumentJob implements ShouldQueue
                 'processed_at' => now()->toISOString(),
             ],
         ];
-    }
-
-    /**
-     * Обработка провала задачи
-     */
-    public function failed(Exception $exception): void
-    {
-        $documentProcessing = DocumentProcessing::find($this->documentProcessingId);
-
-        if ($documentProcessing && !$documentProcessing->isFailed()) {
-            $documentProcessing->markAsFailed(
-                error: 'Job failed after maximum retries: ' . $exception->getMessage(),
-                errorDetails: [
-                    'exception_class' => get_class($exception),
-                    'attempts' => $this->attempts(),
-                    'failed_at' => now()->toISOString(),
-                ]
-            );
-        }
-
-        Log::error('ProcessDocumentJob failed permanently', [
-            'document_processing_id' => $this->documentProcessingId,
-            'attempts' => $this->attempts(),
-            'error' => $exception->getMessage(),
-        ]);
     }
 }

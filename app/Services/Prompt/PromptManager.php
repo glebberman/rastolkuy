@@ -72,7 +72,7 @@ final readonly class PromptManager
             return $result;
         } catch (LLMException $e) {
             $this->handleExecutionError($executionId, $e, $startTime);
-            
+
             // Wrap LLM exception in PromptException for consistency
             throw new PromptException("LLM request failed: {$e->getMessage()}", previous: $e);
         } catch (Exception $e) {
