@@ -9,9 +9,13 @@ export function useRoute() {
     };
 }
 
-export function route(name?: string, params?: any, absolute?: boolean) {
+export function route(name?: string, params?: any, absolute?: boolean): string {
     if (typeof window !== 'undefined' && window.route) {
-        return window.route(name, params, absolute);
+        try {
+            return window.route(name, params, absolute) as string;
+        } catch (error) {
+            console.warn('Route error:', error);
+        }
     }
     
     // Fallback для server-side rendering

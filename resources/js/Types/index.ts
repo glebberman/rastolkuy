@@ -124,6 +124,4 @@ declare global {
     interface Window {
         axios: typeof import('axios').default;
     }
-    
-    var route: (name?: string, params?: any, absolute?: boolean) => string;
 }

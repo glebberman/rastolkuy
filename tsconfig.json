@@ -23,7 +23,8 @@
   "include": [
     "resources/js/**/*.ts",
     "resources/js/**/*.tsx",
-    "resources/js/**/*.d.ts"
+    "resources/js/**/*.d.ts",
+    "resources/js/Types/ziggy.d.ts"
   ],
   "exclude": [
     "node_modules",

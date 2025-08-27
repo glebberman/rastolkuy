@@ -9,9 +9,6 @@ import { route as routeFn } from 'ziggy-js';
 const appName = import.meta.env.VITE_APP_NAME || 'Legal Translator';
 
 // Make route function available globally
-declare global {
-    var route: typeof routeFn;
-}
 window.route = routeFn;
 
 createInertiaApp({
