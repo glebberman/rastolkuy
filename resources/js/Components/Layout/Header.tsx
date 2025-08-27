@@ -1,18 +1,19 @@
 import React from 'react';
 import { Link, usePage } from '@inertiajs/react';
-import { PageProps, User } from '../../Types';
-import ThemeSwitcher from '../UI/ThemeSwitcher';
-import UserDropdown from './UserDropdown';
+import { PageProps, User } from '@/Types';
+import ThemeSwitcher from '@/Components/UI/ThemeSwitcher';
+import UserDropdown from '@/Components/Layout/UserDropdown';
 import { IconGavel } from '@tabler/icons-react';
+import { route } from '@/Utils/route';
 
 export default function Header() {
-    const { auth } = usePage<PageProps>().props;
+    const { auth } = usePage<PageProps<Record<string, unknown>>>().props;
 
     return (
         <header className="navbar navbar-expand-lg navbar-light bg-white border-bottom">
             <div className="container-fluid">
                 {/* Brand */}
-                <Link className="navbar-brand d-flex align-items-center" href="/">
+                <Link className="navbar-brand d-flex align-items-center" href={route('dashboard')}>
                     <IconGavel className="me-2" size={28} />
                     <span className="fw-bold">Legal Translator</span>
                 </Link>
@@ -37,13 +38,13 @@ export default function Header() {
                             <>
                                 <Link
                                     className="nav-link"
-                                    href="/dashboard"
+                                    href={route('dashboard')}
                                 >
                                     Главная
                                 </Link>
                                 <Link
                                     className="nav-link"
-                                    href="/documents"
+                                    href={route('documents.index') || '/documents'}
                                 >
                                     Документы
                                 </Link>
@@ -88,13 +89,13 @@ export default function Header() {
                         ) : (
                             <div className="d-flex align-items-center gap-2">
                                 <Link
-                                    href="/login"
+                                    href={route('login')}
                                     className="btn btn-outline-primary btn-sm"
                                 >
                                     Войти
                                 </Link>
                                 <Link
-                                    href="/register"
+                                    href={route('register')}
                                     className="btn btn-primary btn-sm"
                                 >
                                     Регистрация

@@ -13,7 +13,7 @@ export interface Auth {
     user: User | null;
 }
 
-export interface PageProps<T extends Record<string, unknown> = Record<string, unknown>> {
+export interface PageProps<T extends Record<string, unknown> = Record<string, unknown>> extends T {
     auth: Auth;
     csrf_token: string;
     flash: {
@@ -30,6 +30,7 @@ export interface PageProps<T extends Record<string, unknown> = Record<string, un
         defaults: Record<string, any>;
         location: string;
     };
+    [key: string]: unknown;
 }
 
 export type PagePropsWithData<T> = PageProps & T;
