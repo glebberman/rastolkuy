@@ -19,6 +19,8 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class AuthController extends Controller
@@ -41,11 +43,26 @@ class AuthController extends Controller
         try {
             $user = $this->authService->register($request);
 
+            Log::info('User registered successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
             return response()->json([
                 'message' => 'Пользователь успешно зарегистрирован. Проверьте email для подтверждения.',
                 'data' => new UserResource($user),
             ], ResponseAlias::HTTP_CREATED);
         } catch (Exception $e) {
+            Log::error('Registration failed', [
+                'email' => $request->validated('email') ?? 'unknown',
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'error' => 'Registration failed',
                 'message' => 'Не удалось зарегистрировать пользователя',
@@ -63,6 +80,13 @@ class AuthController extends Controller
         try {
             $result = $this->authService->login($request);
 
+            Log::info('User logged in successfully', [
+                'user_id' => $result['user']->id,
+                'email' => $result['user']->email,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent()
+            ]);
+
             return response()->json([
                 'message' => 'Вход выполнен успешно',
                 'data' => [
@@ -70,12 +94,27 @@ class AuthController extends Controller
                     'token' => $result['token'],
                 ],
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
+            Log::warning('Login validation failed', [
+                'email' => $request->validated('email'),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'error' => $e->getMessage()
+            ]);
+            
             return response()->json([
                 'error' => 'Invalid credentials',
                 'message' => 'Неверный email или пароль',
             ], ResponseAlias::HTTP_UNPROCESSABLE_ENTITY);
         } catch (Exception $e) {
+            Log::error('Login failed with exception', [
+                'email' => $request->validated('email'),
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'error' => 'Login failed',
                 'message' => 'Не удалось выполнить вход',
@@ -193,7 +232,7 @@ class AuthController extends Controller
             return response()->json([
                 'message' => 'Пароль успешно изменен',
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return response()->json([
                 'error' => 'Invalid token',
                 'message' => 'Недействительный или истекший токен сброса',
