@@ -199,15 +199,43 @@ class AuthService {
 
     async getCurrentUser(): Promise<User> {
         try {
+            console.log('getCurrentUser: Making API request...');
+            console.log('getCurrentUser: Token being used:', this.getToken());
+            
             const response = await axios.get('/api/auth/user');
             const data = response.data;
             
-            if (data.success && data.data) {
-                this.setUser(data.data);
-                return data.data;
+            console.log('getCurrentUser: API response:', data);
+            console.log('getCurrentUser: Response structure:', {
+                hasSuccess: 'success' in data,
+                hasData: 'data' in data,
+                hasUser: data.data ? 'user' in data.data : false,
+                dataKeys: data.data ? Object.keys(data.data) : 'no data',
+                directUser: 'user' in data
+            });
+            
+            // Check for both possible structures
+            let user = null;
+            if (data.data && (data.data.user || data.data)) {
+                user = data.data.user || data.data;
+            } else if (data.user) {
+                user = data.user;
             }
+            
+            if (user) {
+                console.log('getCurrentUser: User found:', user);
+                this.setUser(user);
+                return user;
+            }
+            
             throw new Error('Не удалось получить данные пользователя');
         } catch (error: any) {
+            console.error('getCurrentUser: API error:', error);
+            console.error('getCurrentUser: Response details:', {
+                status: error.response?.status,
+                data: error.response?.data,
+                headers: error.response?.headers
+            });
             this.clearAuth();
             throw error;
         }
