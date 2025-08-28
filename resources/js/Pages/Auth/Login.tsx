@@ -25,7 +25,13 @@ export default function Login() {
         setErrors({});
 
         try {
-            await authService.login(data);
+            console.log('Attempting login with:', { email: data.email });
+            const result = await authService.login(data);
+            console.log('Login successful, result:', result);
+            console.log('Token saved:', authService.getToken());
+            console.log('User saved:', authService.getUser());
+            console.log('Is authenticated:', authService.isAuthenticated());
+            
             router.visit('/dashboard');
         } catch (error: any) {
             // Handle Laravel validation errors (field-specific)

@@ -24,12 +24,13 @@ export interface RegisterData {
 }
 
 export interface AuthResponse {
-    success: boolean;
     message: string;
     data?: {
         user: User;
         token: string;
     };
+    // Legacy fields for backward compatibility
+    success?: boolean;
     user?: User;
     token?: string;
 }
@@ -93,10 +94,25 @@ class AuthService {
             
             const response = await axios.post('/api/auth/login', credentials);
             const data = response.data as AuthResponse;
+            
+            console.log('API Response received:', data);
+            console.log('Response structure check:', {
+                success: data.success,
+                hasData: !!data.data,
+                dataKeys: data.data ? Object.keys(data.data) : 'no data'
+            });
 
-            if (data.success && data.data) {
+            // Check if we have data field (successful response)
+            if (data.data && data.data.token && data.data.user) {
+                console.log('Saving token:', data.data.token);
+                console.log('Saving user:', data.data.user);
                 this.setToken(data.data.token);
                 this.setUser(data.data.user);
+                console.log('Token after save:', this.getToken());
+                console.log('User after save:', this.getUser());
+            } else {
+                console.error('Invalid response structure - missing data/token/user:', data);
+                throw new Error('Invalid API response structure');
             }
 
             return data;
@@ -133,9 +149,14 @@ class AuthService {
             const response = await axios.post('/api/auth/register', userData);
             const data = response.data as AuthResponse;
 
-            if (data.success && data.data) {
-                this.setToken(data.data.token);
-                this.setUser(data.data.user);
+            // For registration, the API might return just user data without token
+            if (data.data) {
+                if (data.data.token) {
+                    this.setToken(data.data.token);
+                }
+                if (data.data.user) {
+                    this.setUser(data.data.user);
+                }
             }
 
             return data;

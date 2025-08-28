@@ -35,15 +35,24 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
 
     useEffect(() => {
         const checkAuth = async () => {
+            console.log('Dashboard: Checking authentication...');
+            console.log('Dashboard: Token exists:', !!authService.getToken());
+            console.log('Dashboard: User exists:', !!authService.getUser());
+            console.log('Dashboard: Is authenticated:', authService.isAuthenticated());
+            
             if (!authService.isAuthenticated()) {
+                console.log('Dashboard: Not authenticated, redirecting to login');
                 router.visit('/login');
                 return;
             }
 
             try {
+                console.log('Dashboard: Getting current user...');
                 await authService.getCurrentUser();
+                console.log('Dashboard: Authentication successful');
                 setIsAuthenticated(true);
             } catch (error) {
+                console.log('Dashboard: Get current user failed:', error);
                 router.visit('/login');
             } finally {
                 setIsLoading(false);
