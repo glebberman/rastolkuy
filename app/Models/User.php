@@ -7,6 +7,7 @@ namespace App\Models;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
@@ -85,6 +86,22 @@ class User extends Authenticatable implements MustVerifyEmail
     public function documents(): HasMany
     {
         return $this->hasMany(DocumentProcessing::class);
+    }
+
+    /**
+     * Получить баланс кредитов пользователя.
+     */
+    public function credits(): HasOne
+    {
+        return $this->hasOne(UserCredit::class);
+    }
+
+    /**
+     * Получить историю транзакций кредитов пользователя.
+     */
+    public function creditTransactions(): HasMany
+    {
+        return $this->hasMany(CreditTransaction::class);
     }
 
     /**

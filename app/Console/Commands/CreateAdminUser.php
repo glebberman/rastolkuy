@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\User;
+use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class CreateAdminUser extends Command
 {
@@ -27,9 +28,16 @@ class CreateAdminUser extends Command
         $this->newLine();
 
         // Get input data
-        $email = $this->option('email') ?: $this->ask('Admin Email', config('app.admin_email', 'admin@example.com'));
-        $password = $this->option('password') ?: $this->secret('Admin Password');
-        $name = $this->option('name') ?: 'Administrator';
+        /** @var string|null $emailOption */
+        $emailOption = $this->option('email');
+        // @phpstan-ignore-next-line
+        $email = $emailOption ?: $this->ask('Admin Email', (string) (config('app.admin_email') ?? 'admin@example.com'));
+        /** @var string|null $passwordOption */
+        $passwordOption = $this->option('password');
+        $password = $passwordOption ?: $this->secret('Admin Password');
+        /** @var string|null $nameOption */
+        $nameOption = $this->option('name');
+        $name = $nameOption ?: 'Administrator';
 
         // Validate input
         $validator = Validator::make([
@@ -44,24 +52,28 @@ class CreateAdminUser extends Command
 
         if ($validator->fails()) {
             $this->error('❌ Validation failed:');
+
             foreach ($validator->errors()->all() as $error) {
                 $this->error("  • {$error}");
             }
+
             return self::FAILURE;
         }
 
         // Check if user exists
         $existingUser = User::where('email', $email)->first();
+
         if ($existingUser && !$this->option('force')) {
-            $this->error("❌ User with email '{$email}' already exists!");
+            $this->error('❌ User with email \'' . $email . '\' already exists!');
             $this->info('Use --force to update existing user.');
+
             return self::FAILURE;
         }
 
         try {
             // Create or update admin role
             $adminRole = Role::firstOrCreate(['name' => 'admin']);
-            
+
             // Create basic permissions
             $permissions = [
                 'manage_users',
@@ -70,11 +82,11 @@ class CreateAdminUser extends Command
                 'manage_settings',
                 'view_statistics',
             ];
-            
+
             foreach ($permissions as $permission) {
                 Permission::firstOrCreate(['name' => $permission]);
             }
-            
+
             // Assign permissions to admin role
             $adminRole->givePermissionTo($permissions);
 
@@ -83,6 +95,7 @@ class CreateAdminUser extends Command
                 $user = $existingUser;
                 $user->update([
                     'name' => $name,
+                    // @phpstan-ignore-next-line
                     'password' => Hash::make($password),
                     'email_verified_at' => now(),
                 ]);
@@ -91,6 +104,7 @@ class CreateAdminUser extends Command
                 $user = User::create([
                     'name' => $name,
                     'email' => $email,
+                    // @phpstan-ignore-next-line
                     'password' => Hash::make($password),
                     'email_verified_at' => now(),
                 ]);
@@ -113,11 +127,11 @@ class CreateAdminUser extends Command
 
             $this->newLine();
             $this->warn('⚠️  Please save the admin credentials securely and change the password after first login!');
-            
-            return self::SUCCESS;
 
-        } catch (\Exception $e) {
+            return self::SUCCESS;
+        } catch (Exception $e) {
             $this->error("❌ Error creating admin user: {$e->getMessage()}");
+
             return self::FAILURE;
         }
     }

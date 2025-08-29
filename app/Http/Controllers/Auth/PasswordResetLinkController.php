@@ -30,7 +30,7 @@ class PasswordResetLinkController extends Controller
         ]);
 
         $status = Password::sendResetLink(
-            $request->only('email')
+            $request->only('email'),
         );
 
         if ($status == Password::RESET_LINK_SENT) {
@@ -38,6 +38,6 @@ class PasswordResetLinkController extends Controller
         }
 
         return back()->withInput($request->only('email'))
-                     ->withErrors(['email' => 'Пользователь с таким Email не найден.']);
+            ->withErrors(['email' => 'Пользователь с таким Email не найден.']);
     }
 }

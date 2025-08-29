@@ -37,7 +37,8 @@
     33 => 'Spatie\\QueryBuilder\\QueryBuilderServiceProvider',
     34 => 'Tighten\\Ziggy\\ZiggyServiceProvider',
     35 => 'App\\Providers\\AuthServiceProvider',
-    36 => 'App\\Providers\\StructureAnalysisServiceProvider',
+    36 => 'App\\Providers\\EventServiceProvider',
+    37 => 'App\\Providers\\StructureAnalysisServiceProvider',
   ),
   'eager' => 
   array (
@@ -62,7 +63,8 @@
     18 => 'Spatie\\QueryBuilder\\QueryBuilderServiceProvider',
     19 => 'Tighten\\Ziggy\\ZiggyServiceProvider',
     20 => 'App\\Providers\\AuthServiceProvider',
-    21 => 'App\\Providers\\StructureAnalysisServiceProvider',
+    21 => 'App\\Providers\\EventServiceProvider',
+    22 => 'App\\Providers\\StructureAnalysisServiceProvider',
   ),
   'deferred' => 
   array (
