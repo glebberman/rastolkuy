@@ -47,7 +47,7 @@ class AuthController extends Controller
                 'user_id' => $user->id,
                 'email' => $user->email,
                 'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
+                'user_agent' => $request->userAgent(),
             ]);
 
             return response()->json([
@@ -60,9 +60,9 @@ class AuthController extends Controller
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'error' => 'Registration failed',
                 'message' => 'Не удалось зарегистрировать пользователя',
@@ -84,7 +84,7 @@ class AuthController extends Controller
                 'user_id' => $result['user']->id,
                 'email' => $result['user']->email,
                 'ip' => $request->ip(),
-                'user_agent' => $request->userAgent()
+                'user_agent' => $request->userAgent(),
             ]);
 
             return response()->json([
@@ -99,9 +99,9 @@ class AuthController extends Controller
                 'email' => $request->validated('email'),
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
-            
+
             return response()->json([
                 'error' => 'Invalid credentials',
                 'message' => 'Неверный email или пароль',
@@ -112,9 +112,9 @@ class AuthController extends Controller
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'trace' => $e->getTraceAsString(),
             ]);
-            
+
             return response()->json([
                 'error' => 'Login failed',
                 'message' => 'Не удалось выполнить вход',

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\CreditController;
 use App\Http\Controllers\Api\DocumentProcessingController;
 use Illuminate\Support\Facades\Route;
 
@@ -86,6 +87,40 @@ Route::post('auth/refresh', [AuthController::class, 'refreshToken'])
 Route::post('auth/resend-verification', [AuthController::class, 'resendVerification'])
     ->middleware(['auth:sanctum', 'custom.throttle:3,1'])
     ->name('api.auth.resend-verification');
+
+// -----------------------------------------------------------------------------
+// УПРАВЛЕНИЕ КРЕДИТАМИ
+// -----------------------------------------------------------------------------
+
+// Получение баланса кредитов
+Route::get('user/credits/balance', [CreditController::class, 'balance'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.credits.balance');
+
+// Получение статистики кредитов
+Route::get('user/credits/statistics', [CreditController::class, 'statistics'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.credits.statistics');
+
+// Получение истории транзакций
+Route::get('user/credits/history', [CreditController::class, 'history'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.credits.history');
+
+// Пополнение кредитов (только для разработки)
+Route::post('user/credits/topup', [CreditController::class, 'topup'])
+    ->middleware(['auth:sanctum', 'custom.throttle:10,1'])
+    ->name('api.credits.topup');
+
+// Конвертация USD в кредиты
+Route::post('credits/convert-usd', [CreditController::class, 'convertUsdToCredits'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.credits.convert-usd');
+
+// Проверка достаточности баланса
+Route::post('user/credits/check-balance', [CreditController::class, 'checkSufficientBalance'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.credits.check-balance');
 
 // -----------------------------------------------------------------------------
 // ЗАГРУЗКА И ОБРАБОТКА ДОКУМЕНТОВ
