@@ -1,15 +1,31 @@
-# API Documentation
+# API Documentation v1
 
 ## Общая информация
 
 **Base URL**: `https://your-domain.com/api`  
+**API Version**: `v1` (все маршруты начинаются с `/v1/`)  
 **Аутентификация**: Bearer Token (Laravel Sanctum)  
 **Content-Type**: `application/json`  
 **Rate Limiting**: Настраивается через middleware `custom.throttle`
 
+## Структура маршрутов
+
+Все API маршруты используют версионирование v1 с плоской структурой:
+
+**Публичные маршруты** (без аутентификации):
+- Регистрация и аутентификация: `/v1/auth/*`
+
+**Защищенные маршруты** (требуют Bearer token):
+- Управление сессией: `/v1/auth/user`, `/v1/auth/logout`, etc.
+- Кредитная система: `/v1/credits/*`  
+- Документы: `/v1/documents/*`
+- Админ панель: `/v1/documents/admin/*`
+
+**Именованные маршруты**: Все routes имеют dot notation: `api.v1.{resource}.{action}`
+
 ## Аутентификация
 
-### POST `/auth/register`
+### POST `/v1/auth/register`
 Регистрация нового пользователя.
 
 **Rate Limit**: 5 requests per minute
@@ -36,7 +52,7 @@
 }
 ```
 
-### POST `/auth/login`
+### POST `/v1/auth/login`
 Авторизация пользователя.
 
 **Rate Limit**: 10 requests per minute
@@ -61,7 +77,7 @@
 }
 ```
 
-### POST `/auth/logout` 🔒
+### POST `/v1/auth/logout` 🔒
 Выход из системы.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -74,7 +90,7 @@
 }
 ```
 
-### GET `/auth/user` 🔒
+### GET `/v1/auth/user` 🔒
 Получение данных текущего пользователя.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -91,7 +107,7 @@
 }
 ```
 
-### PUT `/auth/user` 🔒
+### PUT `/v1/auth/user` 🔒
 Обновление профиля пользователя.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -105,7 +121,7 @@
 }
 ```
 
-### POST `/auth/forgot-password`
+### POST `/v1/auth/forgot-password`
 Запрос сброса пароля.
 
 **Rate Limit**: 3 requests per minute
@@ -117,7 +133,7 @@
 }
 ```
 
-### POST `/auth/reset-password`
+### POST `/v1/auth/reset-password`
 Сброс пароля по токену.
 
 **Rate Limit**: 5 requests per minute
@@ -133,7 +149,7 @@
 
 ## Управление кредитами
 
-### GET `/user/credits/balance` 🔒
+### GET `/v1/credits/balance` 🔒
 Получение текущего баланса кредитов.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -147,7 +163,7 @@
 }
 ```
 
-### GET `/user/credits/statistics` 🔒
+### GET `/v1/credits/statistics` 🔒
 Получение статистики по кредитам.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -166,7 +182,7 @@
 }
 ```
 
-### GET `/user/credits/history` 🔒
+### GET `/v1/credits/history` 🔒
 История транзакций с пагинацией.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -201,7 +217,7 @@
 }
 ```
 
-### POST `/user/credits/topup` 🔒
+### POST `/v1/credits/topup` 🔒
 Пополнение кредитов (только для разработки).
 
 **Environment**: `local` only  
@@ -238,7 +254,7 @@
 }
 ```
 
-### POST `/user/credits/check-balance` 🔒
+### POST `/v1/credits/check-balance` 🔒
 Проверка достаточности баланса.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -260,7 +276,7 @@
 }
 ```
 
-### POST `/credits/convert-usd` 🔒
+### POST `/v1/credits/convert-usd` 🔒
 Конвертация USD в кредиты.
 
 **Headers**: `Authorization: Bearer {token}`  
@@ -507,12 +523,27 @@ options: JSON (optional) - дополнительные опции обрабо�
 Проверка ролей пользователей:
 - `admin` - администраторские функции
 
+## Именованные маршруты
+
+Все маршруты имеют именованные aliases для использования в Laravel:
+
+```php
+// Примеры именованных маршрутов
+route('api.v1.auth.register')           // POST /api/v1/auth/register
+route('api.v1.auth.login')              // POST /api/v1/auth/login
+route('api.v1.credits.balance')         // GET /api/v1/credits/balance
+route('api.v1.documents.store')         // POST /api/v1/documents
+route('api.v1.documents.status', $uuid) // GET /api/v1/documents/{uuid}/status
+```
+
+**Формат именования**: `api.v1.{resource}.{action}`
+
 ## Примеры использования
 
 ### JavaScript/TypeScript
 ```typescript
 // Авторизация
-const response = await fetch('/api/auth/login', {
+const response = await fetch('/api/v1/auth/login', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
@@ -524,7 +555,7 @@ const response = await fetch('/api/auth/login', {
 const { token } = await response.json();
 
 // Использование API с токеном
-const balance = await fetch('/api/user/credits/balance', {
+const balance = await fetch('/api/v1/credits/balance', {
   headers: { 'Authorization': `Bearer ${token}` }
 });
 ```
@@ -532,12 +563,12 @@ const balance = await fetch('/api/user/credits/balance', {
 ### cURL
 ```bash
 # Авторизация
-curl -X POST https://api.example.com/api/auth/login \
+curl -X POST https://api.example.com/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"user@example.com","password":"password123"}'
 
 # Проверка баланса
-curl -X GET https://api.example.com/api/user/credits/balance \
+curl -X GET https://api.example.com/api/v1/credits/balance \
   -H "Authorization: Bearer YOUR_TOKEN"
 
 # Загрузка документа
@@ -552,4 +583,10 @@ curl -X POST https://api.example.com/api/v1/documents \
 ⚡ - Асинхронная обработка  
 📊 - Кешируется  
 
-*Обновлено: 2025-08-29*
+---
+
+**API Version**: v1  
+**Route Naming**: `api.v1.{resource}.{action}`  
+**Backward Compatibility**: Нет (приложение в разработке)  
+
+*Обновлено: 2025-08-30 - Рефакторинг маршрутов RAS-23*
