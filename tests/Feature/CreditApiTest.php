@@ -33,7 +33,7 @@ class CreditApiTest extends TestCase
 
     public function testCanGetUserCreditBalance(): void
     {
-        $response = $this->getJson('/api/user/credits/balance');
+        $response = $this->getJson(route('api.v1.credits.balance'));
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -63,7 +63,7 @@ class CreditApiTest extends TestCase
             'description' => 'Test topup',
         ]);
 
-        $response = $this->getJson('/api/user/credits/statistics');
+        $response = $this->getJson(route('api.v1.credits.statistics'));
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -86,7 +86,7 @@ class CreditApiTest extends TestCase
             'user_id' => $this->user->id,
         ]);
 
-        $response = $this->getJson('/api/user/credits/history');
+        $response = $this->getJson(route('api.v1.credits.history'));
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -120,7 +120,7 @@ class CreditApiTest extends TestCase
             'user_id' => $this->user->id,
         ]);
 
-        $response = $this->getJson('/api/user/credits/history?per_page=10');
+        $response = $this->getJson(route('api.v1.credits.history') . '?per_page=10');
 
         $response->assertStatus(200);
 
@@ -138,7 +138,7 @@ class CreditApiTest extends TestCase
         // Set environment to local
         $this->app['env'] = 'local';
 
-        $response = $this->postJson('/api/user/credits/topup', [
+        $response = $this->postJson(route('api.v1.credits.topup'), [
             'amount' => 50.0,
             'description' => 'Test topup',
         ]);
@@ -169,7 +169,7 @@ class CreditApiTest extends TestCase
         // Set environment to production
         $this->app['env'] = 'production';
 
-        $response = $this->postJson('/api/user/credits/topup', [
+        $response = $this->postJson(route('api.v1.credits.topup'), [
             'amount' => 50.0,
             'description' => 'Test topup',
         ]);
@@ -186,19 +186,19 @@ class CreditApiTest extends TestCase
         $this->app['env'] = 'local';
 
         // Test negative amount
-        $response = $this->postJson('/api/user/credits/topup', [
+        $response = $this->postJson(route('api.v1.credits.topup'), [
             'amount' => -10.0,
         ]);
         $response->assertStatus(422);
 
         // Test zero amount
-        $response = $this->postJson('/api/user/credits/topup', [
+        $response = $this->postJson(route('api.v1.credits.topup'), [
             'amount' => 0,
         ]);
         $response->assertStatus(422);
 
         // Test amount too large
-        $response = $this->postJson('/api/user/credits/topup', [
+        $response = $this->postJson(route('api.v1.credits.topup'), [
             'amount' => 20000,
         ]);
         $response->assertStatus(422);
@@ -206,7 +206,7 @@ class CreditApiTest extends TestCase
 
     public function testCanConvertUsdToCredits(): void
     {
-        $response = $this->postJson('/api/credits/convert-usd', [
+        $response = $this->postJson(route('api.v1.credits.convert-usd'), [
             'usd_amount' => 1.50,
         ]);
 
@@ -229,7 +229,7 @@ class CreditApiTest extends TestCase
 
     public function testCanCheckSufficientBalance(): void
     {
-        $response = $this->postJson('/api/user/credits/check-balance', [
+        $response = $this->postJson(route('api.v1.credits.check-balance'), [
             'required_amount' => 50.0,
         ]);
 
@@ -255,7 +255,7 @@ class CreditApiTest extends TestCase
 
     public function testInsufficientBalanceCheck(): void
     {
-        $response = $this->postJson('/api/user/credits/check-balance', [
+        $response = $this->postJson(route('api.v1.credits.check-balance'), [
             'required_amount' => 150.0,
         ]);
 
@@ -276,8 +276,16 @@ class CreditApiTest extends TestCase
         $this->app['auth']->forgetGuards();
 
         $endpoints = [
-            'GET' => ['/api/user/credits/balance', '/api/user/credits/statistics', '/api/user/credits/history'],
-            'POST' => ['/api/user/credits/topup', '/api/user/credits/check-balance', '/api/credits/convert-usd'],
+            'GET' => [
+                route('api.v1.credits.balance'),
+                route('api.v1.credits.statistics'),
+                route('api.v1.credits.history')
+            ],
+            'POST' => [
+                route('api.v1.credits.topup'),
+                route('api.v1.credits.check-balance'),
+                route('api.v1.credits.convert-usd')
+            ],
         ];
 
         foreach ($endpoints as $method => $urls) {
@@ -292,7 +300,7 @@ class CreditApiTest extends TestCase
     {
         // Make multiple requests quickly
         for ($i = 0; $i < 5; ++$i) {
-            $response = $this->getJson('/api/user/credits/balance');
+            $response = $this->getJson(route('api.v1.credits.balance'));
             $response->assertStatus(200);
         }
 
@@ -303,13 +311,13 @@ class CreditApiTest extends TestCase
     public function testValidationErrors(): void
     {
         // Test USD conversion validation
-        $response = $this->postJson('/api/credits/convert-usd', [
+        $response = $this->postJson(route('api.v1.credits.convert-usd'), [
             'usd_amount' => 'invalid',
         ]);
         $response->assertStatus(422);
 
         // Test balance check validation
-        $response = $this->postJson('/api/user/credits/check-balance', [
+        $response = $this->postJson(route('api.v1.credits.check-balance'), [
             'required_amount' => -1,
         ]);
         $response->assertStatus(422);
