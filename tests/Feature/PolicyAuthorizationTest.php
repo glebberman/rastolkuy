@@ -31,10 +31,10 @@ class PolicyAuthorizationTest extends TestCase
             'password_confirmation' => 'password123',
         ];
 
-        $registerResponse = $this->postJson('/api/auth/register', $userData);
+        $registerResponse = $this->postJson(route('api.v1.auth.register'), $userData);
         $registerResponse->assertStatus(201);
 
-        $loginResponse = $this->postJson('/api/auth/login', [
+        $loginResponse = $this->postJson(route('api.v1.auth.login'), [
             'email' => 'test@example.com',
             'password' => 'password123',
         ]);
@@ -48,7 +48,7 @@ class PolicyAuthorizationTest extends TestCase
         $response = $this->postJson('/api/v1/documents/');
         $response->assertStatus(401);
 
-        $response = $this->getJson('/api/auth/user');
+        $response = $this->getJson(route('api.v1.auth.user'));
         $response->assertStatus(401);
     }
 
@@ -111,7 +111,7 @@ class PolicyAuthorizationTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->putJson('/api/auth/user', [
+        ])->putJson(route('api.v1.auth.update-user'), [
             'name' => 'Updated Name',
         ]);
 
@@ -158,14 +158,14 @@ class PolicyAuthorizationTest extends TestCase
         // Should be able to get user profile
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->getJson('/api/auth/user');
+        ])->getJson(route('api.v1.auth.user'));
 
         $response->assertStatus(200);
 
         // Should be able to refresh token
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->postJson('/api/auth/refresh');
+        ])->postJson(route('api.v1.auth.refresh'));
 
         $response->assertStatus(200);
     }
