@@ -53,6 +53,11 @@ Route::get('v1/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEm
     ->middleware(['auth:sanctum', 'signed', 'throttle:6,1'])
     ->name('api.v1.auth.verify-email');
 
+// Laravel email verification system expects this route name
+Route::get('v1/auth/verify-email/{id}/{hash}', [AuthController::class, 'verifyEmail'])
+    ->middleware(['auth:sanctum', 'signed', 'throttle:6,1'])
+    ->name('verification.verify');
+
 // =============================================================================
 // ЗАЩИЩЕННЫЕ МАРШРУТЫ v1 (требуют авторизации через Sanctum)
 // =============================================================================

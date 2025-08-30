@@ -9,6 +9,7 @@ use Inertia\Inertia;
 Route::get('login', fn () => Inertia::render('Auth/Login'))->name('login');
 Route::get('register', fn () => Inertia::render('Auth/Register'))->name('register');
 Route::get('forgot-password', fn () => Inertia::render('Auth/ForgotPassword'))->name('password.request');
+Route::get('reset-password/{token}', fn (string $token) => Inertia::render('Auth/ResetPassword', ['token' => $token]))->name('password.reset');
 
 // Public Home Page
 Route::get('/', fn () => Inertia::render('Dashboard'))->name('home');
