@@ -30,7 +30,7 @@ class AuthControllerTest extends TestCase
             'password_confirmation' => 'password123',
         ];
 
-        $response = $this->postJson('/api/auth/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(201)
             ->assertJsonStructure([
@@ -53,7 +53,7 @@ class AuthControllerTest extends TestCase
 
     public function testRegistrationRequiresValidData(): void
     {
-        $response = $this->postJson('/api/auth/register', []);
+        $response = $this->postJson(route('api.v1.auth.register'), []);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['name', 'email', 'password']);
@@ -68,7 +68,7 @@ class AuthControllerTest extends TestCase
             'password_confirmation' => 'password123',
         ];
 
-        $response = $this->postJson('/api/auth/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
@@ -85,7 +85,7 @@ class AuthControllerTest extends TestCase
             'password_confirmation' => 'password123',
         ];
 
-        $response = $this->postJson('/api/auth/register', $userData);
+        $response = $this->postJson(route('api.v1.auth.register'), $userData);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['email']);
@@ -98,7 +98,7 @@ class AuthControllerTest extends TestCase
             'password' => Hash::make('password123'),
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson(route('api.v1.auth.login'), [
             'email' => 'john@example.com',
             'password' => 'password123',
         ]);
@@ -124,7 +124,7 @@ class AuthControllerTest extends TestCase
             'password' => Hash::make('password123'),
         ]);
 
-        $response = $this->postJson('/api/auth/login', [
+        $response = $this->postJson(route('api.v1.auth.login'), [
             'email' => 'john@example.com',
             'password' => 'wrongpassword',
         ]);
@@ -140,7 +140,7 @@ class AuthControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->getJson('/api/auth/user');
+        ])->getJson(route('api.v1.auth.user'));
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -155,7 +155,7 @@ class AuthControllerTest extends TestCase
 
     public function testUnauthenticatedUserCannotGetProfile(): void
     {
-        $response = $this->getJson('/api/auth/user');
+        $response = $this->getJson(route('api.v1.auth.user'));
 
         $response->assertStatus(401);
     }
@@ -171,7 +171,7 @@ class AuthControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->putJson('/api/auth/user', [
+        ])->putJson(route('api.v1.auth.update-user'), [
             'name' => 'New Name',
         ]);
 
@@ -191,7 +191,7 @@ class AuthControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->postJson('/api/auth/logout');
+        ])->postJson(route('api.v1.auth.logout'));
 
         $response->assertStatus(200);
 
@@ -207,7 +207,7 @@ class AuthControllerTest extends TestCase
 
         $response = $this->withHeaders([
             'Authorization' => 'Bearer ' . $token,
-        ])->postJson('/api/auth/refresh');
+        ])->postJson(route('api.v1.auth.refresh'));
 
         $response->assertStatus(200)
             ->assertJsonStructure([
@@ -223,7 +223,7 @@ class AuthControllerTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'john@example.com']);
 
-        $response = $this->postJson('/api/auth/forgot-password', [
+        $response = $this->postJson(route('api.v1.auth.forgot-password'), [
             'email' => 'john@example.com',
         ]);
 
@@ -232,7 +232,7 @@ class AuthControllerTest extends TestCase
 
     public function testForgotPasswordRejectsNonExistentEmail(): void
     {
-        $response = $this->postJson('/api/auth/forgot-password', [
+        $response = $this->postJson(route('api.v1.auth.forgot-password'), [
             'email' => 'nonexistent@example.com',
         ]);
 
@@ -242,7 +242,7 @@ class AuthControllerTest extends TestCase
 
     public function testPasswordResetValidation(): void
     {
-        $response = $this->postJson('/api/auth/reset-password', []);
+        $response = $this->postJson(route('api.v1.auth.reset-password'), []);
 
         $response->assertStatus(422)
             ->assertJsonValidationErrors(['token', 'email', 'password']);
@@ -257,7 +257,7 @@ class AuthControllerTest extends TestCase
 
         // Make 11 requests (limit is 10 per minute)
         for ($i = 0; $i < 11; ++$i) {
-            $response = $this->postJson('/api/auth/login', [
+            $response = $this->postJson(route('api.v1.auth.login'), [
                 'email' => 'john@example.com',
                 'password' => 'wrongpassword',
             ]);
@@ -271,7 +271,7 @@ class AuthControllerTest extends TestCase
     {
         // Make 6 registration requests (limit is 5 per minute)
         for ($i = 0; $i < 6; ++$i) {
-            $this->postJson('/api/auth/register', [
+            $this->postJson(route('api.v1.auth.register'), [
                 'name' => "User {$i}",
                 'email' => "user{$i}@example.com",
                 'password' => 'password123',
@@ -280,7 +280,7 @@ class AuthControllerTest extends TestCase
         }
 
         // The 6th request should be rate limited
-        $response = $this->postJson('/api/auth/register', [
+        $response = $this->postJson(route('api.v1.auth.register'), [
             'name' => 'User 6',
             'email' => 'user6@example.com',
             'password' => 'password123',
