@@ -11,7 +11,9 @@ use App\Http\Requests\Api\ResetPasswordRequest;
 use App\Http\Requests\Api\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -20,6 +22,11 @@ use RuntimeException;
 
 class AuthService
 {
+    public function __construct(
+        private readonly CreditService $creditService,
+    ) {
+    }
+
     /**
      * Register a new user.
      */
@@ -187,5 +194,45 @@ class AuthService
         return [
             'token' => $token,
         ];
+    }
+
+    /**
+     * Get user statistics with caching.
+     *
+     * @return array{credits_balance: float, total_documents: int, processed_today: int, last_activity: string}
+     */
+    public function getUserStats(User $user): array
+    {
+        $cacheKey = "user_stats_{$user->id}";
+
+        /** @var array{credits_balance: float, total_documents: int, processed_today: int, last_activity: string} $result */
+        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($user): array {
+            // Get credits balance
+            $creditsBalance = $this->creditService->getBalance($user);
+
+            // Get document statistics
+            $totalDocuments = $user->documentProcessings()->count();
+
+            $processedToday = $user->documentProcessings()
+                ->whereIn('status', ['completed', 'failed'])
+                ->whereDate('completed_at', Carbon::today())
+                ->count();
+
+            // Get last activity
+            $lastDocument = $user->documentProcessings()
+                ->latest('updated_at')
+                ->first();
+
+            $lastActivity = $lastDocument !== null && $lastDocument->updated_at !== null
+                ? $lastDocument->updated_at->toISOString()
+                : ($user->updated_at !== null ? $user->updated_at->toISOString() : now()->toISOString());
+
+            return [
+                'credits_balance' => $creditsBalance,
+                'total_documents' => $totalDocuments,
+                'processed_today' => $processedToday,
+                'last_activity' => $lastActivity,
+            ];
+        });
     }
 }

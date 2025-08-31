@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\DashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -12,10 +13,10 @@ Route::get('forgot-password', fn () => Inertia::render('Auth/ForgotPassword'))->
 Route::get('reset-password/{token}', fn (string $token) => Inertia::render('Auth/ResetPassword', ['token' => $token]))->name('password.reset');
 
 // Public Home Page
-Route::get('/', fn () => Inertia::render('Dashboard'))->name('home');
+Route::get('/', [DashboardController::class, 'index'])->name('home');
 
-// Dashboard (SPA - authentication handled in frontend)
-Route::get('dashboard', fn () => Inertia::render('Dashboard'))->name('dashboard');
+// Dashboard (with real user data)
+Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 // Documents (placeholder for future implementation)
 Route::get('documents', fn () => Inertia::render('Documents/Index'))->name('documents.index');
