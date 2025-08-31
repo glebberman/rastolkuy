@@ -28,7 +28,7 @@ class UserStatsApiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 500.00]);
 
         // Create some documents for testing
@@ -76,7 +76,7 @@ class UserStatsApiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 100.00]);
 
         Sanctum::actingAs($user);
@@ -103,7 +103,7 @@ class UserStatsApiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 0.00]);
 
         Sanctum::actingAs($user);
@@ -125,7 +125,7 @@ class UserStatsApiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 100.00]);
 
         // Create documents completed today
@@ -167,7 +167,7 @@ class UserStatsApiTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id]);
 
         Sanctum::actingAs($user);

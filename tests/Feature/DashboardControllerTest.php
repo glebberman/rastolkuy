@@ -45,7 +45,7 @@ class DashboardControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 250.00]);
 
         // Create some documents
@@ -80,7 +80,7 @@ class DashboardControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id]);
 
         // Create documents with specific filenames
@@ -116,7 +116,7 @@ class DashboardControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id]);
 
         // Create 10 documents
@@ -141,7 +141,7 @@ class DashboardControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id]);
 
         // 8 completed, 2 failed = 80% success rate
@@ -172,7 +172,7 @@ class DashboardControllerTest extends TestCase
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
-        
+
         UserCredit::factory()->create(['user_id' => $user->id]);
 
         $this->actingAs($user);
