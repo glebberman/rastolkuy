@@ -206,7 +206,7 @@ class AuthService
         $cacheKey = "user_stats_{$user->id}";
 
         /** @var array{credits_balance: float, total_documents: int, processed_today: int, last_activity: string} $result */
-        return Cache::remember($cacheKey, now()->addMinutes(5), function () use ($user): array {
+        $result = Cache::remember($cacheKey, now()->addMinutes(5), function () use ($user) {
             // Get credits balance
             $creditsBalance = $this->creditService->getBalance($user);
 
@@ -234,5 +234,7 @@ class AuthService
                 'last_activity' => $lastActivity,
             ];
         });
+
+        return $result;
     }
 }
