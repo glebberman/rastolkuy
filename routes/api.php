@@ -9,64 +9,15 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| API Routes
+| API Routes v1
 |--------------------------------------------------------------------------
 |
-| Все API маршруты приложения Растолкуй.
-| Включает как новые v1 маршруты, так и legacy маршруты для совместимости.
+| Все API маршруты приложения Растолкуй версии v1.
+| Используется плоская структура без групповых префиксов.
 | Разделены на публичные и защищенные маршруты.
 | Все маршруты имеют именование через точку для удобства использования.
 |
 */
-
-// =============================================================================
-// LEGACY API ROUTES (для обратной совместимости с фронтендом)
-// =============================================================================
-
-// Регистрация нового пользователя (legacy)
-Route::post('auth/register', [AuthController::class, 'register'])
-    ->middleware('custom.throttle:5,1')
-    ->name('api.auth.register');
-
-// Вход в систему (legacy)
-Route::post('auth/login', [AuthController::class, 'login'])
-    ->middleware('custom.throttle:10,1')
-    ->name('api.auth.login');
-
-// Запрос сброса пароля (legacy)
-Route::post('auth/forgot-password', [AuthController::class, 'forgotPassword'])
-    ->middleware('custom.throttle:3,1')
-    ->name('api.auth.forgot-password');
-
-// Сброс пароля по токену (legacy)
-Route::post('auth/reset-password', [AuthController::class, 'resetPassword'])
-    ->middleware('custom.throttle:5,1')
-    ->name('api.auth.reset-password');
-
-// Выход из системы (legacy)
-Route::post('auth/logout', [AuthController::class, 'logout'])
-    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
-    ->name('api.auth.logout');
-
-// Получение данных текущего пользователя (legacy)
-Route::get('auth/user', [AuthController::class, 'user'])
-    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
-    ->name('api.auth.user');
-
-// Обновление профиля пользователя (legacy)
-Route::put('auth/user', [AuthController::class, 'updateUser'])
-    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
-    ->name('api.auth.update-user');
-
-// Обновление токена доступа (legacy)
-Route::post('auth/refresh', [AuthController::class, 'refreshToken'])
-    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
-    ->name('api.auth.refresh');
-
-// Повторная отправка письма подтверждения (legacy)
-Route::post('auth/resend-verification', [AuthController::class, 'resendVerification'])
-    ->middleware(['auth:sanctum', 'custom.throttle:3,1'])
-    ->name('api.auth.resend-verification');
 
 // =============================================================================
 // ПУБЛИЧНЫЕ МАРШРУТЫ v1 (не требуют авторизации)
