@@ -8,15 +8,15 @@ use Inertia\Inertia;
 
 // Public Authentication Pages (SPA)
 Route::get('login', function () {
-    return Inertia::render('Auth/Login');
+    return Inertia::render('Auth/Login', []);
 })->name('login');
 
 Route::get('register', function () {
-    return Inertia::render('Auth/Register');
+    return Inertia::render('Auth/Register', []);
 })->name('register');
 
 Route::get('forgot-password', function () {
-    return Inertia::render('Auth/ForgotPassword');
+    return Inertia::render('Auth/ForgotPassword', []);
 })->name('password.request');
 
 Route::get('reset-password/{token}', function (string $token) {
@@ -31,7 +31,7 @@ Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard'
 
 // Documents (placeholder for future implementation)
 Route::get('documents', function () {
-    return Inertia::render('Documents/Index');
+    return Inertia::render('Documents/Index', []);
 })->name('documents.index');
 
 // Include extractor test routes
