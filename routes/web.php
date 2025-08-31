@@ -7,10 +7,21 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 // Public Authentication Pages (SPA)
-Route::get('login', fn () => Inertia::render('Auth/Login'))->name('login');
-Route::get('register', fn () => Inertia::render('Auth/Register'))->name('register');
-Route::get('forgot-password', fn () => Inertia::render('Auth/ForgotPassword'))->name('password.request');
-Route::get('reset-password/{token}', fn (string $token) => Inertia::render('Auth/ResetPassword', ['token' => $token]))->name('password.reset');
+Route::get('login', function () {
+    return Inertia::render('Auth/Login');
+})->name('login');
+
+Route::get('register', function () {
+    return Inertia::render('Auth/Register');
+})->name('register');
+
+Route::get('forgot-password', function () {
+    return Inertia::render('Auth/ForgotPassword');
+})->name('password.request');
+
+Route::get('reset-password/{token}', function (string $token) {
+    return Inertia::render('Auth/ResetPassword', ['token' => $token]);
+})->name('password.reset');
 
 // Public Home Page
 Route::get('/', [DashboardController::class, 'index'])->name('home');
@@ -19,7 +30,9 @@ Route::get('/', [DashboardController::class, 'index'])->name('home');
 Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
 // Documents (placeholder for future implementation)
-Route::get('documents', fn () => Inertia::render('Documents/Index'))->name('documents.index');
+Route::get('documents', function () {
+    return Inertia::render('Documents/Index');
+})->name('documents.index');
 
 // Include extractor test routes
 require __DIR__ . '/test-extractor.php';
