@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $task_type Тип задачи (translation, contradiction, ambiguity)
  * @property array<string, mixed> $options Опции обработки
  * @property bool $anchor_at_start Позиция якорей (true = начало, false = конец)
- * @property 'completed'|'failed'|'pending'|'processing' $status Статус обработки
+ * @property 'completed'|'estimated'|'failed'|'pending'|'processing'|'uploaded' $status Статус обработки
  * @property string|null $result Результат обработки
  * @property array<string, mixed>|null $error_details Детали ошибки
  * @property array<string, mixed>|null $processing_metadata Метаданные обработки
@@ -35,6 +35,8 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property Carbon|null $deleted_at
+ *
+ * @method static Builder<DocumentProcessing> where(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'and')
  */
 class DocumentProcessing extends Model
 {
@@ -44,6 +46,8 @@ class DocumentProcessing extends Model
     /**
      * Возможные статусы обработки.
      */
+    public const string STATUS_UPLOADED = 'uploaded';
+    public const string STATUS_ESTIMATED = 'estimated';
     public const string STATUS_PENDING = 'pending';
     public const string STATUS_PROCESSING = 'processing';
     public const string STATUS_COMPLETED = 'completed';
@@ -78,6 +82,7 @@ class DocumentProcessing extends Model
 
     protected $casts = [
         'options' => 'array',
+        'result' => 'array',
         'anchor_at_start' => 'boolean',
         'error_details' => 'array',
         'processing_metadata' => 'array',
@@ -121,6 +126,46 @@ class DocumentProcessing extends Model
     public function isPending(): bool
     {
         return $this->status === self::STATUS_PENDING;
+    }
+
+    /**
+     * Проверяет, загружен ли файл.
+     */
+    public function isUploaded(): bool
+    {
+        return $this->status === self::STATUS_UPLOADED;
+    }
+
+    /**
+     * Проверяет, оценена ли стоимость.
+     */
+    public function isEstimated(): bool
+    {
+        return $this->status === self::STATUS_ESTIMATED;
+    }
+
+    /**
+     * Отмечает файл как загруженный.
+     */
+    public function markAsUploaded(): void
+    {
+        $this->update([
+            'status' => self::STATUS_UPLOADED,
+        ]);
+    }
+
+    /**
+     * Отмечает стоимость как оцененную.
+     */
+    public function markAsEstimated(array $estimationData = []): void
+    {
+        $this->update([
+            'status' => self::STATUS_ESTIMATED,
+            'processing_metadata' => array_merge($this->processing_metadata ?? [], [
+                'estimated_at' => now()->toISOString(),
+                'estimation' => $estimationData,
+            ]),
+        ]);
     }
 
     /**
@@ -172,7 +217,9 @@ class DocumentProcessing extends Model
     public function getProgressPercentage(): int
     {
         return match ($this->status) {
-            self::STATUS_PENDING => 0,
+            self::STATUS_UPLOADED => 10,
+            self::STATUS_ESTIMATED => 20,
+            self::STATUS_PENDING => 25,
             self::STATUS_PROCESSING => 50,
             self::STATUS_COMPLETED => 100,
             self::STATUS_FAILED => 0,
@@ -185,6 +232,8 @@ class DocumentProcessing extends Model
     public function getStatusDescription(): string
     {
         return match ($this->status) {
+            self::STATUS_UPLOADED => 'Файл загружен',
+            self::STATUS_ESTIMATED => 'Стоимость рассчитана',
             self::STATUS_PENDING => 'Ожидает обработки',
             self::STATUS_PROCESSING => 'Обрабатывается',
             self::STATUS_COMPLETED => 'Завершена',
@@ -218,7 +267,12 @@ class DocumentProcessing extends Model
      */
     public function scopeActive(Builder $query): Builder
     {
-        return $query->whereIn('status', [self::STATUS_PENDING, self::STATUS_PROCESSING]);
+        return $query->whereIn('status', [
+            self::STATUS_UPLOADED,
+            self::STATUS_ESTIMATED,
+            self::STATUS_PENDING,
+            self::STATUS_PROCESSING,
+        ]);
     }
 
     /**

@@ -19,6 +19,8 @@ use Illuminate\Support\Carbon;
  * @property float $balance Текущий баланс кредитов
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
+ *
+ * @method static UserCredit create(array<string, mixed> $attributes = [])
  */
 class UserCredit extends Model
 {

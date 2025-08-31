@@ -279,12 +279,12 @@ class CreditApiTest extends TestCase
             'GET' => [
                 route('api.v1.credits.balance'),
                 route('api.v1.credits.statistics'),
-                route('api.v1.credits.history')
+                route('api.v1.credits.history'),
             ],
             'POST' => [
                 route('api.v1.credits.topup'),
                 route('api.v1.credits.check-balance'),
-                route('api.v1.credits.convert-usd')
+                route('api.v1.credits.convert-usd'),
             ],
         ];
 
