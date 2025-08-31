@@ -4,22 +4,26 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\DTOs\EstimateDocumentDto;
+use App\DTOs\UploadDocumentDto;
 use App\Http\Requests\ProcessDocumentRequest;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\DocumentProcessing;
 use App\Models\User;
 use App\Services\LLM\CostCalculator;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 
-class DocumentProcessingService
+readonly class DocumentProcessingService
 {
     public function __construct(
-        private readonly CostCalculator $costCalculator,
+        private CostCalculator $costCalculator,
+        private CreditService  $creditService,
     ) {
     }
 
@@ -70,6 +74,167 @@ class DocumentProcessingService
         ]);
 
         return $documentProcessing;
+    }
+
+    /**
+     * Загрузить только файл без запуска обработки.
+     */
+    public function uploadDocument(UploadDocumentDto $dto, User $user): DocumentProcessing
+    {
+        $uuid = Str::uuid()->toString();
+
+        // Генерируем уникальное имя файла
+        $originalName = $dto->file->getClientOriginalName();
+        $extension = $dto->file->getClientOriginalExtension();
+        $filename = $uuid . '.' . $extension;
+
+        // Сохраняем файл
+        $filePath = $dto->file->storeAs('documents', $filename, 'local');
+
+        if (!$filePath) {
+            throw new RuntimeException('Failed to store uploaded file');
+        }
+
+        // Создаем запись в базе данных со статусом uploaded
+        $documentProcessing = DocumentProcessing::create([
+            'user_id' => $user->id,
+            'uuid' => $uuid,
+            'original_filename' => $originalName,
+            'file_path' => $filePath,
+            'file_type' => $dto->file->getClientMimeType(),
+            'file_size' => $dto->file->getSize(),
+            'task_type' => $dto->taskType,
+            'options' => $dto->options,
+            'anchor_at_start' => $dto->anchorAtStart,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
+        ]);
+
+        Log::info('Document uploaded', [
+            'uuid' => $uuid,
+            'filename' => $originalName,
+            'task_type' => $dto->taskType,
+            'file_size' => $dto->file->getSize(),
+            'status' => DocumentProcessing::STATUS_UPLOADED,
+        ]);
+
+        return $documentProcessing;
+    }
+
+    /**
+     * Получить предварительную оценку стоимости обработки документа.
+     */
+    public function estimateDocumentCost(DocumentProcessing $documentProcessing, EstimateDocumentDto $dto): DocumentProcessing
+    {
+        if (!$documentProcessing->isUploaded()) {
+            throw new InvalidArgumentException('Document must be in uploaded status for estimation');
+        }
+
+        $model = $dto->model ?? $this->getDefaultModel();
+        $estimation = $this->estimateProcessingCost($documentProcessing->file_size, $model);
+
+        // Конвертируем USD в кредиты
+        $creditsNeeded = $this->creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
+
+        $user = $documentProcessing->user;
+
+        if ($user === null) {
+            throw new InvalidArgumentException('Document processing must have an associated user');
+        }
+
+        $estimationData = array_merge($estimation, [
+            'credits_needed' => $creditsNeeded,
+            'model_selected' => $model,
+            'has_sufficient_balance' => $this->creditService->hasSufficientBalance($user, $creditsNeeded),
+            'user_balance' => $this->creditService->getBalance($user),
+        ]);
+
+        // Отмечаем как оцененный
+        $documentProcessing->markAsEstimated($estimationData);
+
+        Log::info('Document cost estimated', [
+            'uuid' => $documentProcessing->uuid,
+            'estimated_cost_usd' => $estimation['estimated_cost_usd'],
+            'credits_needed' => $creditsNeeded,
+            'model' => $model,
+        ]);
+
+        $refreshed = $documentProcessing->fresh();
+
+        if ($refreshed === null) {
+            throw new RuntimeException('Document processing was deleted during estimation');
+        }
+
+        return $refreshed;
+    }
+
+    /**
+     * Запустить обработку оцененного документа.
+     */
+    public function processEstimatedDocument(DocumentProcessing $documentProcessing): DocumentProcessing
+    {
+        if (!$documentProcessing->isEstimated()) {
+            throw new InvalidArgumentException('Document must be in estimated status for processing');
+        }
+
+        $user = $documentProcessing->user;
+
+        if ($user === null) {
+            throw new InvalidArgumentException('Document processing must have an associated user');
+        }
+
+        $metadata = $documentProcessing->processing_metadata;
+
+        if (!is_array($metadata) || !isset($metadata['estimation']) || !is_array($metadata['estimation']) || !isset($metadata['estimation']['credits_needed'])) {
+            throw new InvalidArgumentException('Document estimation data is missing or invalid');
+        }
+
+        $estimation = $metadata['estimation'];
+        $creditsNeededValue = $estimation['credits_needed'];
+
+        if (!is_numeric($creditsNeededValue)) {
+            throw new InvalidArgumentException('Credits needed value must be numeric');
+        }
+
+        $creditsNeeded = (float) $creditsNeededValue;
+
+        // Проверяем достаточность баланса
+        if (!$this->creditService->hasSufficientBalance($user, $creditsNeeded)) {
+            throw new InvalidArgumentException('Insufficient balance to process document');
+        }
+
+        // Используем транзакцию для атомарного списания кредитов и обновления статуса
+        return DB::transaction(function () use ($documentProcessing, $user, $creditsNeeded) {
+            // Списываем кредиты
+            $this->creditService->debitCredits(
+                $user,
+                $creditsNeeded,
+                "Document processing: {$documentProcessing->original_filename}",
+                'document_processing',
+                $documentProcessing->uuid,
+            );
+
+            // Обновляем статус на pending и запускаем обработку
+            $documentProcessing->update(['status' => DocumentProcessing::STATUS_PENDING]);
+
+            // Запускаем асинхронную обработку
+            ProcessDocumentJob::dispatch($documentProcessing->id)
+                ->onQueue('document-processing')
+                ->delay(now()->addSeconds(2));
+
+            Log::info('Document processing started', [
+                'uuid' => $documentProcessing->uuid,
+                'credits_debited' => $creditsNeeded,
+                'filename' => $documentProcessing->original_filename,
+            ]);
+
+            $refreshed = $documentProcessing->fresh();
+
+            if ($refreshed === null) {
+                throw new RuntimeException('Document processing was deleted during processing start');
+            }
+
+            return $refreshed;
+        });
     }
 
     /**
@@ -157,6 +322,8 @@ class DocumentProcessingService
         return [
             'total_processings' => DocumentProcessing::count(),
             'by_status' => [
+                'uploaded' => DocumentProcessing::where('status', DocumentProcessing::STATUS_UPLOADED)->count(),
+                'estimated' => DocumentProcessing::where('status', DocumentProcessing::STATUS_ESTIMATED)->count(),
                 'pending' => DocumentProcessing::where('status', DocumentProcessing::STATUS_PENDING)->count(),
                 'processing' => DocumentProcessing::where('status', DocumentProcessing::STATUS_PROCESSING)->count(),
                 'completed' => DocumentProcessing::where('status', DocumentProcessing::STATUS_COMPLETED)->count(),

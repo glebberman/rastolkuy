@@ -128,7 +128,22 @@ Route::post('v1/credits/check-balance', [CreditController::class, 'checkSufficie
 // УПРАВЛЕНИЕ ДОКУМЕНТАМИ
 // -----------------------------------------------------------------------------
 
-// Загрузка документа для обработки
+// Загрузка только файла (без обработки)
+Route::post('v1/documents/upload', [DocumentProcessingController::class, 'upload'])
+    ->middleware(['auth:sanctum', 'permission:documents.create'])
+    ->name('api.v1.documents.upload');
+
+// Получение предварительной оценки стоимости
+Route::post('v1/documents/{uuid}/estimate', [DocumentProcessingController::class, 'estimate'])
+    ->middleware(['auth:sanctum', 'permission:documents.view'])
+    ->name('api.v1.documents.estimate');
+
+// Запуск обработки оцененного документа
+Route::post('v1/documents/{uuid}/process', [DocumentProcessingController::class, 'process'])
+    ->middleware(['auth:sanctum', 'permission:documents.create'])
+    ->name('api.v1.documents.process');
+
+// Загрузка документа для обработки (старый метод для обратной совместимости)
 Route::post('v1/documents', [DocumentProcessingController::class, 'store'])
     ->middleware(['auth:sanctum', 'permission:documents.create'])
     ->name('api.v1.documents.store');
@@ -136,25 +151,21 @@ Route::post('v1/documents', [DocumentProcessingController::class, 'store'])
 // Получение статуса обработки документа по UUID
 Route::get('v1/documents/{uuid}/status', [DocumentProcessingController::class, 'show'])
     ->middleware(['auth:sanctum', 'permission:documents.view'])
-    ->where('uuid', '[0-9a-f-]{36}')
     ->name('api.v1.documents.status');
 
 // Получение результата обработки документа по UUID
 Route::get('v1/documents/{uuid}/result', [DocumentProcessingController::class, 'result'])
     ->middleware(['auth:sanctum', 'permission:documents.view'])
-    ->where('uuid', '[0-9a-f-]{36}')
     ->name('api.v1.documents.result');
 
 // Отмена обработки документа (если в статусе pending)
 Route::post('v1/documents/{uuid}/cancel', [DocumentProcessingController::class, 'cancel'])
     ->middleware(['auth:sanctum', 'permission:documents.cancel'])
-    ->where('uuid', '[0-9a-f-]{36}')
     ->name('api.v1.documents.cancel');
 
 // Удаление записи об обработке документа
 Route::delete('v1/documents/{uuid}', [DocumentProcessingController::class, 'destroy'])
     ->middleware(['auth:sanctum', 'permission:documents.delete'])
-    ->where('uuid', '[0-9a-f-]{36}')
     ->name('api.v1.documents.destroy');
 
 // -----------------------------------------------------------------------------

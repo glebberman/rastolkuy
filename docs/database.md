@@ -146,7 +146,7 @@ CREATE TABLE document_processings (
     task_type VARCHAR(50) NOT NULL, -- 'translation'|'contradiction'|'ambiguity'
     options JSON NULL,
     anchor_at_start BOOLEAN DEFAULT FALSE,
-    status ENUM('pending', 'processing', 'completed', 'failed') DEFAULT 'pending',
+    status ENUM('uploaded', 'estimated', 'pending', 'processing', 'completed', 'failed', 'cancelled') DEFAULT 'uploaded',
     result LONGTEXT NULL,
     error_details JSON NULL,
     processing_metadata JSON NULL,
@@ -166,11 +166,14 @@ CREATE TABLE document_processings (
 );
 ```
 
-**Статусы обработки:**
-- `pending` - ожидает обработки
-- `processing` - в процессе
+**Статусы обработки (RAS-19 - новый workflow):**
+- `uploaded` - файл загружен, ожидает оценки (по умолчанию)
+- `estimated` - стоимость рассчитана, ожидает запуска
+- `pending` - в очереди на обработку
+- `processing` - в процессе обработки
 - `completed` - завершено успешно
 - `failed` - ошибка обработки
+- `cancelled` - обработка отменена
 
 **Типы задач:**
 - `translation` - перевод на простой язык

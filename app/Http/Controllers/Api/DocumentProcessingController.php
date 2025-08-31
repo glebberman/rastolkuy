@@ -4,15 +4,35 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Api;
 
+use App\DTOs\EstimateDocumentDto;
+use App\DTOs\UploadDocumentDto;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\CancelDocumentRequest;
+use App\Http\Requests\DeleteDocumentRequest;
+use App\Http\Requests\DocumentResultRequest;
+use App\Http\Requests\EstimateDocumentRequest;
+use App\Http\Requests\ProcessDocumentEstimatedRequest;
 use App\Http\Requests\ProcessDocumentRequest;
+use App\Http\Requests\ShowDocumentRequest;
+use App\Http\Requests\UploadDocumentRequest;
+use App\Http\Resources\DocumentCancelledResource;
+use App\Http\Resources\DocumentEstimatedResource;
+use App\Http\Resources\DocumentListResource;
+use App\Http\Resources\DocumentProcessedResource;
 use App\Http\Resources\DocumentProcessingResource;
+use App\Http\Resources\DocumentResultResource;
+use App\Http\Resources\DocumentStatusResource;
+use App\Http\Resources\DocumentStatsResource;
+use App\Http\Resources\DocumentStoredResource;
+use App\Http\Resources\DocumentUploadedResource;
 use App\Services\AuditService;
 use App\Services\DocumentProcessingService;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
@@ -28,29 +48,178 @@ class DocumentProcessingController extends Controller
     }
 
     /**
-     * Загрузить документ и инициировать его обработку.
+     * Загрузить только файл без запуска обработки.
      */
-    public function store(ProcessDocumentRequest $request): JsonResponse
+    public function upload(UploadDocumentRequest $request): JsonResponse|JsonResource
     {
         $this->authorize('create', \App\Models\DocumentProcessing::class);
 
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
         try {
-            /** @var \App\Models\User $user */
-            $user = $request->user();
-            $documentProcessing = $this->documentProcessingService->uploadAndProcess($request, $user);
+            $dto = UploadDocumentDto::fromRequest($request);
+            $documentProcessing = $this->documentProcessingService->uploadDocument($dto, $user);
 
             $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'upload');
 
-            return response()->json([
-                'message' => 'Документ загружен и поставлен в очередь на обработку',
-                'data' => new DocumentProcessingResource($documentProcessing),
-            ], ResponseAlias::HTTP_CREATED);
+            return (new DocumentUploadedResource($documentProcessing))
+                ->response()
+                ->setStatusCode(ResponseAlias::HTTP_CREATED);
         } catch (RuntimeException $e) {
+            Log::error('Failed to store uploaded file', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'error' => 'Failed to store uploaded file',
                 'message' => 'Не удалось сохранить загруженный файл',
             ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         } catch (Exception $e) {
+            Log::error('Document upload failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Document upload failed',
+                'message' => 'Не удалось загрузить документ',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Получить предварительную оценку стоимости обработки.
+     */
+    public function estimate(EstimateDocumentRequest $request): JsonResponse|JsonResource
+    {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
+        $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
+
+        if (!$documentProcessing) {
+            return response()->json([
+                'error' => 'Document not found',
+                'message' => 'Документ с указанным идентификатором не найден',
+            ], ResponseAlias::HTTP_NOT_FOUND);
+        }
+
+        $this->authorize('view', $documentProcessing);
+
+        try {
+            $dto = EstimateDocumentDto::fromRequest($request);
+            $documentProcessing = $this->documentProcessingService->estimateDocumentCost($documentProcessing, $dto);
+
+            /** @var \App\Models\User $user */
+            $user = $request->user();
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'estimate');
+
+            return new DocumentEstimatedResource($documentProcessing);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'error' => 'Invalid document status',
+                'message' => $e->getMessage(),
+            ], ResponseAlias::HTTP_CONFLICT);
+        } catch (Exception $e) {
+            Log::error('Document cost estimation failed', [
+                'document_uuid' => $uuid,
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Estimation failed',
+                'message' => 'Не удалось рассчитать стоимость обработки',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Запустить обработку оцененного документа.
+     */
+    public function process(ProcessDocumentEstimatedRequest $request): JsonResponse|JsonResource
+    {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
+        $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
+
+        if (!$documentProcessing) {
+            return response()->json([
+                'error' => 'Document not found',
+                'message' => 'Документ с указанным идентификатором не найден',
+            ], ResponseAlias::HTTP_NOT_FOUND);
+        }
+
+        $this->authorize('view', $documentProcessing);
+
+        try {
+            $documentProcessing = $this->documentProcessingService->processEstimatedDocument($documentProcessing);
+
+            /** @var \App\Models\User $user */
+            $user = $request->user();
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'process_start');
+
+            return new DocumentProcessedResource($documentProcessing);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'error' => 'Cannot process document',
+                'message' => $e->getMessage(),
+            ], ResponseAlias::HTTP_CONFLICT);
+        } catch (Exception $e) {
+            Log::error('Document processing failed to start', [
+                'document_uuid' => $uuid,
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Processing failed to start',
+                'message' => 'Не удалось запустить обработку документа',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Загрузить документ и инициировать его обработку (старый метод для обратной совместимости).
+     */
+    public function store(ProcessDocumentRequest $request): JsonResponse|JsonResource
+    {
+        $this->authorize('create', \App\Models\DocumentProcessing::class);
+
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        try {
+            $documentProcessing = $this->documentProcessingService->uploadAndProcess($request, $user);
+
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'upload');
+
+            return (new DocumentStoredResource($documentProcessing))
+                ->response()
+                ->setStatusCode(ResponseAlias::HTTP_CREATED);
+        } catch (RuntimeException $e) {
+            Log::error('Failed to store uploaded file for processing', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Failed to store uploaded file',
+                'message' => 'Не удалось сохранить загруженный файл',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        } catch (Exception $e) {
+            Log::error('Document upload and processing failed', [
+                'user_id' => $user->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'error' => 'Document upload failed',
                 'message' => 'Не удалось загрузить документ для обработки',
@@ -61,8 +230,10 @@ class DocumentProcessingController extends Controller
     /**
      * Получить статус обработки документа.
      */
-    public function show(string $uuid): JsonResponse
+    public function show(ShowDocumentRequest $request): JsonResponse|JsonResource
     {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
         $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
 
         if (!$documentProcessing) {
@@ -78,17 +249,16 @@ class DocumentProcessingController extends Controller
         $user = request()->user();
         $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'view');
 
-        return response()->json([
-            'message' => 'Статус обработки документа',
-            'data' => new DocumentProcessingResource($documentProcessing),
-        ]);
+        return new DocumentStatusResource($documentProcessing);
     }
 
     /**
      * Получить результат обработки документа.
      */
-    public function result(string $uuid): JsonResponse
+    public function result(DocumentResultRequest $request): JsonResponse|JsonResource
     {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
         $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
 
         if (!$documentProcessing) {
@@ -109,25 +279,13 @@ class DocumentProcessingController extends Controller
             ], ResponseAlias::HTTP_ACCEPTED);
         }
 
-        return response()->json([
-            'message' => 'Результат обработки документа',
-            'data' => [
-                'id' => $documentProcessing->uuid,
-                'filename' => $documentProcessing->original_filename,
-                'task_type' => $documentProcessing->task_type,
-                'result' => $documentProcessing->result,
-                'processing_time_seconds' => $documentProcessing->processing_time_seconds,
-                'cost_usd' => $documentProcessing->cost_usd,
-                'metadata' => $documentProcessing->processing_metadata,
-                'completed_at' => $documentProcessing->completed_at?->toJSON(),
-            ],
-        ]);
+        return new DocumentResultResource($documentProcessing);
     }
 
     /**
      * Получить список всех обработок (для админ панели).
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request): JsonResponse|JsonResource
     {
         $this->authorize('viewAny', \App\Models\DocumentProcessing::class);
 
@@ -141,25 +299,16 @@ class DocumentProcessingController extends Controller
 
         $documentProcessings = $this->documentProcessingService->getFilteredList($filters, $perPage);
 
-        return response()->json([
-            'message' => 'Список обработок документов',
-            'data' => DocumentProcessingResource::collection($documentProcessings->items()),
-            'meta' => [
-                'current_page' => $documentProcessings->currentPage(),
-                'last_page' => $documentProcessings->lastPage(),
-                'per_page' => $documentProcessings->perPage(),
-                'total' => $documentProcessings->total(),
-                'from' => $documentProcessings->firstItem(),
-                'to' => $documentProcessings->lastItem(),
-            ],
-        ]);
+        return new DocumentListResource($documentProcessings);
     }
 
     /**
      * Отменить обработку документа (если она еще не началась).
      */
-    public function cancel(string $uuid): JsonResponse
+    public function cancel(CancelDocumentRequest $request): JsonResponse|JsonResource
     {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
         $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
 
         if (!$documentProcessing) {
@@ -174,10 +323,7 @@ class DocumentProcessingController extends Controller
         try {
             $this->documentProcessingService->cancelProcessing($documentProcessing);
 
-            return response()->json([
-                'message' => 'Обработка документа отменена',
-                'data' => new DocumentProcessingResource($documentProcessing),
-            ]);
+            return new DocumentCancelledResource($documentProcessing);
         } catch (InvalidArgumentException $e) {
             return response()->json([
                 'error' => 'Cannot cancel',
@@ -190,8 +336,10 @@ class DocumentProcessingController extends Controller
     /**
      * Удалить запись об обработке документа.
      */
-    public function destroy(string $uuid): JsonResponse
+    public function destroy(DeleteDocumentRequest $request): JsonResponse|JsonResource
     {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
         $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
 
         if (!$documentProcessing) {
@@ -213,16 +361,12 @@ class DocumentProcessingController extends Controller
     /**
      * Получить статистику по обработкам
      */
-    public function stats(): JsonResponse
+    public function stats(): JsonResponse|JsonResource
     {
         $this->authorize('stats', \App\Models\DocumentProcessing::class);
 
         $stats = $this->documentProcessingService->getStatistics();
 
-        return response()->json([
-            'message' => 'Статистика обработки документов',
-            'data' => $stats,
-            'generated_at' => now()->toJSON(),
-        ]);
+        return new DocumentStatsResource($stats);
     }
 }

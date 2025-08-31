@@ -40,6 +40,15 @@ class DocumentProcessingResource extends JsonResource
                 'message' => ($processing->error_details)['message'] ?? 'Unknown error',
                 'details' => $this->whenLoaded('error_details', $processing->error_details),
             ]),
+            'estimation' => $this->when(
+                ($processing->isEstimated() || $processing->isPending() || $processing->isProcessing() || $processing->isCompleted())
+                && is_array($processing->processing_metadata)
+                && isset($processing->processing_metadata['estimation'])
+                && is_array($processing->processing_metadata['estimation']),
+                function () use ($processing) {
+                    return is_array($processing->processing_metadata) ? $processing->processing_metadata['estimation'] : null;
+                },
+            ),
             'metadata' => $this->when($processing->processing_metadata !== null, $processing->processing_metadata),
             'timestamps' => [
                 'created_at' => $processing->created_at?->toISOString(),
