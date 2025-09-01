@@ -129,6 +129,16 @@ Route::post('v1/credits/check-balance', [CreditController::class, 'checkSufficie
     ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
     ->name('api.v1.credits.check-balance');
 
+// Курсы обмена валют
+Route::get('v1/credits/rates', [CreditController::class, 'exchangeRates'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.v1.credits.rates');
+
+// Стоимость кредитов в валютах
+Route::get('v1/credits/costs', [CreditController::class, 'creditCosts'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.v1.credits.costs');
+
 // -----------------------------------------------------------------------------
 // УПРАВЛЕНИЕ ДОКУМЕНТАМИ
 // -----------------------------------------------------------------------------

@@ -5,14 +5,28 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Http\Resources\CreditTransactionResource;
+use App\Http\Requests\Api\Credit\CheckBalanceRequest;
+use App\Http\Requests\Api\Credit\ConvertUsdRequest;
+use App\Http\Requests\Api\Credit\CreditBalanceRequest;
+use App\Http\Requests\Api\Credit\CreditCostsRequest;
+use App\Http\Requests\Api\Credit\CreditHistoryRequest;
+use App\Http\Requests\Api\Credit\CreditStatisticsRequest;
+use App\Http\Requests\Api\Credit\CreditTopupRequest;
+use App\Http\Requests\Api\Credit\ExchangeRatesRequest;
+use App\Http\Responses\Api\Credit\CheckBalanceResponse;
+use App\Http\Responses\Api\Credit\ConvertUsdResponse;
+use App\Http\Responses\Api\Credit\CreditBalanceResponse;
+use App\Http\Responses\Api\Credit\CreditCostsResponse;
+use App\Http\Responses\Api\Credit\CreditErrorResponse;
+use App\Http\Responses\Api\Credit\CreditHistoryResponse;
+use App\Http\Responses\Api\Credit\CreditStatisticsResponse;
+use App\Http\Responses\Api\Credit\CreditTopupResponse;
+use App\Http\Responses\Api\Credit\ExchangeRatesResponse;
 use App\Services\CreditService;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
-use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use InvalidArgumentException;
-use Symfony\Component\HttpFoundation\Response as ResponseAlias;
+use RuntimeException;
 
 class CreditController extends Controller
 {
@@ -26,7 +40,7 @@ class CreditController extends Controller
     /**
      * Получить баланс кредитов текущего пользователя.
      */
-    public function balance(Request $request): JsonResponse
+    public function balance(CreditBalanceRequest $request): CreditBalanceResponse|CreditErrorResponse
     {
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -34,25 +48,19 @@ class CreditController extends Controller
         try {
             $balance = $this->creditService->getBalance($user);
 
-            return response()->json([
-                'message' => 'Баланс кредитов пользователя',
-                'data' => [
-                    'balance' => $balance,
-                    'user_id' => $user->id,
-                ],
-            ]);
+            return new CreditBalanceResponse($user, $balance);
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Failed to retrieve balance',
-                'message' => 'Не удалось получить баланс кредитов',
-            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return CreditErrorResponse::internalServerError(
+                'Failed to retrieve balance',
+                'Не удалось получить баланс кредитов',
+            );
         }
     }
 
     /**
      * Получить статистику кредитов пользователя.
      */
-    public function statistics(Request $request): JsonResponse
+    public function statistics(CreditStatisticsRequest $request): CreditStatisticsResponse|CreditErrorResponse
     {
         /** @var \App\Models\User $user */
         $user = $request->user();
@@ -60,49 +68,33 @@ class CreditController extends Controller
         try {
             $statistics = $this->creditService->getUserStatistics($user);
 
-            return response()->json([
-                'message' => 'Статистика кредитов пользователя',
-                'data' => $statistics,
-            ]);
+            return new CreditStatisticsResponse($statistics);
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Failed to retrieve statistics',
-                'message' => 'Не удалось получить статистику кредитов',
-            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return CreditErrorResponse::internalServerError(
+                'Failed to retrieve statistics',
+                'Не удалось получить статистику кредитов',
+            );
         }
     }
 
     /**
      * Получить историю транзакций кредитов.
      */
-    public function history(Request $request): JsonResponse
+    public function history(CreditHistoryRequest $request): CreditHistoryResponse|CreditErrorResponse
     {
         /** @var \App\Models\User $user */
         $user = $request->user();
 
         try {
-            $perPageRaw = $request->input('per_page', 20);
-            $perPage = is_numeric($perPageRaw) ? (int) $perPageRaw : 20;
-
+            $perPage = $request->getPerPage();
             $transactions = $this->creditService->getTransactionHistory($user, $perPage);
 
-            return response()->json([
-                'message' => 'История транзакций кредитов',
-                'data' => CreditTransactionResource::collection($transactions->items()),
-                'meta' => [
-                    'current_page' => $transactions->currentPage(),
-                    'last_page' => $transactions->lastPage(),
-                    'per_page' => $transactions->perPage(),
-                    'total' => $transactions->total(),
-                    'from' => $transactions->firstItem(),
-                    'to' => $transactions->lastItem(),
-                ],
-            ]);
+            return new CreditHistoryResponse($transactions);
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Failed to retrieve transaction history',
-                'message' => 'Не удалось получить историю транзакций',
-            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return CreditErrorResponse::internalServerError(
+                'Failed to retrieve transaction history',
+                'Не удалось получить историю транзакций',
+            );
         }
     }
 
@@ -110,30 +102,23 @@ class CreditController extends Controller
      * Пополнить баланс кредитов (для тестирования).
      * В production это должно быть интегрировано с платежной системой.
      */
-    public function topup(Request $request): JsonResponse
+    public function topup(CreditTopupRequest $request): CreditTopupResponse|CreditErrorResponse
     {
         // В production среде этот endpoint должен быть защищен
         // и интегрирован с платежной системой
         if (!app()->environment('local')) {
-            return response()->json([
-                'error' => 'Not available',
-                'message' => 'Этот endpoint доступен только в среде разработки',
-            ], ResponseAlias::HTTP_FORBIDDEN);
+            return CreditErrorResponse::forbidden(
+                'Not available',
+                'Этот endpoint доступен только в среде разработки',
+            );
         }
 
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $request->validate([
-            'amount' => 'required|numeric|min:1|max:10000',
-            'description' => 'string|max:255',
-        ]);
-
         try {
-            // @phpstan-ignore-next-line
-            $amount = (float) $request->input('amount');
-            // @phpstan-ignore-next-line
-            $description = (string) ($request->input('description') ?? 'Test credit topup');
+            $amount = $request->getAmount();
+            $description = $request->getDescription();
 
             $transaction = $this->creditService->addCredits(
                 $user,
@@ -144,85 +129,120 @@ class CreditController extends Controller
                 ['source' => 'test_endpoint'],
             );
 
-            return response()->json([
-                'message' => 'Кредиты успешно добавлены',
-                'data' => new CreditTransactionResource($transaction),
-            ], ResponseAlias::HTTP_CREATED);
+            return new CreditTopupResponse($transaction);
         } catch (InvalidArgumentException $e) {
-            return response()->json([
-                'error' => 'Invalid request',
-                'message' => $e->getMessage(),
-            ], ResponseAlias::HTTP_BAD_REQUEST);
+            return CreditErrorResponse::badRequest(
+                'Invalid request',
+                $e->getMessage(),
+            );
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Failed to add credits',
-                'message' => 'Не удалось добавить кредиты',
-            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return CreditErrorResponse::internalServerError(
+                'Failed to add credits',
+                'Не удалось добавить кредиты',
+            );
         }
     }
 
     /**
      * Конвертировать USD в кредиты для расчета стоимости.
      */
-    public function convertUsdToCredits(Request $request): JsonResponse
+    public function convertUsdToCredits(ConvertUsdRequest $request): ConvertUsdResponse|CreditErrorResponse
     {
-        $request->validate([
-            'usd_amount' => 'required|numeric|min:0',
-        ]);
-
         try {
-            // @phpstan-ignore-next-line
-            $usdAmount = (float) $request->input('usd_amount');
+            $usdAmount = $request->getUsdAmount();
             $credits = $this->creditService->convertUsdToCredits($usdAmount);
 
-            return response()->json([
-                'message' => 'Конвертация USD в кредиты',
-                'data' => [
-                    'usd_amount' => $usdAmount,
-                    'credits' => $credits,
-                    'rate' => config('credits.usd_to_credits_rate', 100),
-                ],
-            ]);
+            return new ConvertUsdResponse($usdAmount, $credits);
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Conversion failed',
-                'message' => 'Не удалось выполнить конвертацию',
-            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return CreditErrorResponse::internalServerError(
+                'Conversion failed',
+                'Не удалось выполнить конвертацию',
+            );
         }
     }
 
     /**
      * Проверить, достаточно ли кредитов для операции.
      */
-    public function checkSufficientBalance(Request $request): JsonResponse
+    public function checkSufficientBalance(CheckBalanceRequest $request): CheckBalanceResponse|CreditErrorResponse
     {
         /** @var \App\Models\User $user */
         $user = $request->user();
 
-        $request->validate([
-            'required_amount' => 'required|numeric|min:0',
-        ]);
-
         try {
-            // @phpstan-ignore-next-line
-            $requiredAmount = (float) $request->input('required_amount');
+            $requiredAmount = $request->getRequiredAmount();
             $currentBalance = $this->creditService->getBalance($user);
             $hasSufficient = $this->creditService->hasSufficientBalance($user, $requiredAmount);
+            $deficit = $hasSufficient ? 0 : ($requiredAmount - $currentBalance);
 
-            return response()->json([
-                'message' => 'Проверка баланса кредитов',
-                'data' => [
-                    'current_balance' => $currentBalance,
-                    'required_amount' => $requiredAmount,
-                    'has_sufficient_balance' => $hasSufficient,
-                    'deficit' => $hasSufficient ? 0 : ($requiredAmount - $currentBalance),
-                ],
-            ]);
+            return new CheckBalanceResponse($currentBalance, $requiredAmount, $hasSufficient, $deficit);
         } catch (Exception $e) {
-            return response()->json([
-                'error' => 'Balance check failed',
-                'message' => 'Не удалось проверить баланс',
-            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+            return CreditErrorResponse::internalServerError(
+                'Balance check failed',
+                'Не удалось проверить баланс',
+            );
+        }
+    }
+
+    /**
+     * Получить курсы обмена валют.
+     */
+    public function exchangeRates(ExchangeRatesRequest $request): ExchangeRatesResponse|CreditErrorResponse
+    {
+        try {
+            $rates = $this->creditService->getExchangeRates();
+            $baseCurrency = $this->creditService->getBaseCurrency();
+            $supportedCurrencies = $this->creditService->getSupportedCurrencies();
+
+            return new ExchangeRatesResponse($rates, $baseCurrency, $supportedCurrencies);
+        } catch (InvalidArgumentException $e) {
+            return CreditErrorResponse::invalidConfiguration(
+                'Invalid configuration',
+                'Некорректная конфигурация валют',
+                $e->getMessage(),
+            );
+        } catch (RuntimeException $e) {
+            return CreditErrorResponse::configurationError(
+                'Configuration error',
+                'Ошибка конфигурации валютной системы',
+                $e->getMessage(),
+            );
+        } catch (Exception $e) {
+            return CreditErrorResponse::internalServerError(
+                'Failed to retrieve exchange rates',
+                'Не удалось получить курсы валют',
+            );
+        }
+    }
+
+    /**
+     * Получить стоимость кредитов в разных валютах.
+     */
+    public function creditCosts(CreditCostsRequest $request): CreditCostsResponse|CreditErrorResponse
+    {
+        try {
+            $creditCosts = $this->creditService->getCreditCostInCurrencies();
+            $baseCurrency = $this->creditService->getBaseCurrency();
+            $supportedCurrencies = $this->creditService->getSupportedCurrencies();
+
+            return new CreditCostsResponse($creditCosts, $baseCurrency, $supportedCurrencies);
+        } catch (InvalidArgumentException $e) {
+            return CreditErrorResponse::invalidConfiguration(
+                'Invalid configuration',
+                'Некорректная конфигурация валют',
+                $e->getMessage(),
+            );
+        } catch (RuntimeException $e) {
+            return CreditErrorResponse::configurationError(
+                'Configuration error',
+                'Ошибка конфигурации валютной системы',
+                $e->getMessage(),
+            );
+        } catch (Exception $e) {
+            return CreditErrorResponse::internalServerError(
+                'Failed to retrieve credit costs',
+                'Не удалось получить стоимость кредитов',
+            );
         }
     }
 }

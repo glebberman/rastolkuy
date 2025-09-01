@@ -299,6 +299,66 @@
 }
 ```
 
+### GET `/v1/credits/rates` 🔒
+Получить курсы обмена валют.
+
+**Headers**: `Authorization: Bearer {token}`  
+**Rate Limit**: 60 requests per minute
+
+**Response 200**:
+```json
+{
+  "message": "Курсы обмена валют",
+  "data": {
+    "rates": {
+      "RUB": 1.0,
+      "USD": 95.0,
+      "EUR": 105.0
+    },
+    "base_currency": "RUB",
+    "supported_currencies": ["RUB", "USD", "EUR"],
+    "updated_at": "2025-01-09T12:00:00.000000Z"
+  }
+}
+```
+
+**Описание полей**:
+- `rates` - курсы валют относительно базовой валюты
+- `base_currency` - базовая валюта системы (обычно RUB)
+- `supported_currencies` - список поддерживаемых валют
+- `updated_at` - время последнего обновления
+
+### GET `/v1/credits/costs` 🔒
+Получить стоимость 1 кредита в разных валютах.
+
+**Headers**: `Authorization: Bearer {token}`  
+**Rate Limit**: 60 requests per minute
+
+**Response 200**:
+```json
+{
+  "message": "Стоимость кредитов в валютах",
+  "data": {
+    "credit_costs": {
+      "RUB": 1.0,
+      "USD": 0.01,
+      "EUR": 0.009
+    },
+    "base_currency": "RUB",
+    "supported_currencies": ["RUB", "USD", "EUR"],
+    "description": "Cost of 1 credit in different currencies",
+    "updated_at": "2025-01-09T12:00:00.000000Z"
+  }
+}
+```
+
+**Описание полей**:
+- `credit_costs` - стоимость 1 кредита в различных валютах
+- `base_currency` - базовая валюта системы
+- `supported_currencies` - список поддерживаемых валют
+- `description` - описание формата данных
+- `updated_at` - время последнего обновления
+
 ## Обработка документов
 
 ### Новый workflow (3-этапный)
@@ -788,6 +848,8 @@ route('api.v1.auth.logout')                // POST /api/v1/auth/logout
 route('api.v1.credits.balance')            // GET /api/v1/credits/balance
 route('api.v1.credits.history')            // GET /api/v1/credits/history
 route('api.v1.credits.statistics')         // GET /api/v1/credits/statistics
+route('api.v1.credits.rates')              // GET /api/v1/credits/rates
+route('api.v1.credits.costs')              // GET /api/v1/credits/costs
 
 // Документы - новый workflow
 route('api.v1.documents.upload')           // POST /api/v1/documents/upload

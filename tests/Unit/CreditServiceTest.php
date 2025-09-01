@@ -10,6 +10,7 @@ use App\Services\CreditService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
 use InvalidArgumentException;
+use RuntimeException;
 use Tests\TestCase;
 
 class CreditServiceTest extends TestCase
@@ -192,5 +193,281 @@ class CreditServiceTest extends TestCase
             'amount' => 100.0,
             'description' => 'Welcome bonus credits',
         ]);
+    }
+
+    public function testGetExchangeRates(): void
+    {
+        // Set test configuration
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+
+        $rates = $this->creditService->getExchangeRates();
+
+        $this->assertIsArray($rates);
+        $this->assertEquals(1.0, $rates['RUB']);
+        $this->assertEquals(95.0, $rates['USD']);
+        $this->assertEquals(105.0, $rates['EUR']);
+    }
+
+    public function testGetCreditCostInCurrencies(): void
+    {
+        // Set test configuration
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+
+        $costs = $this->creditService->getCreditCostInCurrencies();
+
+        $this->assertIsArray($costs);
+        $this->assertEquals(1.0, $costs['RUB']);
+        $this->assertEquals(0.01, $costs['USD']);
+        $this->assertEquals(0.009, $costs['EUR']);
+    }
+
+    public function testGetBaseCurrency(): void
+    {
+        Config::set('credits.default_currency', 'RUB');
+
+        $baseCurrency = $this->creditService->getBaseCurrency();
+
+        $this->assertEquals('RUB', $baseCurrency);
+    }
+
+    public function testGetSupportedCurrencies(): void
+    {
+        Config::set('credits.supported_currencies', ['RUB', 'USD', 'EUR']);
+
+        $currencies = $this->creditService->getSupportedCurrencies();
+
+        $this->assertIsArray($currencies);
+        $this->assertEquals(['RUB', 'USD', 'EUR'], $currencies);
+    }
+
+    public function testConvertCurrencySameCurrency(): void
+    {
+        $amount = $this->creditService->convertCurrency(100.0, 'RUB', 'RUB');
+
+        $this->assertEquals(100.0, $amount);
+    }
+
+    public function testConvertCurrencyFromBaseCurrency(): void
+    {
+        // Set test configuration
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+        Config::set('credits.supported_currencies', ['RUB', 'USD', 'EUR']);
+
+        // 1 RUB should convert to 95 USD (rate 95.0 means 1 RUB = 95 USD)
+        $amount = $this->creditService->convertCurrency(1.0, 'RUB', 'USD');
+
+        $this->assertEquals(95.0, $amount);
+    }
+
+    public function testConvertCurrencyToBaseCurrency(): void
+    {
+        // Set test configuration
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+        Config::set('credits.supported_currencies', ['RUB', 'USD', 'EUR']);
+
+        // 95 USD should convert to 1 RUB (1 USD = 1/95 RUB)
+        $amount = $this->creditService->convertCurrency(95.0, 'USD', 'RUB');
+
+        $this->assertEquals(1.0, $amount);
+    }
+
+    public function testConvertCurrencyBetweenNonBaseCurrencies(): void
+    {
+        // Set test configuration
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+        Config::set('credits.supported_currencies', ['RUB', 'USD', 'EUR']);
+
+        // 95 USD to EUR: 95 USD -> 1 RUB -> 105 EUR
+        $amount = $this->creditService->convertCurrency(95.0, 'USD', 'EUR');
+
+        $this->assertEquals(105.0, $amount);
+    }
+
+    public function testConvertCurrencyUnsupportedCurrency(): void
+    {
+        // Set complete test configuration but exclude GBP
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+        ]);
+        Config::set('credits.supported_currencies', ['RUB', 'USD']);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Unsupported currency conversion: GBP to USD');
+
+        $this->creditService->convertCurrency(100.0, 'GBP', 'USD');
+    }
+
+    public function testGetCreditCostInCurrency(): void
+    {
+        // Set test configuration
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+
+        $cost = $this->creditService->getCreditCostInCurrency('USD');
+
+        $this->assertEquals(0.01, $cost);
+    }
+
+    public function testGetCreditCostInCurrencyUnsupportedCurrency(): void
+    {
+        // Set test configuration
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+        ]);
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Credit cost not configured for currency: GBP');
+
+        $this->creditService->getCreditCostInCurrency('GBP');
+    }
+
+    public function testConfigurationValidationMissingBaseCurrency(): void
+    {
+        // Set invalid configuration - base currency missing from rates
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Base currency 'RUB' not found in currency configuration");
+
+        $this->creditService->convertCurrency(100.0, 'USD', 'EUR');
+    }
+
+    public function testConfigurationValidationBaseCurrencyNotOne(): void
+    {
+        // Set invalid configuration - base currency rate is not 1.0
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 2.0, // Should be 1.0
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Base currency 'RUB' must have exchange rate of 1.0");
+
+        $this->creditService->convertCurrency(100.0, 'USD', 'EUR');
+    }
+
+    public function testConfigurationValidationMissingSupportedCurrencyInRates(): void
+    {
+        // Set invalid configuration - supported currency missing from rates
+        Config::set('credits.supported_currencies', ['RUB', 'USD', 'EUR', 'GBP']);
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+            'EUR' => 105.0,
+            // Missing GBP
+        ]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Supported currency 'GBP' missing in exchange rates configuration");
+
+        $this->creditService->convertCurrency(100.0, 'USD', 'EUR');
+    }
+
+    public function testConfigurationValidationNegativeExchangeRate(): void
+    {
+        // Set invalid configuration - negative exchange rate
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => -95.0, // Negative rate
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+        ]);
+        Config::set('credits.supported_currencies', ['RUB', 'USD']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Exchange rate for currency 'USD' must be positive number");
+
+        $this->creditService->convertCurrency(100.0, 'USD', 'RUB');
+    }
+
+    public function testConfigurationValidationNegativeCreditCost(): void
+    {
+        // Set invalid configuration - negative credit cost
+        Config::set('credits.default_currency', 'RUB');
+        Config::set('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+        ]);
+        Config::set('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => -0.01, // Negative cost
+        ]);
+        Config::set('credits.supported_currencies', ['RUB', 'USD']);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage("Credit cost for currency 'USD' must be positive number");
+
+        $this->creditService->convertCurrency(100.0, 'USD', 'RUB');
+    }
+
+    public function testClearCurrencyCache(): void
+    {
+        // This test verifies the cache clearing method exists and can be called
+        $this->creditService->clearCurrencyCache();
+
+        // Since cache operations are void, we just verify no exception is thrown
+        $this->assertTrue(true);
     }
 }
