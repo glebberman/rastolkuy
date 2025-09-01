@@ -92,7 +92,7 @@ class AuthService {
             // Get CSRF cookie for SPA
             await axios.get('/sanctum/csrf-cookie');
             
-            const response = await axios.post('/api/auth/login', credentials);
+            const response = await axios.post('/api/v1/auth/login', credentials);
             const data = response.data as AuthResponse;
             
             console.log('API Response received:', data);
@@ -146,7 +146,7 @@ class AuthService {
             // Get CSRF cookie for SPA
             await axios.get('/sanctum/csrf-cookie');
             
-            const response = await axios.post('/api/auth/register', userData);
+            const response = await axios.post('/api/v1/auth/register', userData);
             const data = response.data as AuthResponse;
 
             // For registration, the API might return just user data without token
@@ -188,7 +188,7 @@ class AuthService {
     async logout(): Promise<void> {
         try {
             if (this.token) {
-                await axios.post('/api/auth/logout');
+                await axios.post('/api/v1/auth/logout');
             }
         } catch (error) {
             console.error('Logout error:', error);
@@ -202,7 +202,7 @@ class AuthService {
             console.log('getCurrentUser: Making API request...');
             console.log('getCurrentUser: Token being used:', this.getToken());
             
-            const response = await axios.get('/api/auth/user');
+            const response = await axios.get('/api/v1/auth/user');
             const data = response.data;
             
             console.log('getCurrentUser: API response:', data);
@@ -243,7 +243,7 @@ class AuthService {
 
     async forgotPassword(email: string): Promise<{ message: string }> {
         try {
-            const response = await axios.post('/api/auth/forgot-password', { email });
+            const response = await axios.post('/api/v1/auth/forgot-password', { email });
             return response.data;
         } catch (error: any) {
             // Log technical error details to console for debugging

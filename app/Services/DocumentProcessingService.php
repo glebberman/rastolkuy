@@ -23,7 +23,7 @@ readonly class DocumentProcessingService
 {
     public function __construct(
         private CostCalculator $costCalculator,
-        private CreditService  $creditService,
+        private CreditService $creditService,
     ) {
     }
 

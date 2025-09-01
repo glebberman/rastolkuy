@@ -342,4 +342,42 @@ class AuthController extends Controller
             ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * Get user statistics.
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        $this->authorize('auth.stats');
+
+        try {
+            /** @var \App\Models\User|null $user */
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Unauthenticated',
+                    'message' => 'Пользователь не аутентифицирован',
+                ], ResponseAlias::HTTP_UNAUTHORIZED);
+            }
+
+            $stats = $this->authService->getUserStats($user);
+
+            return response()->json([
+                'message' => 'Статистика пользователя',
+                'data' => $stats,
+            ]);
+        } catch (Exception $e) {
+            Log::error('Failed to get user stats', [
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Stats retrieval failed',
+                'message' => 'Не удалось получить статистику пользователя',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

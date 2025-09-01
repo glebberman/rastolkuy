@@ -43,6 +43,7 @@ class RoleAndPermissionSeeder extends Seeder
             'auth.update-profile',
             'auth.verify-email',
             'auth.reset-password',
+            'auth.stats',
 
             // System administration
             'system.admin',
@@ -72,6 +73,7 @@ class RoleAndPermissionSeeder extends Seeder
             'auth.refresh-token',
             'auth.update-profile',
             'auth.verify-email',
+            'auth.stats',
             'documents.view',
             'documents.create',
             'documents.update',

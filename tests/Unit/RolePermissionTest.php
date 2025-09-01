@@ -94,7 +94,7 @@ class RolePermissionTest extends TestCase
         $adminRole = Role::findByName('admin');
 
         $this->assertCount(3, $guestRole->permissions);
-        $this->assertCount(12, $customerRole->permissions); // Updated count
+        $this->assertCount(13, $customerRole->permissions); // Updated count
         $this->assertCount(Permission::count(), $adminRole->permissions);
     }
 

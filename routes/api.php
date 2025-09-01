@@ -90,6 +90,11 @@ Route::post('v1/auth/resend-verification', [AuthController::class, 'resendVerifi
     ->middleware(['auth:sanctum', 'custom.throttle:3,1'])
     ->name('api.v1.auth.resend-verification');
 
+// Получение статистики пользователя
+Route::get('v1/user/stats', [AuthController::class, 'stats'])
+    ->middleware(['auth:sanctum', 'custom.throttle:60,1'])
+    ->name('api.v1.user.stats');
+
 // -----------------------------------------------------------------------------
 // УПРАВЛЕНИЕ КРЕДИТАМИ
 // -----------------------------------------------------------------------------
