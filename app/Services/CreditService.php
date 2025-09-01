@@ -311,11 +311,14 @@ class CreditService
     public function getExchangeRates(): array
     {
         /** @var array<string, float> */
-        return Config::get('credits.exchange_rates', [
-            'RUB' => 1.0,
-            'USD' => 95.0,
-            'EUR' => 105.0,
-        ]);
+        return Cache::remember('currency_exchange_rates', 3600, function (): array {
+            /** @var array<string, float> */
+            return Config::get('credits.exchange_rates', [
+                'RUB' => 1.0,
+                'USD' => 95.0,
+                'EUR' => 105.0,
+            ]);
+        });
     }
 
     /**
@@ -324,11 +327,14 @@ class CreditService
     public function getCreditCostInCurrencies(): array
     {
         /** @var array<string, float> */
-        return Config::get('credits.credit_cost', [
-            'RUB' => 1.0,
-            'USD' => 0.01,
-            'EUR' => 0.009,
-        ]);
+        return Cache::remember('currency_credit_costs', 3600, function (): array {
+            /** @var array<string, float> */
+            return Config::get('credits.credit_cost', [
+                'RUB' => 1.0,
+                'USD' => 0.01,
+                'EUR' => 0.009,
+            ]);
+        });
     }
 
     /**
@@ -351,6 +357,8 @@ class CreditService
 
     /**
      * Конвертировать сумму между валютами.
+     * Курсы валют интерпретируются как "сколько единиц иностранной валюты за 1 единицу базовой валюты".
+     * Например: USD=95.0 означает 1 RUB = 95 USD (или 1 USD = 1/95 RUB).
      */
     public function convertCurrency(float $amount, string $fromCurrency, string $toCurrency): float
     {
@@ -358,6 +366,7 @@ class CreditService
             return $amount;
         }
 
+        $this->validateCurrencyConfig();
         $rates = $this->getExchangeRates();
         $baseCurrency = $this->getBaseCurrency();
 
@@ -365,9 +374,21 @@ class CreditService
             throw new InvalidArgumentException("Unsupported currency conversion: {$fromCurrency} to {$toCurrency}");
         }
 
-        // Convert to base currency first, then to target currency
-        $amountInBase = $fromCurrency === $baseCurrency ? $amount : $amount / $rates[$fromCurrency];
-        $convertedAmount = $toCurrency === $baseCurrency ? $amountInBase : $amountInBase * $rates[$toCurrency];
+        // Convert to base currency first
+        if ($fromCurrency === $baseCurrency) {
+            $amountInBase = $amount;
+        } else {
+            // If from foreign currency to base: divide by rate (1 USD = 1/95 RUB, so 95 USD = 1 RUB)
+            $amountInBase = $amount / $rates[$fromCurrency];
+        }
+
+        // Convert from base currency to target currency
+        if ($toCurrency === $baseCurrency) {
+            $convertedAmount = $amountInBase;
+        } else {
+            // If from base to foreign currency: multiply by rate (1 RUB = 95 USD)
+            $convertedAmount = $amountInBase * $rates[$toCurrency];
+        }
 
         return round($convertedAmount, 6);
     }
@@ -387,6 +408,15 @@ class CreditService
     }
 
     /**
+     * Очистить кеш валютных данных.
+     */
+    public function clearCurrencyCache(): void
+    {
+        Cache::forget('currency_exchange_rates');
+        Cache::forget('currency_credit_costs');
+    }
+
+    /**
      * Очистить кеш статистики пользователя.
      */
     public function clearUserCache(User $user): void
@@ -402,6 +432,54 @@ class CreditService
 
         // Clear tagged cache if using Redis/Memcached
         Cache::tags(["user_credits_{$user->id}"])->flush();
+    }
+
+    /**
+     * Валидация конфигурации валют.
+     *
+     * @throws RuntimeException
+     */
+    private function validateCurrencyConfig(): void
+    {
+        $rates = $this->getExchangeRates();
+        $costs = $this->getCreditCostInCurrencies();
+        $baseCurrency = $this->getBaseCurrency();
+        $supportedCurrencies = $this->getSupportedCurrencies();
+
+        // Проверяем что базовая валюта присутствует в конфигурации
+        if (!isset($rates[$baseCurrency]) || !isset($costs[$baseCurrency])) {
+            throw new RuntimeException("Base currency '{$baseCurrency}' not found in currency configuration");
+        }
+
+        // Проверяем что базовая валюта имеет курс 1.0
+        if ($rates[$baseCurrency] !== 1.0) {
+            throw new RuntimeException("Base currency '{$baseCurrency}' must have exchange rate of 1.0");
+        }
+
+        // Проверяем консистентность списка поддерживаемых валют
+        foreach ($supportedCurrencies as $currency) {
+            if (!isset($rates[$currency])) {
+                throw new RuntimeException("Supported currency '{$currency}' missing in exchange rates configuration");
+            }
+
+            if (!isset($costs[$currency])) {
+                throw new RuntimeException("Supported currency '{$currency}' missing in credit costs configuration");
+            }
+        }
+
+        // Проверяем что все курсы положительные
+        foreach ($rates as $currency => $rate) {
+            if (!is_numeric($rate) || $rate <= 0) {
+                throw new RuntimeException("Exchange rate for currency '{$currency}' must be positive number");
+            }
+        }
+
+        // Проверяем что все стоимости кредитов положительные
+        foreach ($costs as $currency => $cost) {
+            if (!is_numeric($cost) || $cost <= 0) {
+                throw new RuntimeException("Credit cost for currency '{$currency}' must be positive number");
+            }
+        }
     }
 
     /**

@@ -12,6 +12,7 @@ use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
+use RuntimeException;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class CreditController extends Controller
@@ -244,6 +245,18 @@ class CreditController extends Controller
                     'updated_at' => now()->toISOString(),
                 ],
             ]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'error' => 'Invalid configuration',
+                'message' => 'Некорректная конфигурация валют',
+                'details' => $e->getMessage(),
+            ], ResponseAlias::HTTP_BAD_REQUEST);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'error' => 'Configuration error',
+                'message' => 'Ошибка конфигурации валютной системы',
+                'details' => $e->getMessage(),
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to retrieve exchange rates',
@@ -271,6 +284,18 @@ class CreditController extends Controller
                     'updated_at' => now()->toISOString(),
                 ],
             ]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'error' => 'Invalid configuration',
+                'message' => 'Некорректная конфигурация валют',
+                'details' => $e->getMessage(),
+            ], ResponseAlias::HTTP_BAD_REQUEST);
+        } catch (RuntimeException $e) {
+            return response()->json([
+                'error' => 'Configuration error',
+                'message' => 'Ошибка конфигурации валютной системы',
+                'details' => $e->getMessage(),
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         } catch (Exception $e) {
             return response()->json([
                 'error' => 'Failed to retrieve credit costs',
