@@ -149,99 +149,137 @@
 
 ## Управление кредитами
 
+Все endpoints кредитной системы теперь используют кастомные Request и Response классы для улучшенной валидации и единообразной структуры ответов.
+
 ### GET `/v1/credits/balance` 🔒
-Получение текущего баланса кредитов.
+Получение текущего баланса кредитов пользователя.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `CreditBalanceRequest`  
+**Response Class**: `CreditBalanceResponse`
 
 **Response 200**:
 ```json
 {
-  "balance": 150.5,
-  "currency": "credits"
+  "message": "Баланс кредитов пользователя",
+  "data": {
+    "balance": 150.5,
+    "user_id": 1
+  }
 }
 ```
 
 ### GET `/v1/credits/statistics` 🔒
-Получение статистики по кредитам.
+Получение детальной статистики по кредитам пользователя.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `CreditStatisticsRequest`  
+**Response Class**: `CreditStatisticsResponse`
 
 **Response 200**:
 ```json
 {
-  "balance": 150.5,
-  "total_topups": 200.0,
-  "total_debits": 49.5,
-  "total_refunds": 0.0,
-  "transaction_count": 15,
-  "last_transaction_at": "2025-08-29T12:00:00Z",
-  "cached_at": "2025-08-29T12:30:00Z"
+  "message": "Статистика кредитов пользователя",
+  "data": {
+    "balance": 150.5,
+    "total_topups": 200.0,
+    "total_debits": 49.5,
+    "total_refunds": 0.0,
+    "transaction_count": 15,
+    "last_transaction_at": "2025-08-29T12:00:00Z",
+    "cached_at": "2025-08-29T12:30:00Z"
+  }
 }
 ```
 
 ### GET `/v1/credits/history` 🔒
-История транзакций с пагинацией.
+История транзакций с пагинацией и валидацией параметров.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `CreditHistoryRequest`  
+**Response Class**: `CreditHistoryResponse`
 
 **Query Parameters**:
-- `per_page` (integer, optional) - количество записей на страницу (default: 20)
+- `per_page` (integer, optional) - количество записей на страницу (1-100, default: 20)
+
+**Validation Rules**:
+- `per_page`: sometimes|integer|min:1|max:100
 
 **Response 200**:
 ```json
 {
+  "message": "История транзакций кредитов",
   "data": [
     {
       "id": 1,
       "type": "topup",
+      "type_description": "Пополнение",
       "amount": 100.0,
+      "absolute_amount": 100.0,
       "balance_before": 50.0,
       "balance_after": 150.0,
       "description": "Welcome bonus",
-      "metadata": {
-        "source": "registration_bonus"
-      },
-      "created_at": "2025-08-29T12:00:00Z"
+      "timestamps": {
+        "created_at": "2025-08-29T12:00:00Z"
+      }
     }
   ],
   "meta": {
     "current_page": 1,
+    "last_page": 1,
     "per_page": 20,
     "total": 15,
-    "last_page": 1
+    "from": 1,
+    "to": 15
   }
 }
 ```
 
 ### POST `/v1/credits/topup` 🔒
-Пополнение кредитов (только для разработки).
+Пополнение кредитов с валидацией и улучшенным error handling (только для разработки).
 
 **Environment**: `local` only  
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 10 requests per minute
+**Rate Limit**: 10 requests per minute  
+**Request Class**: `CreditTopupRequest`  
+**Response Class**: `CreditTopupResponse | CreditErrorResponse`
 
 **Request Body**:
 ```json
 {
-  "amount": "numeric (required|min:0.01)",
-  "description": "string (optional)"
+  "amount": "numeric (required|min:1|max:10000)",
+  "description": "string (optional|max:255)"
 }
 ```
+
+**Validation Rules**:
+- `amount`: required|numeric|min:1|max:10000
+- `description`: sometimes|string|max:255
+
+**Localized Error Messages**:
+- `amount.required`: "Сумма пополнения обязательна"
+- `amount.min`: "Минимальная сумма пополнения: 1"
+- `amount.max`: "Максимальная сумма пополнения: 10000"
 
 **Response 201**:
 ```json
 {
-  "message": "Credits added successfully",
-  "transaction": {
+  "message": "Кредиты успешно добавлены",
+  "data": {
     "id": 1,
     "type": "topup",
+    "type_description": "Пополнение",
     "amount": 50.0,
+    "absolute_amount": 50.0,
+    "balance_before": 150.0,
     "balance_after": 200.0,
-    "created_at": "2025-08-29T12:00:00Z"
+    "description": "Test credit topup",
+    "timestamps": {
+      "created_at": "2025-08-29T12:00:00Z"
+    }
   }
 }
 ```
@@ -254,56 +292,93 @@
 }
 ```
 
+**Response 400** (Validation Error):
+```json
+{
+  "error": "Invalid request",
+  "message": "Adding 15000 credits would exceed maximum balance of 10000"
+}
+```
+
 ### POST `/v1/credits/check-balance` 🔒
-Проверка достаточности баланса.
+Проверка достаточности баланса с детальной информацией.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `CheckBalanceRequest`  
+**Response Class**: `CheckBalanceResponse`
 
 **Request Body**:
 ```json
 {
-  "required_amount": "numeric (required|min:0.01)"
+  "required_amount": "numeric (required|min:0|max:1000000)"
 }
 ```
+
+**Validation Rules**:
+- `required_amount`: required|numeric|min:0|max:1000000
+
+**Localized Error Messages**:
+- `required_amount.required`: "Требуемая сумма обязательна"
+- `required_amount.min`: "Требуемая сумма не может быть отрицательной"
+- `required_amount.max`: "Максимальная проверяемая сумма: 1,000,000"
 
 **Response 200**:
 ```json
 {
-  "sufficient": true,
-  "current_balance": 150.0,
-  "required_amount": 10.0
+  "message": "Проверка баланса кредитов",
+  "data": {
+    "current_balance": 150.0,
+    "required_amount": 10.0,
+    "has_sufficient_balance": true,
+    "deficit": 0
+  }
 }
 ```
 
 ### POST `/v1/credits/convert-usd` 🔒
-Конвертация USD в кредиты.
+Конвертация USD в кредиты с расширенными лимитами и валидацией.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `ConvertUsdRequest`  
+**Response Class**: `ConvertUsdResponse`
 
 **Request Body**:
 ```json
 {
-  "usd_amount": "numeric (required|min:0.01)"
+  "usd_amount": "numeric (required|min:0|max:100000)"
 }
 ```
+
+**Validation Rules**:
+- `usd_amount`: required|numeric|min:0|max:100000
+
+**Localized Error Messages**:
+- `usd_amount.required`: "Сумма в долларах обязательна"
+- `usd_amount.min`: "Сумма не может быть отрицательной"
+- `usd_amount.max`: "Максимальная сумма для конвертации: $100,000"
 
 **Response 200**:
 ```json
 {
-  "usd_amount": 1.0,
-  "credits": 100.0,
-  "conversion_rate": 100.0,
-  "currency": "USD"
+  "message": "Конвертация USD в кредиты",
+  "data": {
+    "usd_amount": 1.0,
+    "credits": 100.0,
+    "rate": 100
+  }
 }
 ```
 
 ### GET `/v1/credits/rates` 🔒
-Получить курсы обмена валют.
+Получить курсы обмена валют с кешированием и улучшенной обработкой ошибок.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `ExchangeRatesRequest`  
+**Response Class**: `ExchangeRatesResponse | CreditErrorResponse`  
+**Caching**: 1 hour TTL
 
 **Response 200**:
 ```json
@@ -322,6 +397,24 @@
 }
 ```
 
+**Response 400** (Configuration Error):
+```json
+{
+  "error": "Invalid configuration",
+  "message": "Некорректная конфигурация валют",
+  "details": "Base currency 'RUB' not found in currency configuration"
+}
+```
+
+**Response 500** (System Error):
+```json
+{
+  "error": "Configuration error",
+  "message": "Ошибка конфигурации валютной системы",
+  "details": "Exchange rate for currency 'USD' must be positive number"
+}
+```
+
 **Описание полей**:
 - `rates` - курсы валют относительно базовой валюты
 - `base_currency` - базовая валюта системы (обычно RUB)
@@ -329,10 +422,13 @@
 - `updated_at` - время последнего обновления
 
 ### GET `/v1/credits/costs` 🔒
-Получить стоимость 1 кредита в разных валютах.
+Получить стоимость 1 кредита в разных валютах с кешированием и валидацией.
 
 **Headers**: `Authorization: Bearer {token}`  
-**Rate Limit**: 60 requests per minute
+**Rate Limit**: 60 requests per minute  
+**Request Class**: `CreditCostsRequest`  
+**Response Class**: `CreditCostsResponse | CreditErrorResponse`  
+**Caching**: 1 hour TTL
 
 **Response 200**:
 ```json
@@ -349,6 +445,24 @@
     "description": "Cost of 1 credit in different currencies",
     "updated_at": "2025-01-09T12:00:00.000000Z"
   }
+}
+```
+
+**Response 400** (Configuration Error):
+```json
+{
+  "error": "Invalid configuration",
+  "message": "Некорректная конфигурация валют",
+  "details": "Supported currency 'GBP' missing in exchange rates configuration"
+}
+```
+
+**Response 500** (System Error):
+```json
+{
+  "error": "Configuration error", 
+  "message": "Ошибка конфигурации валютной системы",
+  "details": "Credit cost for currency 'USD' must be positive number"
 }
 ```
 
@@ -1001,4 +1115,68 @@ curl -X POST https://api.example.com/api/v1/documents \
 **Resource Format**: Все ответы через JsonResource с единой структурой  
 **Backward Compatibility**: Legacy endpoint `/v1/documents` сохранен  
 
-*Обновлено: 2025-08-31 - Реализация RAS-19 + Resource архитектура*
+## Архитектура Request/Response классов
+
+### Кредитная система (RAS-21)
+
+Все endpoints кредитной системы реализованы с использованием кастомных Request и Response классов для обеспечения type safety и единообразия:
+
+#### Request Classes
+- **CreditBalanceRequest** - базовая авторизация
+- **CreditStatisticsRequest** - базовая авторизация  
+- **CreditHistoryRequest** - валидация `per_page` (1-100)
+- **CreditTopupRequest** - валидация `amount` (1-10000) и `description` (max:255)
+- **ConvertUsdRequest** - валидация `usd_amount` (0-100000)
+- **CheckBalanceRequest** - валидация `required_amount` (0-1000000)
+- **ExchangeRatesRequest** - базовая авторизация
+- **CreditCostsRequest** - базовая авторизация
+
+#### Response Classes
+- **CreditBalanceResponse** - баланс + user_id
+- **CreditStatisticsResponse** - детальная статистика
+- **CreditHistoryResponse** - пагинированная история через CreditTransactionResource
+- **CreditTopupResponse** - транзакция через CreditTransactionResource
+- **ConvertUsdResponse** - результат конвертации
+- **CheckBalanceResponse** - детальная проверка баланса
+- **ExchangeRatesResponse** - курсы валют с timestamp
+- **CreditCostsResponse** - стоимость кредитов с timestamp
+- **CreditErrorResponse** - унифицированная обработка ошибок
+
+#### Улучшения
+- **Type Safety**: Все методы используют строгую типизацию
+- **Валидация**: Кастомные правила с локализованными сообщениями на русском
+- **Error Handling**: Детализированные сообщения об ошибках конфигурации
+- **Кеширование**: 1-час TTL для курсов валют и стоимости кредитов
+- **Единообразие**: Все ответы следуют одинаковой структуре `{message, data}`
+
+### Файловая структура
+
+```
+app/Http/
+├── Requests/Api/Credit/
+│   ├── CreditBalanceRequest.php
+│   ├── CreditStatisticsRequest.php
+│   ├── CreditHistoryRequest.php
+│   ├── CreditTopupRequest.php
+│   ├── ConvertUsdRequest.php
+│   ├── CheckBalanceRequest.php
+│   ├── ExchangeRatesRequest.php
+│   └── CreditCostsRequest.php
+└── Responses/Api/Credit/
+    ├── CreditBalanceResponse.php
+    ├── CreditStatisticsResponse.php
+    ├── CreditHistoryResponse.php
+    ├── CreditTopupResponse.php
+    ├── ConvertUsdResponse.php
+    ├── CheckBalanceResponse.php
+    ├── ExchangeRatesResponse.php
+    ├── CreditCostsResponse.php
+    └── CreditErrorResponse.php
+```
+
+### Совместимость
+- **PHPStan Level 9**: Полная совместимость без ошибок
+- **Тесты**: Все существующие тесты проходят без изменений
+- **API**: Структура JSON ответов остается неизменной для обратной совместимости
+
+*Обновлено: 2025-01-09 - Реализация RAS-21: Custom Request/Response classes*

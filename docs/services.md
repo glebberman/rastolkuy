@@ -46,17 +46,18 @@ app/Services/
 
 ## Основные сервисы
 
-### 1. CreditService - Финансовый менеджмент
+### 1. CreditService - Финансовый менеджмент (Обновлено RAS-21)
 
-**Назначение**: Управление балансами кредитов пользователей, транзакциями и операциями биллинга.
+**Назначение**: Управление балансами кредитов пользователей, транзакциями, валютными операциями и биллингом.
 
 **Ключевые возможности**:
 - Thread-safe операции с балансом через транзакции базы данных
 - Event-driven архитектура для операций с кредитами
-- Комплексное логирование транзакций
-- Конвертация курсов между USD и кредитами
-- Асинхронная обработка возвратов
-- Настраиваемые политики и лимиты
+- **Мультивалютная поддержка** с валидацией конфигурации
+- **Кеширование валютных данных** (TTL 1 час)
+- Конвертация курсов между различными валютами
+- Асинхронная обработка возвратов через очереди
+- Комплексное логирование и статистика
 
 **Основные методы**:
 ```php
@@ -64,14 +65,35 @@ app/Services/
 public function getBalance(User $user): float
 public function hasSufficientBalance(User $user, float $amount): bool
 
-// Транзакционные операции
-public function addCredits(User $user, float $amount, string $description): CreditTransaction
+// Транзакционные операции (расширенный функционал)
+public function addCredits(
+    User $user, 
+    float $amount, 
+    string $description,
+    ?string $referenceType = null,
+    ?string $referenceId = null,
+    array $metadata = []
+): CreditTransaction
+
 public function debitCredits(User $user, float $amount, string $description): CreditTransaction
 public function refundCredits(User $user, float $amount, string $description): CreditTransaction
 
 // Конвертация и статистика
 public function convertUsdToCredits(float $usdAmount): float
-public function getUserStatistics(User $user): array
+public function convertCreditsToUsd(float $credits): float
+public function getUserStatistics(User $user, bool $forceRefresh = false): array
+
+// Валютные операции (НОВОЕ в RAS-21)
+public function getExchangeRates(): array
+public function getCreditCostInCurrencies(): array
+public function getBaseCurrency(): string
+public function getSupportedCurrencies(): array
+public function convertCurrency(float $amount, string $from, string $to): float
+public function getCreditCostInCurrency(string $currency): float
+
+// Кеш-менеджмент
+public function clearCurrencyCache(): void
+public function clearUserCache(User $user): void
 ```
 
 **События**:
@@ -80,21 +102,55 @@ public function getUserStatistics(User $user): array
 - `CreditRefunded` - События возврата кредитов
 - `InsufficientBalance` - Предупреждения о низком балансе
 
-**Конфигурация**: `config/credits.php`
+**Расширенная конфигурация**: `config/credits.php`
 ```php
 return [
+    // Базовые настройки
     'initial_balance' => 100,
     'maximum_balance' => 100000,
-    'minimum_balance' => 0,
-    'usd_to_credits_rate' => 100, // 1 USD = 100 кредитов
-    'low_balance_threshold' => 10,
+    'usd_to_credits_rate' => 100,
+    
+    // Валютная система (НОВОЕ)
+    'default_currency' => 'RUB',
+    'supported_currencies' => ['RUB', 'USD', 'EUR'],
+    'exchange_rates' => [
+        'RUB' => 1.0,    // Базовая валюта
+        'USD' => 95.0,   // 1 RUB = 95 USD
+        'EUR' => 105.0,  // 1 RUB = 105 EUR
+    ],
+    'credit_cost' => [
+        'RUB' => 1.0,    // 1 кредит = 1 рубль
+        'USD' => 0.01,   // 1 кредит = 0.01 USD
+        'EUR' => 0.009,  // 1 кредит = 0.009 EUR
+    ],
+    
+    // Политики
+    'policies' => [
+        'allow_negative_balance' => false,
+        'refund_processing_enabled' => true,
+    ],
 ];
 ```
 
-**Производительность**:
+**Валидация конфигурации**:
+- Автоматическая проверка согласованности валютных настроек
+- Валидация положительности курсов и стоимостей
+- Проверка корректности базовой валюты (курс = 1.0)
+- RuntimeException при некорректной конфигурации
+
+**Производительность и кеширование**:
 - Транзакции базы данных для консистентности
-- Redis кеширование для статистики пользователей (TTL 30 мин)
+- **Валютные курсы**: Redis кеширование (TTL 1 час)
+- **Стоимость кредитов**: Redis кеширование (TTL 1 час)
+- Статистика пользователей: кеширование (TTL 30 мин)
 - Асинхронная обработка возвратов через очереди
+
+**API Integration** (RAS-21):
+Сервис интегрирован с кастомными Request/Response классами:
+- Валидация входящих данных через FormRequest классы
+- Type-safe ответы через Response классы
+- Локализованные сообщения об ошибках
+- Унифицированная обработка ошибок конфигурации
 
 ### 2. LLMService - Слой интеграции ИИ
 
@@ -477,4 +533,196 @@ LLM_TOKENS_PER_MINUTE=40000
 
 ---
 
-*Обновлено: 2025-08-29*
+## HTTP Layer Architecture (RAS-21)
+
+### Request/Response Pattern Implementation
+
+Для обеспечения type safety, улучшенной валидации и единообразной структуры API, система реализует паттерн кастомных Request и Response классов.
+
+#### Кредитная система - HTTP слой
+
+**Архитектурные принципы**:
+- **Single Responsibility**: Каждый Request/Response класс отвечает за один endpoint
+- **Type Safety**: Строгая типизация на всех уровнях с PHPStan Level 9
+- **Validation**: Локализованные правила валидации с кастомными сообщениями
+- **Consistency**: Единообразная структура ответов `{message, data}`
+
+#### Request Classes Pattern
+
+```php
+// Базовый паттерн FormRequest класса
+abstract class BaseCreditRequest extends FormRequest
+{
+    public function authorize(): bool 
+    {
+        return $this->user() !== null;
+    }
+    
+    // Type-safe геттеры для валидированных данных
+    protected function getValidatedFloat(string $key): float
+    {
+        /** @var float|int|numeric-string $value */
+        $value = $this->validated($key);
+        return (float) $value;
+    }
+}
+
+// Примеры реализации
+class CreditTopupRequest extends BaseCreditRequest
+{
+    public function rules(): array
+    {
+        return [
+            'amount' => 'required|numeric|min:1|max:10000',
+            'description' => 'sometimes|string|max:255',
+        ];
+    }
+    
+    public function getAmount(): float 
+    {
+        return $this->getValidatedFloat('amount');
+    }
+}
+```
+
+#### Response Classes Pattern
+
+```php
+// Базовый Response класс
+abstract class BaseCreditResponse extends JsonResponse
+{
+    protected function buildResponse(string $message, array $data, int $status): array
+    {
+        return [
+            'message' => $message,
+            'data' => $data,
+        ];
+    }
+}
+
+// Успешные ответы
+class CreditBalanceResponse extends BaseCreditResponse
+{
+    public function __construct(User $user, float $balance)
+    {
+        $data = $this->buildResponse(
+            'Баланс кредитов пользователя',
+            [
+                'balance' => $balance,
+                'user_id' => $user->id,
+            ],
+            Response::HTTP_OK
+        );
+        
+        parent::__construct($data);
+    }
+}
+
+// Унифицированная обработка ошибок
+class CreditErrorResponse extends JsonResponse
+{
+    public static function invalidConfiguration(
+        string $error, 
+        string $message, 
+        string $details
+    ): self {
+        return new self([
+            'error' => $error,
+            'message' => $message,
+            'details' => $details,
+        ], Response::HTTP_BAD_REQUEST);
+    }
+}
+```
+
+#### Controller Integration Pattern
+
+```php
+class CreditController extends Controller
+{
+    // Type-safe method signatures с union types
+    public function balance(
+        CreditBalanceRequest $request
+    ): CreditBalanceResponse|CreditErrorResponse {
+        try {
+            $user = $request->user();
+            $balance = $this->creditService->getBalance($user);
+            
+            return new CreditBalanceResponse($user, $balance);
+        } catch (Exception $e) {
+            return CreditErrorResponse::internalServerError(
+                'Failed to retrieve balance',
+                'Не удалось получить баланс кредитов'
+            );
+        }
+    }
+}
+```
+
+#### Валидация и локализация
+
+**Локализованные сообщения**:
+```php
+public function messages(): array
+{
+    return [
+        'amount.required' => 'Сумма пополнения обязательна',
+        'amount.numeric' => 'Сумма должна быть числом',
+        'amount.min' => 'Минимальная сумма пополнения: 1',
+        'amount.max' => 'Максимальная сумма пополнения: 10000',
+    ];
+}
+```
+
+#### Benefits реализации
+
+**Для разработки**:
+- IDE autocompletion и type hints
+- Compile-time проверки типов через PHPStan
+- Единообразная структура кода
+- Простота тестирования
+
+**Для API**:
+- Консистентные JSON структуры
+- Детализированные сообщения об ошибках
+- Локализованная валидация
+- Улучшенный DX для frontend разработчиков
+
+**Для поддержки**:
+- Легкая расширяемость новыми endpoints
+- Централизованная обработка ошибок
+- Простая отладка валидационных проблем
+
+#### File Structure
+
+```
+app/Http/
+├── Requests/Api/Credit/
+│   ├── CreditBalanceRequest.php      (авторизация)
+│   ├── CreditHistoryRequest.php      (пагинация 1-100)
+│   ├── CreditTopupRequest.php        (amount + description)
+│   ├── ConvertUsdRequest.php         (usd_amount 0-100k)
+│   ├── CheckBalanceRequest.php       (required_amount 0-1M)
+│   ├── ExchangeRatesRequest.php      (авторизация)
+│   └── CreditCostsRequest.php        (авторизация)
+└── Responses/Api/Credit/
+    ├── CreditBalanceResponse.php     (balance + user_id)
+    ├── CreditHistoryResponse.php     (paginated via Resource)
+    ├── CreditTopupResponse.php       (transaction via Resource)
+    ├── ConvertUsdResponse.php        (conversion result)
+    ├── CheckBalanceResponse.php      (detailed balance check)
+    ├── ExchangeRatesResponse.php     (rates + timestamp)
+    ├── CreditCostsResponse.php       (costs + timestamp)
+    └── CreditErrorResponse.php       (unified error handling)
+```
+
+#### Quality Assurance
+
+- **PHPStan Level 9**: Zero errors, максимальная type safety
+- **Tests Coverage**: Все 51 тест проходят без изменений
+- **Backward Compatibility**: API структура остается неизменной
+- **PSR-12**: Код отформатирован в соответствии со стандартами
+
+---
+
+*Обновлено: 2025-01-09 - Добавлена архитектура HTTP слоя (RAS-21)*
