@@ -306,6 +306,87 @@ class CreditService
     }
 
     /**
+     * Получить курсы обмена валют.
+     */
+    public function getExchangeRates(): array
+    {
+        /** @var array<string, float> */
+        return Config::get('credits.exchange_rates', [
+            'RUB' => 1.0,
+            'USD' => 95.0,
+            'EUR' => 105.0,
+        ]);
+    }
+
+    /**
+     * Получить стоимость кредитов в разных валютах.
+     */
+    public function getCreditCostInCurrencies(): array
+    {
+        /** @var array<string, float> */
+        return Config::get('credits.credit_cost', [
+            'RUB' => 1.0,
+            'USD' => 0.01,
+            'EUR' => 0.009,
+        ]);
+    }
+
+    /**
+     * Получить базовую валюту.
+     */
+    public function getBaseCurrency(): string
+    {
+        /** @var string */
+        return Config::get('credits.default_currency', 'RUB');
+    }
+
+    /**
+     * Получить поддерживаемые валюты.
+     */
+    public function getSupportedCurrencies(): array
+    {
+        /** @var array<string> */
+        return Config::get('credits.supported_currencies', ['RUB', 'USD', 'EUR']);
+    }
+
+    /**
+     * Конвертировать сумму между валютами.
+     */
+    public function convertCurrency(float $amount, string $fromCurrency, string $toCurrency): float
+    {
+        if ($fromCurrency === $toCurrency) {
+            return $amount;
+        }
+
+        $rates = $this->getExchangeRates();
+        $baseCurrency = $this->getBaseCurrency();
+
+        if (!isset($rates[$fromCurrency]) || !isset($rates[$toCurrency])) {
+            throw new InvalidArgumentException("Unsupported currency conversion: {$fromCurrency} to {$toCurrency}");
+        }
+
+        // Convert to base currency first, then to target currency
+        $amountInBase = $fromCurrency === $baseCurrency ? $amount : $amount / $rates[$fromCurrency];
+        $convertedAmount = $toCurrency === $baseCurrency ? $amountInBase : $amountInBase * $rates[$toCurrency];
+
+        return round($convertedAmount, 6);
+    }
+
+    /**
+     * Получить стоимость кредита в указанной валюте.
+     */
+    public function getCreditCostInCurrency(string $currency): float
+    {
+        $creditCosts = $this->getCreditCostInCurrencies();
+
+        if (!isset($creditCosts[$currency])) {
+            throw new InvalidArgumentException("Credit cost not configured for currency: {$currency}");
+        }
+
+        return $creditCosts[$currency];
+    }
+
+    /**
      * Очистить кеш статистики пользователя.
      */
     public function clearUserCache(User $user): void

@@ -225,4 +225,57 @@ class CreditController extends Controller
             ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
+
+    /**
+     * Получить курсы обмена валют.
+     */
+    public function exchangeRates(): JsonResponse
+    {
+        try {
+            $rates = $this->creditService->getExchangeRates();
+            $baseCurrency = $this->creditService->getBaseCurrency();
+
+            return response()->json([
+                'message' => 'Курсы обмена валют',
+                'data' => [
+                    'rates' => $rates,
+                    'base_currency' => $baseCurrency,
+                    'supported_currencies' => $this->creditService->getSupportedCurrencies(),
+                    'updated_at' => now()->toISOString(),
+                ],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'error' => 'Failed to retrieve exchange rates',
+                'message' => 'Не удалось получить курсы валют',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Получить стоимость кредитов в разных валютах.
+     */
+    public function creditCosts(): JsonResponse
+    {
+        try {
+            $creditCosts = $this->creditService->getCreditCostInCurrencies();
+            $baseCurrency = $this->creditService->getBaseCurrency();
+
+            return response()->json([
+                'message' => 'Стоимость кредитов в валютах',
+                'data' => [
+                    'credit_costs' => $creditCosts,
+                    'base_currency' => $baseCurrency,
+                    'supported_currencies' => $this->creditService->getSupportedCurrencies(),
+                    'description' => 'Cost of 1 credit in different currencies',
+                    'updated_at' => now()->toISOString(),
+                ],
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'error' => 'Failed to retrieve credit costs',
+                'message' => 'Не удалось получить стоимость кредитов',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
 }

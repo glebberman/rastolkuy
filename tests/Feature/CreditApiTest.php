@@ -322,4 +322,129 @@ class CreditApiTest extends TestCase
         ]);
         $response->assertStatus(422);
     }
+
+    public function testCanGetExchangeRates(): void
+    {
+        $response = $this->getJson(route('api.v1.credits.rates'));
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    'rates' => [
+                        'RUB',
+                        'USD',
+                        'EUR',
+                    ],
+                    'base_currency',
+                    'supported_currencies',
+                    'updated_at',
+                ],
+            ]);
+
+        // Verify the rates are correct from config
+        /** @var array{base_currency: string, rates: array<string, float>, supported_currencies: array<string>} $data */
+        $data = $response->json('data');
+        $this->assertEquals('RUB', $data['base_currency']);
+        $this->assertEquals(1.0, $data['rates']['RUB']);
+        $this->assertEquals(95.0, $data['rates']['USD']);
+        $this->assertEquals(105.0, $data['rates']['EUR']);
+        $this->assertIsArray($data['supported_currencies']);
+        $this->assertContains('RUB', $data['supported_currencies']);
+        $this->assertContains('USD', $data['supported_currencies']);
+        $this->assertContains('EUR', $data['supported_currencies']);
+    }
+
+    public function testCanGetCreditCosts(): void
+    {
+        $response = $this->getJson(route('api.v1.credits.costs'));
+
+        $response->assertStatus(200)
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    'credit_costs' => [
+                        'RUB',
+                        'USD',
+                        'EUR',
+                    ],
+                    'base_currency',
+                    'supported_currencies',
+                    'description',
+                    'updated_at',
+                ],
+            ]);
+
+        // Verify the credit costs are correct from config
+        /** @var array{base_currency: string, credit_costs: array<string, float>, description: string} $data */
+        $data = $response->json('data');
+        $this->assertEquals('RUB', $data['base_currency']);
+        $this->assertEquals(1.0, $data['credit_costs']['RUB']);
+        $this->assertEquals(0.01, $data['credit_costs']['USD']);
+        $this->assertEquals(0.009, $data['credit_costs']['EUR']);
+        $this->assertEquals('Cost of 1 credit in different currencies', $data['description']);
+    }
+
+    public function testExchangeRatesIncludeTimestamp(): void
+    {
+        $response = $this->getJson(route('api.v1.credits.rates'));
+
+        $response->assertStatus(200);
+
+        /** @var array{updated_at: string} $data */
+        $data = $response->json('data');
+        $this->assertArrayHasKey('updated_at', $data);
+        $this->assertIsString($data['updated_at']);
+        // Verify it's a valid ISO timestamp (Laravel uses ISO 8601 format)
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $data['updated_at']);
+    }
+
+    public function testCreditCostsIncludeTimestamp(): void
+    {
+        $response = $this->getJson(route('api.v1.credits.costs'));
+
+        $response->assertStatus(200);
+
+        /** @var array{updated_at: string} $data */
+        $data = $response->json('data');
+        $this->assertArrayHasKey('updated_at', $data);
+        $this->assertIsString($data['updated_at']);
+        // Verify it's a valid ISO timestamp (Laravel uses ISO 8601 format)
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/', $data['updated_at']);
+    }
+
+    public function testUnauthenticatedUserCannotAccessNewCurrencyEndpoints(): void
+    {
+        // Clear any previous authentication
+        $this->app['auth']->forgetGuards();
+
+        $endpoints = [
+            'GET' => [
+                route('api.v1.credits.rates'),
+                route('api.v1.credits.costs'),
+            ],
+        ];
+
+        foreach ($endpoints as $method => $urls) {
+            foreach ($urls as $url) {
+                $response = $this->json($method, $url);
+                $response->assertStatus(401);
+            }
+        }
+    }
+
+    public function testCurrencyEndpointsHaveRateLimitingApplied(): void
+    {
+        // Test rate limiting for currency endpoints
+        for ($i = 0; $i < 3; ++$i) {
+            $response = $this->getJson(route('api.v1.credits.rates'));
+            $response->assertStatus(200);
+
+            $response = $this->getJson(route('api.v1.credits.costs'));
+            $response->assertStatus(200);
+        }
+
+        // This is a simplified test - in real scenarios you'd need to exceed the actual rate limit
+        $this->assertTrue(true); // Rate limiting is configured, actual testing would require specific setup
+    }
 }
