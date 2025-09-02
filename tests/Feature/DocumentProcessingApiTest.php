@@ -452,6 +452,38 @@ class DocumentProcessingApiTest extends TestCase
         ]);
     }
 
+    public function testCanUploadDocumentWithFormDataStringBooleans(): void
+    {
+        $file = UploadedFile::fake()->create('test-document.pdf', 100);
+
+        $response = $this->post(route('api.v1.documents.upload'), [
+            'file' => $file,
+            'task_type' => DocumentProcessing::TASK_TRANSLATION,
+            'anchor_at_start' => 'false', // Строковое boolean значение как в FormData
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    'id',
+                    'anchor_at_start',
+                ],
+            ])
+            ->assertJson([
+                'data' => [
+                    'anchor_at_start' => false,
+                ],
+            ]);
+
+        $this->assertDatabaseHas('document_processings', [
+            'user_id' => $this->user->id,
+            'anchor_at_start' => false,
+        ]);
+    }
+
     public function testUnauthenticatedUserCannotAccessEndpoints(): void
     {
         // Clear authentication

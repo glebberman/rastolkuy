@@ -20,11 +20,10 @@ class ExchangeRatesRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, array<mixed>|ValidationRule|string>
+     * @return array<string, array<mixed>|string|ValidationRule>
      */
     public function rules(): array
     {
         return [];
     }
-
 }

@@ -196,7 +196,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                         <div className="d-flex align-items-center">
                                             <div className="subheader">Кредиты</div>
                                         </div>
-                                        <div className="d-flex align-items-baseline">
+                                        <div className="d-flex align-items-center">
                                             <div className="h1 mb-0 me-2">{currentStats?.credits_balance || 0} кр.</div>
                                             <div className="me-auto">
                                                 <IconCoins size={24} className="text-primary" />
@@ -212,7 +212,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                         <div className="d-flex align-items-center">
                                             <div className="subheader">Всего документов</div>
                                         </div>
-                                        <div className="d-flex align-items-baseline">
+                                        <div className="d-flex align-items-center">
                                             <div className="h1 mb-0 me-2">{currentStats?.total_documents || 0}</div>
                                             <div className="me-auto">
                                                 <IconFile size={24} className="text-muted" />
@@ -228,7 +228,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                         <div className="d-flex align-items-center">
                                             <div className="subheader">Обработано сегодня</div>
                                         </div>
-                                        <div className="d-flex align-items-baseline">
+                                        <div className="d-flex align-items-center">
                                             <div className="h1 mb-0 me-2">{currentStats?.processed_today || 0}</div>
                                             <div className="me-auto">
                                                 <IconTrendingUp size={24} className="text-success" />
