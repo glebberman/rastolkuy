@@ -58,7 +58,7 @@ readonly class DocumentProcessingService
             'task_type' => $request->validated('task_type'),
             'options' => $request->validated('options', []),
             'anchor_at_start' => $request->validated('anchor_at_start', false),
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
         ]);
 
         // Запускаем асинхронную обработку
@@ -106,7 +106,7 @@ readonly class DocumentProcessingService
             'task_type' => $dto->taskType,
             'options' => $dto->options,
             'anchor_at_start' => $dto->anchorAtStart,
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
         ]);
 
         Log::info('Document uploaded', [
@@ -114,7 +114,7 @@ readonly class DocumentProcessingService
             'filename' => $originalName,
             'task_type' => $dto->taskType,
             'file_size' => $dto->file->getSize(),
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
         ]);
 
         return $documentProcessing;

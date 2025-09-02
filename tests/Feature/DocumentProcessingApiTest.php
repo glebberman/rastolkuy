@@ -93,8 +93,8 @@ class DocumentProcessingApiTest extends TestCase
                     'filename' => 'test-document.pdf',
                     'task_type' => DocumentProcessing::TASK_TRANSLATION,
                     'anchor_at_start' => true,
-                    'status' => DocumentProcessing::STATUS_PENDING,
-                    'progress_percentage' => 25,
+                    'status' => DocumentProcessing::STATUS_UPLOADED,
+                    'progress_percentage' => 10,
                 ],
             ]);
 
@@ -103,7 +103,7 @@ class DocumentProcessingApiTest extends TestCase
             'original_filename' => 'test-document.pdf',
             'task_type' => DocumentProcessing::TASK_TRANSLATION,
             'anchor_at_start' => true,
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
         ]);
 
         // Verify file was stored
@@ -181,7 +181,7 @@ class DocumentProcessingApiTest extends TestCase
     {
         $document = DocumentProcessing::factory()->create([
             'user_id' => $this->user->id,
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_PENDING, // Документ в неправильном статусе
         ]);
 
         $response = $this->postJson(route('api.v1.documents.estimate', $document->uuid));
@@ -442,13 +442,13 @@ class DocumentProcessingApiTest extends TestCase
             ])
             ->assertJson([
                 'data' => [
-                    'status' => DocumentProcessing::STATUS_PENDING,
+                    'status' => DocumentProcessing::STATUS_UPLOADED,
                 ],
             ]);
 
         $this->assertDatabaseHas('document_processings', [
             'user_id' => $this->user->id,
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
         ]);
     }
 
