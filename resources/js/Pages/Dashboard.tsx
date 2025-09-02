@@ -8,10 +8,12 @@ import {
     IconAlertTriangle,
     IconTrendingUp,
     IconUsers,
-    IconCurrencyDollar
+    IconCoins
 } from '@tabler/icons-react';
 import AppLayout from '../Layouts/AppLayout';
 import { authService } from '@/Utils/auth';
+import FileUploadZone from '../Components/Document/FileUploadZone';
+import DocumentProcessor from '../Components/Document/DocumentProcessor';
 
 interface DashboardProps {
     recentDocuments: Array<{
@@ -22,16 +24,18 @@ interface DashboardProps {
         pages_count?: number;
     }>;
     stats: {
+        credits_balance: number;
         total_documents: number;
         processed_today: number;
-        success_rate: number;
-        total_savings: number;
     };
 }
 
 export default function Dashboard({ recentDocuments = [], stats }: DashboardProps) {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
+    const [currentStats, setCurrentStats] = useState(stats);
+    const [showProcessor, setShowProcessor] = useState(false);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -61,6 +65,28 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
 
         checkAuth();
     }, []);
+
+    const handleFileSelect = (file: File) => {
+        setSelectedFile(file);
+        setShowProcessor(true);
+    };
+
+    const handleCreditsUpdated = (newBalance: number) => {
+        setCurrentStats(prev => ({
+            ...prev,
+            credits_balance: newBalance
+        }));
+    };
+
+    const handleStartNewUpload = () => {
+        setSelectedFile(null);
+        setShowProcessor(false);
+    };
+
+    const handleDocumentComplete = (documentId: string) => {
+        // Could refresh stats here if needed
+        console.log('Document completed:', documentId);
+    };
 
     if (isLoading) {
         return (
@@ -164,14 +190,30 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                     <div className="container-xl">
                         {/* Statistics Cards */}
                         <div className="row row-deck row-cards">
-                            <div className="col-sm-6 col-lg-3">
+                            <div className="col-sm-6 col-lg-4">
+                                <div className="card">
+                                    <div className="card-body">
+                                        <div className="d-flex align-items-center">
+                                            <div className="subheader">Кредиты</div>
+                                        </div>
+                                        <div className="d-flex align-items-baseline">
+                                            <div className="h1 mb-0 me-2">{currentStats?.credits_balance || 0} кр.</div>
+                                            <div className="me-auto">
+                                                <IconCoins size={24} className="text-primary" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className="col-sm-6 col-lg-4">
                                 <div className="card">
                                     <div className="card-body">
                                         <div className="d-flex align-items-center">
                                             <div className="subheader">Всего документов</div>
                                         </div>
                                         <div className="d-flex align-items-baseline">
-                                            <div className="h1 mb-0 me-2">{stats?.total_documents || 0}</div>
+                                            <div className="h1 mb-0 me-2">{currentStats?.total_documents || 0}</div>
                                             <div className="me-auto">
                                                 <IconFile size={24} className="text-muted" />
                                             </div>
@@ -179,15 +221,15 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                     </div>
                                 </div>
                             </div>
-                            
-                            <div className="col-sm-6 col-lg-3">
+
+                            <div className="col-sm-6 col-lg-4">
                                 <div className="card">
                                     <div className="card-body">
                                         <div className="d-flex align-items-center">
                                             <div className="subheader">Обработано сегодня</div>
                                         </div>
                                         <div className="d-flex align-items-baseline">
-                                            <div className="h1 mb-0 me-2">{stats?.processed_today || 0}</div>
+                                            <div className="h1 mb-0 me-2">{currentStats?.processed_today || 0}</div>
                                             <div className="me-auto">
                                                 <IconTrendingUp size={24} className="text-success" />
                                             </div>
@@ -195,149 +237,25 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                     </div>
                                 </div>
                             </div>
-
-                            <div className="col-sm-6 col-lg-3">
-                                <div className="card">
-                                    <div className="card-body">
-                                        <div className="d-flex align-items-center">
-                                            <div className="subheader">Успешность</div>
-                                        </div>
-                                        <div className="d-flex align-items-baseline">
-                                            <div className="h1 mb-0 me-2">{stats?.success_rate || 0}%</div>
-                                            <div className="me-auto">
-                                                <IconCheck size={24} className="text-info" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="col-sm-6 col-lg-3">
-                                <div className="card">
-                                    <div className="card-body">
-                                        <div className="d-flex align-items-center">
-                                            <div className="subheader">Экономия времени</div>
-                                        </div>
-                                        <div className="d-flex align-items-baseline">
-                                            <div className="h1 mb-0 me-2">{stats?.total_savings || 0}ч</div>
-                                            <div className="me-auto">
-                                                <IconCurrencyDollar size={24} className="text-warning" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
-                        {/* Recent Documents */}
+                        {/* Central Upload/Processing Zone */}
                         <div className="row row-cards mt-3">
                             <div className="col-12">
-                                <div className="card">
-                                    <div className="card-header">
-                                        <h3 className="card-title">Последние документы</h3>
-                                        <div className="card-actions">
-                                            <Link href="/documents" className="btn btn-outline-primary btn-sm">
-                                                Все документы
-                                            </Link>
-                                        </div>
-                                    </div>
-                                    <div className="card-body p-0">
-                                        {recentDocuments.length > 0 ? (
-                                            <div className="table-responsive">
-                                                <table className="table table-vcenter card-table">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Документ</th>
-                                                            <th>Статус</th>
-                                                            <th>Страниц</th>
-                                                            <th>Дата загрузки</th>
-                                                            <th className="w-1"></th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {recentDocuments.map((document) => (
-                                                            <tr key={document.id}>
-                                                                <td>
-                                                                    <div className="d-flex align-items-center">
-                                                                        <IconFile className="me-2 text-muted" size={16} />
-                                                                        <div>
-                                                                            <div className="font-weight-medium">
-                                                                                {document.title || `Документ #${document.id}`}
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                                <td>
-                                                                    <span className={getStatusBadgeClass(document.status)}>
-                                                                        <div className="d-flex align-items-center">
-                                                                            {getStatusIcon(document.status)}
-                                                                            <span className="ms-1">{getStatusText(document.status)}</span>
-                                                                        </div>
-                                                                    </span>
-                                                                </td>
-                                                                <td>
-                                                                    <span className="text-muted">
-                                                                        {document.pages_count || '—'}
-                                                                    </span>
-                                                                </td>
-                                                                <td>
-                                                                    <span className="text-muted">
-                                                                        {new Date(document.created_at).toLocaleDateString('ru-RU')}
-                                                                    </span>
-                                                                </td>
-                                                                <td>
-                                                                    <div className="dropdown">
-                                                                        <button
-                                                                            className="btn btn-outline-secondary btn-sm dropdown-toggle"
-                                                                            data-bs-toggle="dropdown"
-                                                                        >
-                                                                            Действия
-                                                                        </button>
-                                                                        <div className="dropdown-menu dropdown-menu-end">
-                                                                            <Link
-                                                                                className="dropdown-item"
-                                                                                href={`/documents/${document.id}`}
-                                                                            >
-                                                                                Просмотреть
-                                                                            </Link>
-                                                                            {document.status === 'completed' && (
-                                                                                <Link
-                                                                                    className="dropdown-item"
-                                                                                    href={`/documents/${document.id}/download`}
-                                                                                >
-                                                                                    Скачать
-                                                                                </Link>
-                                                                            )}
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="empty">
-                                                <div className="empty-img">
-                                                    <IconFile size={96} className="text-muted" />
-                                                </div>
-                                                <p className="empty-title">У вас пока нет документов</p>
-                                                <p className="empty-subtitle text-muted">
-                                                    Загрузите ваш первый договор для анализа и перевода на простой язык.
-                                                </p>
-                                                <div className="empty-action">
-                                                    <Link
-                                                        href="/documents/upload"
-                                                        className="btn btn-primary"
-                                                    >
-                                                        <IconPlus className="me-1" size={16} />
-                                                        Загрузить документ
-                                                    </Link>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
+                                {showProcessor ? (
+                                    <DocumentProcessor
+                                        selectedFile={selectedFile || undefined}
+                                        onDocumentComplete={handleDocumentComplete}
+                                        onStartNewUpload={handleStartNewUpload}
+                                        onCreditsUpdated={handleCreditsUpdated}
+                                    />
+                                ) : (
+                                    <FileUploadZone
+                                        onFileSelect={handleFileSelect}
+                                        acceptedTypes={['.pdf', '.docx', '.txt']}
+                                        maxSizeMB={50}
+                                    />
+                                )}
                             </div>
                         </div>
 

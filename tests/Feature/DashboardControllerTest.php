@@ -32,10 +32,9 @@ class DashboardControllerTest extends TestCase
                 fn (Assert $page) => $page
                     ->component('Dashboard')
                     ->has('stats')
+                    ->where('stats.credits_balance', 0)
                     ->where('stats.total_documents', 0)
                     ->where('stats.processed_today', 0)
-                    ->where('stats.success_rate', 0)
-                    ->where('stats.total_savings', 0)
                     ->where('recentDocuments', []),
             );
     }
@@ -68,9 +67,9 @@ class DashboardControllerTest extends TestCase
                 fn (Assert $page) => $page
                     ->component('Dashboard')
                     ->has('stats')
+                    ->where('stats.credits_balance', 250)
                     ->where('stats.total_documents', 4)
-                    ->where('stats.success_rate', 75) // 3 completed out of 4 total
-                    ->where('stats.total_savings', 6) // 3 completed * 2 hours each
+                    ->where('stats.processed_today', 0) // No documents created today
                     ->has('recentDocuments'),
             );
     }
@@ -137,14 +136,14 @@ class DashboardControllerTest extends TestCase
     }
 
     #[Test]
-    public function dashboardCalculatesSuccessRateCorrectly(): void
+    public function dashboardShowsCreditsBalanceCorrectly(): void
     {
         $user = User::factory()->create();
         $user->assignRole('customer');
 
-        UserCredit::factory()->create(['user_id' => $user->id]);
+        UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 150.75]);
 
-        // 8 completed, 2 failed = 80% success rate
+        // Create some documents
         DocumentProcessing::factory()->count(8)->create([
             'user_id' => $user->id,
             'status' => 'completed',
@@ -163,7 +162,8 @@ class DashboardControllerTest extends TestCase
             ->assertInertia(
                 fn (Assert $page) => $page
                     ->component('Dashboard')
-                    ->where('stats.success_rate', 80),
+                    ->where('stats.credits_balance', 150.75)
+                    ->where('stats.total_documents', 10),
             );
     }
 
@@ -173,7 +173,7 @@ class DashboardControllerTest extends TestCase
         $user = User::factory()->create();
         $user->assignRole('customer');
 
-        UserCredit::factory()->create(['user_id' => $user->id]);
+        UserCredit::factory()->create(['user_id' => $user->id, 'balance' => 100.0]);
 
         $this->actingAs($user);
 
@@ -183,9 +183,9 @@ class DashboardControllerTest extends TestCase
             ->assertInertia(
                 fn (Assert $page) => $page
                     ->component('Dashboard')
+                    ->where('stats.credits_balance', 100) // Default initial balance
                     ->where('stats.total_documents', 0)
-                    ->where('stats.success_rate', 0)
-                    ->where('stats.total_savings', 0)
+                    ->where('stats.processed_today', 0)
                     ->where('recentDocuments', []),
             );
     }
