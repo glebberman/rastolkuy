@@ -106,7 +106,7 @@ readonly class DocumentProcessingService
             'task_type' => $dto->taskType,
             'options' => $dto->options,
             'anchor_at_start' => $dto->anchorAtStart,
-            'status' => DocumentProcessing::STATUS_UPLOADED,
+            'status' => DocumentProcessing::STATUS_PENDING,
         ]);
 
         Log::info('Document uploaded', [
@@ -114,7 +114,7 @@ readonly class DocumentProcessingService
             'filename' => $originalName,
             'task_type' => $dto->taskType,
             'file_size' => $dto->file->getSize(),
-            'status' => DocumentProcessing::STATUS_UPLOADED,
+            'status' => DocumentProcessing::STATUS_PENDING,
         ]);
 
         return $documentProcessing;

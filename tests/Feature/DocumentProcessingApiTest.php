@@ -93,8 +93,8 @@ class DocumentProcessingApiTest extends TestCase
                     'filename' => 'test-document.pdf',
                     'task_type' => DocumentProcessing::TASK_TRANSLATION,
                     'anchor_at_start' => true,
-                    'status' => DocumentProcessing::STATUS_UPLOADED,
-                    'progress_percentage' => 10,
+                    'status' => DocumentProcessing::STATUS_PENDING,
+                    'progress_percentage' => 25,
                 ],
             ]);
 
@@ -103,7 +103,7 @@ class DocumentProcessingApiTest extends TestCase
             'original_filename' => 'test-document.pdf',
             'task_type' => DocumentProcessing::TASK_TRANSLATION,
             'anchor_at_start' => true,
-            'status' => DocumentProcessing::STATUS_UPLOADED,
+            'status' => DocumentProcessing::STATUS_PENDING,
         ]);
 
         // Verify file was stored

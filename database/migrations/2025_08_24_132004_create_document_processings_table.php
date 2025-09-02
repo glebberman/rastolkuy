@@ -19,7 +19,7 @@ return new class extends Migration {
             $table->string('task_type', 50)->comment('Тип задачи: translation, contradiction, ambiguity');
             $table->json('options')->nullable()->comment('Опции обработки (JSON)');
             $table->boolean('anchor_at_start')->default(false)->comment('Позиция якорей: true = начало, false = конец');
-            $table->enum('status', ['pending', 'processing', 'completed', 'failed'])->default('pending')->comment('Статус обработки');
+            $table->enum('status', ['pending', 'uploaded', 'estimated', 'processing', 'completed', 'failed'])->default('pending')->comment('Статус обработки');
             $table->longText('result')->nullable()->comment('Результат обработки');
             $table->json('error_details')->nullable()->comment('Детали ошибки (JSON)');
             $table->json('processing_metadata')->nullable()->comment('Метаданные обработки (JSON)');
