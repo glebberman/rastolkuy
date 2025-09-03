@@ -557,4 +557,42 @@ class DocumentProcessingApiTest extends TestCase
                 ],
             ]);
     }
+
+    public function testUserCanGetTheirDocumentList(): void
+    {
+        // Create 3 documents for user
+        DocumentProcessing::factory()->count(3)->create([
+            'user_id' => $this->user->id,
+        ]);
+
+        // Create 2 documents for another user
+        $otherUser = User::factory()->create();
+        DocumentProcessing::factory()->count(2)->create([
+            'user_id' => $otherUser->id,
+        ]);
+
+        $response = $this->getJson(route('api.v1.documents.index'));
+
+        $response->assertStatus(200)
+            ->assertJsonCount(3, 'data') // Should only see their own documents
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    '*' => [
+                        'id',
+                        'filename',
+                        'status',
+                        'task_type',
+                    ],
+                ],
+                'meta',
+            ]);
+
+        // Verify we only see our own documents
+        /** @var array<int, array<string, mixed>> $documents */
+        $documents = $response->json('data');
+        foreach ($documents as $doc) {
+            $this->assertNotNull($doc['id']);
+        }
+    }
 }

@@ -358,6 +358,21 @@ class DocumentProcessingController extends Controller
     }
 
     /**
+     * Получить список документов текущего пользователя.
+     */
+    public function userIndex(Request $request): JsonResponse|JsonResource
+    {
+        /** @var \App\Models\User $user */
+        $user = $request->user();
+
+        $documents = $user->documentProcessings()
+            ->latest('created_at')
+            ->paginate(10);
+
+        return new DocumentListResource($documents);
+    }
+
+    /**
      * Получить статистику по обработкам
      */
     public function stats(): JsonResponse|JsonResource
