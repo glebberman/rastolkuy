@@ -49,6 +49,15 @@ class DocumentProcessingResource extends JsonResource
                     return is_array($processing->processing_metadata) ? $processing->processing_metadata['estimation'] : null;
                 },
             ),
+            'structure_analysis' => $this->when(
+                ($processing->isEstimated() || $processing->isPending() || $processing->isProcessing() || $processing->isCompleted())
+                && is_array($processing->processing_metadata)
+                && isset($processing->processing_metadata['structure_analysis'])
+                && is_array($processing->processing_metadata['structure_analysis']),
+                function () use ($processing) {
+                    return is_array($processing->processing_metadata) ? $processing->processing_metadata['structure_analysis'] : null;
+                },
+            ),
             'metadata' => $this->when($processing->processing_metadata !== null, $processing->processing_metadata),
             'timestamps' => [
                 'created_at' => $processing->created_at?->toISOString(),

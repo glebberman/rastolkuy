@@ -40,6 +40,9 @@ class DocumentProcessingApiTest extends TestCase
         $costCalculatorMock->method('getPricingInfo')->willReturn(['model' => 'test']);
         $this->app->instance(CostCalculator::class, $costCalculatorMock);
 
+        // Create simplified mocks for new dependencies
+        $this->mockStructureAnalysisServices();
+
         // Seed permissions first
         $this->artisan('db:seed', ['--class' => 'RoleAndPermissionSeeder', '--force' => true]);
 
@@ -161,6 +164,14 @@ class DocumentProcessingApiTest extends TestCase
                         'model_selected',
                         'has_sufficient_balance',
                         'user_balance',
+                        'sections_count',
+                        'section_multiplier',
+                    ],
+                    'structure_analysis' => [
+                        'sections_count',
+                        'average_confidence',
+                        'analysis_duration_ms',
+                        'sections',
                     ],
                 ],
             ])
@@ -591,8 +602,38 @@ class DocumentProcessingApiTest extends TestCase
         // Verify we only see our own documents
         /** @var array<int, array<string, mixed>> $documents */
         $documents = $response->json('data');
+
         foreach ($documents as $doc) {
             $this->assertNotNull($doc['id']);
         }
+    }
+
+    private function mockStructureAnalysisServices(): void
+    {
+        // Create mock for SectionDetectorInterface
+        $sectionDetectorMock = $this->createMock(\App\Services\Structure\Contracts\SectionDetectorInterface::class);
+        $sectionDetectorMock->method('detectSections')->willReturn([]);
+        $this->app->instance(\App\Services\Structure\Contracts\SectionDetectorInterface::class, $sectionDetectorMock);
+
+        // Create mock for AnchorGeneratorInterface  
+        $anchorGeneratorMock = $this->createMock(\App\Services\Structure\Contracts\AnchorGeneratorInterface::class);
+        $anchorGeneratorMock->method('generate')->willReturn('<!-- SECTION_ANCHOR_test_123 -->');
+        $anchorGeneratorMock->method('resetUsedAnchors');
+        $this->app->instance(\App\Services\Structure\Contracts\AnchorGeneratorInterface::class, $anchorGeneratorMock);
+
+        // Mock ExtractorManager
+        $extractorManagerMock = $this->createMock(\App\Services\Parser\Extractors\ExtractorManager::class);
+        $extractedDocumentMock = new \App\Services\Parser\Extractors\DTOs\ExtractedDocument(
+            originalPath: '/test/path.pdf',
+            mimeType: 'application/pdf',
+            elements: [],
+            metadata: [],
+            totalPages: 1,
+            extractionTime: 0.1,
+            metrics: [],
+            errors: null
+        );
+        $extractorManagerMock->method('extract')->willReturn($extractedDocumentMock);
+        $this->app->instance(\App\Services\Parser\Extractors\ExtractorManager::class, $extractorManagerMock);
     }
 }

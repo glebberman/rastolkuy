@@ -11,6 +11,8 @@ use App\Jobs\ProcessDocumentJob;
 use App\Models\DocumentProcessing;
 use App\Models\User;
 use App\Services\LLM\CostCalculator;
+use App\Services\Parser\Extractors\ExtractorManager;
+use App\Services\Structure\StructureAnalyzer;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -24,6 +26,8 @@ readonly class DocumentProcessingService
     public function __construct(
         private CostCalculator $costCalculator,
         private CreditService $creditService,
+        private ExtractorManager $extractorManager,
+        private StructureAnalyzer $structureAnalyzer,
     ) {
     }
 
@@ -129,8 +133,43 @@ readonly class DocumentProcessingService
             throw new InvalidArgumentException('Document must be in uploaded status for estimation');
         }
 
+        Log::info('Starting document structure analysis and cost estimation', [
+            'uuid' => $documentProcessing->uuid,
+            'file_path' => $documentProcessing->file_path,
+            'file_size' => $documentProcessing->file_size,
+        ]);
+
+        // Парсинг документа
+        $extractedDocument = $this->extractorManager->extract(
+            Storage::disk('local')->path($documentProcessing->file_path),
+        );
+
+        // Анализ структуры и генерация якорей
+        $structureResult = $this->structureAnalyzer->analyze($extractedDocument);
+
+        // Сохраняем данные структурного анализа
+        $structuralData = [
+            'sections_count' => count($structureResult->sections),
+            'average_confidence' => $structureResult->averageConfidence,
+            'analysis_duration_ms' => (int) ($structureResult->analysisTime * 1000),
+            'sections' => array_map(fn ($section) => [
+                'id' => $section->id,
+                'title' => $section->title,
+                'anchor' => $section->anchor,
+                'level' => $section->level,
+                'confidence' => $section->confidence,
+                'start_position' => $section->startPosition,
+                'end_position' => $section->endPosition,
+            ], $structureResult->sections),
+        ];
+
+        // Более точная оценка стоимости на основе структуры
         $model = $dto->model ?? $this->getDefaultModel();
-        $estimation = $this->estimateProcessingCost($documentProcessing->file_size, $model);
+        $estimation = $this->estimateProcessingCostWithStructure(
+            $documentProcessing->file_size,
+            count($structureResult->sections),
+            $model,
+        );
 
         // Конвертируем USD в кредиты
         $creditsNeeded = $this->creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
@@ -148,11 +187,20 @@ readonly class DocumentProcessingService
             'user_balance' => $this->creditService->getBalance($user),
         ]);
 
-        // Отмечаем как оцененный
-        $documentProcessing->markAsEstimated($estimationData);
+        // Сохраняем все данные в метаданных
+        $documentProcessing->update([
+            'status' => DocumentProcessing::STATUS_ESTIMATED,
+            'processing_metadata' => array_merge($documentProcessing->processing_metadata ?? [], [
+                'estimated_at' => now()->toISOString(),
+                'estimation' => $estimationData,
+                'structure_analysis' => $structuralData,
+            ]),
+        ]);
 
-        Log::info('Document cost estimated', [
+        Log::info('Document structure analyzed and cost estimated', [
             'uuid' => $documentProcessing->uuid,
+            'sections_found' => count($structureResult->sections),
+            'average_confidence' => $structureResult->averageConfidence,
             'estimated_cost_usd' => $estimation['estimated_cost_usd'],
             'credits_needed' => $creditsNeeded,
             'model' => $model,
@@ -364,6 +412,32 @@ readonly class DocumentProcessingService
             'estimated_cost_usd' => $estimatedCost,
             'model_used' => $model ?? $this->getDefaultModel(),
             'pricing_info' => $this->costCalculator->getPricingInfo($model ?? $this->getDefaultModel()),
+        ];
+    }
+
+    /**
+     * Получить более точную оценку стоимости с учетом структуры документа.
+     */
+    public function estimateProcessingCostWithStructure(int $fileSizeBytes, int $sectionsCount, ?string $model = null): array
+    {
+        $estimatedInputTokens = $this->costCalculator->estimateTokensFromFileSize($fileSizeBytes);
+
+        // Коррекция на основе количества секций
+        // Больше секций = больше контекста для LLM = больше output токенов
+        $sectionMultiplier = max(1.0, 1.0 + ($sectionsCount * 0.1)); // +10% за каждую секцию
+        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5 * $sectionMultiplier);
+
+        $estimatedCost = $this->costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
+
+        return [
+            'estimated_input_tokens' => $estimatedInputTokens,
+            'estimated_output_tokens' => $estimatedOutputTokens,
+            'estimated_total_tokens' => $estimatedInputTokens + $estimatedOutputTokens,
+            'estimated_cost_usd' => $estimatedCost,
+            'model_used' => $model ?? $this->getDefaultModel(),
+            'pricing_info' => $this->costCalculator->getPricingInfo($model ?? $this->getDefaultModel()),
+            'sections_count' => $sectionsCount,
+            'section_multiplier' => $sectionMultiplier,
         ];
     }
 
