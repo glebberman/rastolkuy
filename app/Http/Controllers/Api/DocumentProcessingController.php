@@ -24,6 +24,7 @@ use App\Http\Resources\DocumentStatsResource;
 use App\Http\Resources\DocumentStatusResource;
 use App\Http\Resources\DocumentStoredResource;
 use App\Http\Resources\DocumentUploadedResource;
+use App\Models\User;
 use App\Services\AuditService;
 use App\Services\DocumentProcessingService;
 use Exception;
@@ -53,7 +54,7 @@ class DocumentProcessingController extends Controller
     {
         $this->authorize('create', \App\Models\DocumentProcessing::class);
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         try {
@@ -112,7 +113,7 @@ class DocumentProcessingController extends Controller
             $dto = EstimateDocumentDto::fromRequest($request);
             $documentProcessing = $this->documentProcessingService->estimateDocumentCost($documentProcessing, $dto);
 
-            /** @var \App\Models\User $user */
+            /** @var User $user */
             $user = $request->user();
             $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'estimate');
 
@@ -158,7 +159,7 @@ class DocumentProcessingController extends Controller
         try {
             $documentProcessing = $this->documentProcessingService->processEstimatedDocument($documentProcessing);
 
-            /** @var \App\Models\User $user */
+            /** @var User $user */
             $user = $request->user();
             $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'process_start');
 
@@ -190,7 +191,7 @@ class DocumentProcessingController extends Controller
     {
         $this->authorize('create', \App\Models\DocumentProcessing::class);
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = $request->user();
 
         try {
@@ -244,7 +245,7 @@ class DocumentProcessingController extends Controller
 
         $this->authorize('view', $documentProcessing);
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = request()->user();
         $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'view');
 
@@ -355,6 +356,21 @@ class DocumentProcessingController extends Controller
         return response()->json([
             'message' => 'Запись об обработке документа удалена',
         ]);
+    }
+
+    /**
+     * Получить список документов текущего пользователя.
+     */
+    public function userIndex(Request $request): JsonResponse|JsonResource
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        $documents = $user->documentProcessings()
+            ->latest('created_at')
+            ->paginate(10);
+
+        return new DocumentListResource($documents);
     }
 
     /**

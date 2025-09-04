@@ -20,11 +20,10 @@ class CreditStatisticsRequest extends FormRequest
     /**
      * Get the validation rules that apply to the request.
      *
-     * @return array<string, array|ValidationRule|string>
+     * @return array<string, array|string|ValidationRule>
      */
     public function rules(): array
     {
         return [];
     }
-
 }

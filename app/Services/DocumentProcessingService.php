@@ -58,7 +58,7 @@ readonly class DocumentProcessingService
             'task_type' => $request->validated('task_type'),
             'options' => $request->validated('options', []),
             'anchor_at_start' => $request->validated('anchor_at_start', false),
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
         ]);
 
         // Запускаем асинхронную обработку

@@ -28,15 +28,15 @@ return [
     // Development mode settings
     'dev_mode' => [
         'enabled' => env('APP_ENV') === 'local',
-        'interval' => env('POLLING_DEV_INTERVAL', 5), // Faster polling in dev
+        'interval' => env('POLLING_DEV_INTERVAL', 5), // 5 seconds for dev as per RAS-17
         'debug_logging' => env('POLLING_DEBUG_LOG', false),
     ],
 
     // Document processing specific settings
     'document_processing' => [
-        'interval' => env('POLLING_DOCUMENT_INTERVAL', 10),
+        'interval' => env('POLLING_DOCUMENT_INTERVAL', 5), // 5 seconds as per RAS-17
         'max_wait_time' => env('POLLING_DOCUMENT_MAX_WAIT', 600), // 10 minutes
-        'statuses_to_poll' => ['pending', 'processing', 'estimated'],
+        'statuses_to_poll' => ['pending', 'processing', 'estimated', 'uploaded'],
     ],
 
     // Cache settings for polling data

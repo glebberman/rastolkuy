@@ -183,6 +183,11 @@ Route::delete('v1/documents/{uuid}', [DocumentProcessingController::class, 'dest
     ->middleware(['auth:sanctum', 'permission:documents.delete'])
     ->name('api.v1.documents.destroy');
 
+// Список документов пользователя
+Route::get('v1/documents', [DocumentProcessingController::class, 'userIndex'])
+    ->middleware(['auth:sanctum', 'permission:documents.view'])
+    ->name('api.v1.documents.index');
+
 // -----------------------------------------------------------------------------
 // АДМИНИСТРАТИВНЫЕ ФУНКЦИИ (только для администраторов)
 // -----------------------------------------------------------------------------

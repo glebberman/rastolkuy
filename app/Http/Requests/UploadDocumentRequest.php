@@ -123,6 +123,17 @@ class UploadDocumentRequest extends FormRequest
         // Устанавливаем значения по умолчанию
         if (!$this->has('anchor_at_start')) {
             $this->merge(['anchor_at_start' => false]);
+        } else {
+            // Приводим строковые boolean значения к настоящим boolean
+            $value = $this->input('anchor_at_start');
+
+            if (is_string($value)) {
+                $boolValue = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+
+                if ($boolValue !== null) {
+                    $this->merge(['anchor_at_start' => $boolValue]);
+                }
+            }
         }
 
         if (!$this->has('options')) {

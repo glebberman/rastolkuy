@@ -181,7 +181,7 @@ class DocumentProcessingApiTest extends TestCase
     {
         $document = DocumentProcessing::factory()->create([
             'user_id' => $this->user->id,
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_PENDING, // Документ в неправильном статусе
         ]);
 
         $response = $this->postJson(route('api.v1.documents.estimate', $document->uuid));
@@ -442,13 +442,45 @@ class DocumentProcessingApiTest extends TestCase
             ])
             ->assertJson([
                 'data' => [
-                    'status' => DocumentProcessing::STATUS_PENDING,
+                    'status' => DocumentProcessing::STATUS_UPLOADED,
                 ],
             ]);
 
         $this->assertDatabaseHas('document_processings', [
             'user_id' => $this->user->id,
-            'status' => DocumentProcessing::STATUS_PENDING,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
+        ]);
+    }
+
+    public function testCanUploadDocumentWithFormDataStringBooleans(): void
+    {
+        $file = UploadedFile::fake()->create('test-document.pdf', 100);
+
+        $response = $this->post(route('api.v1.documents.upload'), [
+            'file' => $file,
+            'task_type' => DocumentProcessing::TASK_TRANSLATION,
+            'anchor_at_start' => 'false', // Строковое boolean значение как в FormData
+        ], [
+            'Accept' => 'application/json',
+        ]);
+
+        $response->assertStatus(201)
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    'id',
+                    'anchor_at_start',
+                ],
+            ])
+            ->assertJson([
+                'data' => [
+                    'anchor_at_start' => false,
+                ],
+            ]);
+
+        $this->assertDatabaseHas('document_processings', [
+            'user_id' => $this->user->id,
+            'anchor_at_start' => false,
         ]);
     }
 
@@ -524,5 +556,43 @@ class DocumentProcessingApiTest extends TestCase
                     ],
                 ],
             ]);
+    }
+
+    public function testUserCanGetTheirDocumentList(): void
+    {
+        // Create 3 documents for user
+        DocumentProcessing::factory()->count(3)->create([
+            'user_id' => $this->user->id,
+        ]);
+
+        // Create 2 documents for another user
+        $otherUser = User::factory()->create();
+        DocumentProcessing::factory()->count(2)->create([
+            'user_id' => $otherUser->id,
+        ]);
+
+        $response = $this->getJson(route('api.v1.documents.index'));
+
+        $response->assertStatus(200)
+            ->assertJsonCount(3, 'data') // Should only see their own documents
+            ->assertJsonStructure([
+                'message',
+                'data' => [
+                    '*' => [
+                        'id',
+                        'filename',
+                        'status',
+                        'task_type',
+                    ],
+                ],
+                'meta',
+            ]);
+
+        // Verify we only see our own documents
+        /** @var array<int, array<string, mixed>> $documents */
+        $documents = $response->json('data');
+        foreach ($documents as $doc) {
+            $this->assertNotNull($doc['id']);
+        }
     }
 }
