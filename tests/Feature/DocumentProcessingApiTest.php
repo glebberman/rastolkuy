@@ -188,6 +188,30 @@ class DocumentProcessingApiTest extends TestCase
         ]);
     }
 
+    public function testCanEstimateDocumentCostWithFileSizeFallback(): void
+    {
+        // Temporarily set max file size to very small value to trigger fallback
+        config(['document.structure_analysis.max_file_size_mb' => 0.001]);
+
+        // Create document with file size larger than the limit (1024 bytes > 0.001 MB)
+        $document = DocumentProcessing::factory()->create([
+            'user_id' => $this->user->id,
+            'status' => DocumentProcessing::STATUS_UPLOADED,
+            'file_size' => 1024, // 1KB which is > 0.001MB
+        ]);
+
+        $response = $this->postJson(route('api.v1.documents.estimate', $document->uuid));
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.status', DocumentProcessing::STATUS_ESTIMATED)
+            ->assertJsonPath('data.structure_analysis.analysis_failed', true)
+            ->assertJsonPath('data.structure_analysis.fallback_used', true)
+            ->assertJsonPath('data.structure_analysis.sections_count', 0);
+
+        // Reset config
+        config(['document.structure_analysis.max_file_size_mb' => 50]);
+    }
+
     public function testEstimateRequiresUploadedStatus(): void
     {
         $document = DocumentProcessing::factory()->create([
@@ -615,7 +639,7 @@ class DocumentProcessingApiTest extends TestCase
         $sectionDetectorMock->method('detectSections')->willReturn([]);
         $this->app->instance(\App\Services\Structure\Contracts\SectionDetectorInterface::class, $sectionDetectorMock);
 
-        // Create mock for AnchorGeneratorInterface  
+        // Create mock for AnchorGeneratorInterface
         $anchorGeneratorMock = $this->createMock(\App\Services\Structure\Contracts\AnchorGeneratorInterface::class);
         $anchorGeneratorMock->method('generate')->willReturn('<!-- SECTION_ANCHOR_test_123 -->');
         $anchorGeneratorMock->method('resetUsedAnchors');
@@ -631,7 +655,7 @@ class DocumentProcessingApiTest extends TestCase
             totalPages: 1,
             extractionTime: 0.1,
             metrics: [],
-            errors: null
+            errors: null,
         );
         $extractorManagerMock->method('extract')->willReturn($extractedDocumentMock);
         $this->app->instance(\App\Services\Parser\Extractors\ExtractorManager::class, $extractorManagerMock);

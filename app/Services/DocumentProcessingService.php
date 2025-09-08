@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\LLM\CostCalculator;
 use App\Services\Parser\Extractors\ExtractorManager;
 use App\Services\Structure\StructureAnalyzer;
+use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -139,37 +140,88 @@ readonly class DocumentProcessingService
             'file_size' => $documentProcessing->file_size,
         ]);
 
-        // Парсинг документа
-        $extractedDocument = $this->extractorManager->extract(
-            Storage::disk('local')->path($documentProcessing->file_path),
-        );
+        // Проверяем размер файла для анализа структуры
+        $maxFileSizeMb = config('document.structure_analysis.max_file_size_mb', 50);
+        assert(is_numeric($maxFileSizeMb));
+        $maxFileSizeMb = (int) $maxFileSizeMb;
+        $fileSizeMb = $documentProcessing->file_size / (1024 * 1024);
+        $skipStructureAnalysis = $fileSizeMb > $maxFileSizeMb;
 
-        // Анализ структуры и генерация якорей
-        $structureResult = $this->structureAnalyzer->analyze($extractedDocument);
+        if ($skipStructureAnalysis) {
+            Log::info('Skipping structure analysis due to file size limit', [
+                'uuid' => $documentProcessing->uuid,
+                'file_size_mb' => round($fileSizeMb, 2),
+                'max_size_mb' => $maxFileSizeMb,
+            ]);
+        }
 
-        // Сохраняем данные структурного анализа
-        $structuralData = [
-            'sections_count' => count($structureResult->sections),
-            'average_confidence' => $structureResult->averageConfidence,
-            'analysis_duration_ms' => (int) ($structureResult->analysisTime * 1000),
-            'sections' => array_map(fn ($section) => [
-                'id' => $section->id,
-                'title' => $section->title,
-                'anchor' => $section->anchor,
-                'level' => $section->level,
-                'confidence' => $section->confidence,
-                'start_position' => $section->startPosition,
-                'end_position' => $section->endPosition,
-            ], $structureResult->sections),
-        ];
-
-        // Более точная оценка стоимости на основе структуры
+        // Пытаемся выполнить анализ структуры с обработкой ошибок
         $model = $dto->model ?? $this->getDefaultModel();
-        $estimation = $this->estimateProcessingCostWithStructure(
-            $documentProcessing->file_size,
-            count($structureResult->sections),
-            $model,
-        );
+
+        try {
+            if ($skipStructureAnalysis) {
+                throw new RuntimeException('File too large for structure analysis');
+            }
+            // Парсинг документа
+            $extractedDocument = $this->extractorManager->extract(
+                Storage::disk('local')->path($documentProcessing->file_path),
+            );
+
+            // Анализ структуры и генерация якорей
+            $structureResult = $this->structureAnalyzer->analyze($extractedDocument);
+
+            // Сохраняем данные структурного анализа
+            $structuralData = [
+                'sections_count' => count($structureResult->sections),
+                'average_confidence' => $structureResult->averageConfidence,
+                'analysis_duration_ms' => (int) ($structureResult->analysisTime * 1000),
+                'sections' => array_map(fn ($section) => [
+                    'id' => $section->id,
+                    'title' => $section->title,
+                    'anchor' => $section->anchor,
+                    'level' => $section->level,
+                    'confidence' => $section->confidence,
+                    'start_position' => $section->startPosition,
+                    'end_position' => $section->endPosition,
+                ], $structureResult->sections),
+            ];
+
+            // Более точная оценка стоимости на основе структуры
+            $estimation = $this->estimateProcessingCostWithStructure(
+                $documentProcessing->file_size,
+                count($structureResult->sections),
+                $model,
+            );
+
+            Log::info('Document structure analysis completed successfully', [
+                'uuid' => $documentProcessing->uuid,
+                'sections_found' => count($structureResult->sections),
+                'average_confidence' => $structureResult->averageConfidence,
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Document structure analysis failed, falling back to simple estimation', [
+                'uuid' => $documentProcessing->uuid,
+                'error' => $e->getMessage(),
+                'file_path' => $documentProcessing->file_path,
+            ]);
+
+            // Fallback к простой оценке без структуры
+            $structuralData = [
+                'sections_count' => 0,
+                'average_confidence' => 0.0,
+                'analysis_duration_ms' => 0,
+                'sections' => [],
+                'analysis_failed' => true,
+                'error_message' => 'Structure analysis failed: ' . $e->getMessage(),
+                'fallback_used' => true,
+            ];
+
+            // Простая оценка стоимости без учета структуры
+            $estimation = $this->estimateProcessingCost(
+                $documentProcessing->file_size,
+                $model,
+            );
+        }
 
         // Конвертируем USD в кредиты
         $creditsNeeded = $this->creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
@@ -188,22 +240,17 @@ readonly class DocumentProcessingService
         ]);
 
         // Сохраняем все данные в метаданных
-        $documentProcessing->update([
-            'status' => DocumentProcessing::STATUS_ESTIMATED,
-            'processing_metadata' => array_merge($documentProcessing->processing_metadata ?? [], [
-                'estimated_at' => now()->toISOString(),
-                'estimation' => $estimationData,
-                'structure_analysis' => $structuralData,
-            ]),
-        ]);
+        $documentProcessing->markAsEstimatedWithStructure($estimationData, $structuralData);
 
-        Log::info('Document structure analyzed and cost estimated', [
+        Log::info('Document cost estimation completed', [
             'uuid' => $documentProcessing->uuid,
-            'sections_found' => count($structureResult->sections),
-            'average_confidence' => $structureResult->averageConfidence,
+            'sections_found' => $structuralData['sections_count'],
+            'average_confidence' => $structuralData['average_confidence'],
             'estimated_cost_usd' => $estimation['estimated_cost_usd'],
             'credits_needed' => $creditsNeeded,
             'model' => $model,
+            'analysis_failed' => $structuralData['analysis_failed'] ?? false,
+            'fallback_used' => $structuralData['fallback_used'] ?? false,
         ]);
 
         $refreshed = $documentProcessing->fresh();
@@ -422,9 +469,19 @@ readonly class DocumentProcessingService
     {
         $estimatedInputTokens = $this->costCalculator->estimateTokensFromFileSize($fileSizeBytes);
 
-        // Коррекция на основе количества секций
+        // Коррекция на основе количества секций из конфигурации
+        $sectionCostMultiplier = config('document.cost_estimation.section_cost_multiplier', 0.1);
+        assert(is_numeric($sectionCostMultiplier));
+        $sectionCostMultiplier = (float) $sectionCostMultiplier;
+
+        $maxSectionMultiplier = config('document.cost_estimation.max_section_multiplier', 3.0);
+        assert(is_numeric($maxSectionMultiplier));
+        $maxSectionMultiplier = (float) $maxSectionMultiplier;
+
         // Больше секций = больше контекста для LLM = больше output токенов
-        $sectionMultiplier = max(1.0, 1.0 + ($sectionsCount * 0.1)); // +10% за каждую секцию
+        $sectionMultiplier = max(1.0, 1.0 + ($sectionsCount * $sectionCostMultiplier));
+        $sectionMultiplier = min($sectionMultiplier, $maxSectionMultiplier); // Ограничиваем максимум
+
         $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5 * $sectionMultiplier);
 
         $estimatedCost = $this->costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
