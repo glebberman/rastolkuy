@@ -15,6 +15,7 @@ use App\Services\Parser\Extractors\Support\MetricsCollector;
 use Exception;
 use InvalidArgumentException;
 use RuntimeException;
+use Smalot\PdfParser\Parser;
 
 readonly class PdfExtractor implements ExtractorInterface
 {
@@ -57,7 +58,7 @@ readonly class PdfExtractor implements ExtractorInterface
             metadata: [
                 'file_size' => filesize($filePath),
                 'character_count' => mb_strlen($textContent),
-                'extraction_method' => 'pdf_text',
+                'extraction_method' => 'smalot_pdfparser',
             ],
             totalPages: $this->estimatePageCount($textContent),
             extractionTime: $extractionTime,
@@ -118,11 +119,11 @@ readonly class PdfExtractor implements ExtractorInterface
         $fileSize = filesize($filePath);
 
         if ($fileSize === false) {
-            return 10;
+            return 5;
         }
 
-        // PDF processing is slower: ~100KB per second
-        return max(10, (int) ceil($fileSize / (100 * 1024)));
+        // PDF processing with smalot/pdfparser is faster: ~500KB per second
+        return max(5, (int) ceil($fileSize / (500 * 1024)));
     }
 
     private function isValidPdfFile(string $filePath): bool
@@ -142,20 +143,29 @@ readonly class PdfExtractor implements ExtractorInterface
 
     private function extractTextFromPdf(string $filePath): string
     {
-        // Try different methods to extract text from PDF
-        
-        // Method 1: Try pdftotext command if available
-        if ($this->commandExists('pdftotext')) {
-            $text = $this->extractWithPdfToText($filePath);
-            if ($text !== '') {
+        try {
+            // Use smalot/pdfparser library for PDF text extraction
+            $parser = new Parser();
+            $pdf = $parser->parseFile($filePath);
+            
+            $text = $pdf->getText();
+            
+            // Clean up the extracted text
+            $text = $this->cleanExtractedText($text);
+            
+            if (!empty(trim($text))) {
                 return $text;
             }
+            
+        } catch (Exception $e) {
+            // Log error but continue with fallback
+            error_log("PDF parsing failed: " . $e->getMessage());
         }
 
-        // Method 2: Try simple extraction for text-based PDFs
+        // Fallback: try simple extraction method as backup
         $text = $this->extractWithSimpleMethod($filePath);
         if ($text !== '') {
-            return $text;
+            return $this->cleanExtractedText($text);
         }
 
         // If no text could be extracted, provide a fallback message
@@ -164,21 +174,16 @@ readonly class PdfExtractor implements ExtractorInterface
                "Размер файла: " . $this->formatFileSize(filesize($filePath));
     }
 
-    private function commandExists(string $command): bool
+    private function cleanExtractedText(string $text): string
     {
-        $result = shell_exec("which $command 2>/dev/null");
-
-        return !empty($result);
-    }
-
-    private function extractWithPdfToText(string $filePath): string
-    {
-        $escapedPath = escapeshellarg($filePath);
-        $command = "pdftotext -enc UTF-8 -nopgbrk $escapedPath - 2>/dev/null";
+        // Remove excessive whitespace and normalize line breaks
+        $text = preg_replace('/\s+/', ' ', $text) ?: $text;
+        $text = preg_replace('/\s*\n\s*/', "\n", $text) ?: $text;
         
-        $text = shell_exec($command);
-
-        return is_string($text) ? trim($text) : '';
+        // Convert back to proper paragraph structure
+        $text = preg_replace('/(?<=[.!?])\s+(?=[A-ZА-Я])/u', "\n\n", $text) ?: $text;
+        
+        return trim($text);
     }
 
     private function extractWithSimpleMethod(string $filePath): string
