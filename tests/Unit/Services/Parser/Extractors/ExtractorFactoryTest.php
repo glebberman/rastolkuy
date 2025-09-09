@@ -55,7 +55,7 @@ class ExtractorFactoryTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
         $this->expectExceptionMessage('No extractor found for MIME type');
 
-        $this->factory->create('application/pdf');
+        $this->factory->create('application/unsupported');
     }
 
     public function testThrowsExceptionForNonExistingFile(): void
@@ -74,13 +74,16 @@ class ExtractorFactoryTest extends TestCase
         $this->assertContains('text/plain', $mimeTypes);
         $this->assertContains('text/txt', $mimeTypes);
         $this->assertContains('application/txt', $mimeTypes);
+        $this->assertContains('application/pdf', $mimeTypes); // Now supported
+        $this->assertContains('application/vnd.openxmlformats-officedocument.wordprocessingml.document', $mimeTypes); // DOCX support
     }
 
     public function testSupportsMimeType(): void
     {
         $this->assertTrue($this->factory->supports('text/plain'));
         $this->assertTrue($this->factory->supports('text/txt'));
-        $this->assertFalse($this->factory->supports('application/pdf'));
+        $this->assertTrue($this->factory->supports('application/pdf')); // Now supported
+        $this->assertFalse($this->factory->supports('application/unsupported'));
     }
 
     public function testRegistersNewExtractor(): void

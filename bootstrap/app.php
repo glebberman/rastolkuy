@@ -7,6 +7,7 @@ use App\Http\Middleware\RateLimitMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use App\Providers\AuthServiceProvider;
 use App\Providers\EventServiceProvider;
+use App\Providers\LLMServiceProvider;
 use App\Providers\StructureAnalysisServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         AuthServiceProvider::class,
         EventServiceProvider::class,
+        LLMServiceProvider::class,
         StructureAnalysisServiceProvider::class,
     ])
     ->withMiddleware(function (Middleware $middleware) {

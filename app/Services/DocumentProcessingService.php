@@ -12,6 +12,7 @@ use App\Models\DocumentProcessing;
 use App\Models\User;
 use App\Services\LLM\CostCalculator;
 use App\Services\Parser\Extractors\ExtractorManager;
+use App\Services\Structure\DTOs\DocumentSection;
 use App\Services\Structure\StructureAnalyzer;
 use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -24,6 +25,12 @@ use RuntimeException;
 
 readonly class DocumentProcessingService
 {
+    // Константы для лимитов и конфигурации
+    private const string STRUCTURE_ANALYSIS_KEY = 'structure_analysis';
+    private const string SECTIONS_KEY = 'sections';
+    private const int MAX_SECTIONS_COUNT = 1000;
+    private const int MAX_CONTENT_LENGTH = 10 * 1024 * 1024; // 10MB для разметки
+
     public function __construct(
         private CostCalculator $costCalculator,
         private CreditService $creditService,
@@ -260,6 +267,151 @@ readonly class DocumentProcessingService
         }
 
         return $refreshed;
+    }
+
+    /**
+     * Получить документ с разметкой якорями (без обработки LLM).
+     * 
+     * @param DocumentProcessing $documentProcessing Документ в статусе estimated/completed
+     * @return array{
+     *   original_content: string,
+     *   content_with_anchors: string,
+     *   sections_count: int,
+     *   anchors: array<array{id: string, title: string, anchor: string, level: int, confidence: float}>,
+     *   structure_analysis: ?array
+     * }
+     * @throws InvalidArgumentException При неверном статусе документа
+     * @throws RuntimeException При ошибке генерации разметки
+     */
+    public function getDocumentWithMarkup(DocumentProcessing $documentProcessing): array
+    {
+        $this->validateDocumentStatus($documentProcessing);
+        $this->validateDocumentSize($documentProcessing);
+
+        Log::info('Generating document markup', [
+            'uuid' => $documentProcessing->uuid,
+            'status' => $documentProcessing->status,
+        ]);
+
+        try {
+            $sections = $this->getOrAnalyzeSections($documentProcessing);
+            $originalContent = $this->extractContent($documentProcessing);
+            $contentWithAnchors = $this->addAnchorsToDocument($originalContent, $sections, $documentProcessing->anchor_at_start);
+            
+            return $this->buildMarkupResponse($originalContent, $contentWithAnchors, $sections);
+
+        } catch (Exception $e) {
+            Log::error('Failed to generate document markup', [
+                'uuid' => $documentProcessing->uuid,
+                'error' => $e->getMessage(),
+            ]);
+            
+            throw new RuntimeException('Failed to generate document markup: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Добавляет якоря к документу на основе секций.
+     * 
+     * Якоря размещаются в конце каждой секции, определяя границы логически:
+     * - В конце секции перед началом следующей секции
+     * - В конце документа для последней секции
+     * - В начале секции, если addAnchorAtStart = true
+     */
+    private function addAnchorsToDocument(string $content, array $sections, bool $addAnchorAtStart = false): string
+    {
+        if (empty($sections)) {
+            return $content;
+        }
+
+        // Сортируем секции по названиям (по порядку в документе)
+        usort($sections, function ($a, $b) {
+            if (!($a instanceof DocumentSection) ||
+                !($b instanceof DocumentSection)) {
+                return 0;
+            }
+            
+            // Извлекаем номера из заголовков (например, "1. SUBJECT" -> 1)
+            $aNumber = $this->extractSectionNumber($a->title);
+            $bNumber = $this->extractSectionNumber($b->title);
+            
+            return $aNumber <=> $bNumber;
+        });
+
+        $lines = explode("\n", $content);
+        $result = [];
+        
+        if ($addAnchorAtStart) {
+            // Якоря в начале секций
+            foreach ($lines as $line) {
+                $result[] = $line;
+                
+                // Проверяем, является ли эта строка заголовком секции
+                foreach ($sections as $section) {
+                    if (!($section instanceof DocumentSection)) {
+                        continue;
+                    }
+                    
+                    if (trim($line) === trim($section->title)) {
+                        $result[] = $section->anchor;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Якоря в конце секций (по умолчанию)
+            $sectionTitles = array_map(static fn($section) =>
+                ($section instanceof DocumentSection) ? trim($section->title) : '',
+                $sections
+            );
+            
+            $currentSectionIndex = -1;
+            
+            foreach ($lines as $lineIndex => $line) {
+                // Проверяем, начинается ли новая секция ПЕРЕД добавлением строки
+                $trimmedLine = trim($line);
+                $nextSectionIndex = array_search($trimmedLine, $sectionTitles, true);
+                
+                if ($nextSectionIndex !== false && $nextSectionIndex > $currentSectionIndex) {
+                    // Если мы нашли новую секцию и у нас уже была предыдущая,
+                    // добавляем якорь для предыдущей секции ПЕРЕД заголовком новой
+                    if ($currentSectionIndex >= 0) {
+                        $prevSection = $sections[$currentSectionIndex];
+                        if ($prevSection instanceof DocumentSection) {
+                            $result[] = '';
+                            $result[] = $prevSection->anchor;
+                            $result[] = '';
+                        }
+                    }
+                    $currentSectionIndex = $nextSectionIndex;
+                }
+                
+                $result[] = $line;
+            }
+            
+            // Добавляем якорь для последней секции в конец документа
+            if ($currentSectionIndex >= 0 && isset($sections[$currentSectionIndex])) {
+                $lastSection = $sections[$currentSectionIndex];
+                if ($lastSection instanceof DocumentSection) {
+                    $result[] = '';
+                    $result[] = $lastSection->anchor;
+                }
+            }
+        }
+
+        return implode("\n", $result);
+    }
+
+    /**
+     * Извлекает номер секции из заголовка.
+     */
+    private function extractSectionNumber(string $title): int
+    {
+        if (preg_match('/^(\d+)/', trim($title), $matches)) {
+            return (int) $matches[1];
+        }
+        
+        return 0;
     }
 
     /**
@@ -516,5 +668,146 @@ readonly class DocumentProcessingService
         if ($filePath && Storage::disk('local')->exists($filePath)) {
             Storage::disk('local')->delete($filePath);
         }
+    }
+
+    /**
+     * Проверяет статус документа для генерации разметки.
+     * 
+     * @throws InvalidArgumentException При неверном статусе
+     */
+    private function validateDocumentStatus(DocumentProcessing $documentProcessing): void
+    {
+        if (!$documentProcessing->isEstimated() && !$documentProcessing->isCompleted()) {
+            throw new InvalidArgumentException(
+                'Document must be in estimated or completed status for markup generation. Current status: ' . $documentProcessing->status
+            );
+        }
+    }
+
+    /**
+     * Проверяет размер документа для генерации разметки.
+     * 
+     * @throws InvalidArgumentException При превышении лимита размера
+     */
+    private function validateDocumentSize(DocumentProcessing $documentProcessing): void
+    {
+        $maxFileSizeMb = config('document.structure_analysis.max_file_size_mb', 50);
+        assert(is_numeric($maxFileSizeMb));
+        $maxFileSizeMb = (int) $maxFileSizeMb;
+        
+        $fileSizeMb = $documentProcessing->file_size / (1024 * 1024);
+        
+        if ($fileSizeMb > $maxFileSizeMb) {
+            throw new InvalidArgumentException(
+                "Document is too large for markup generation. Size: {$fileSizeMb}MB, Max: {$maxFileSizeMb}MB"
+            );
+        }
+    }
+
+    /**
+     * Получает секции документа из метаданных или выполняет новый анализ.
+     * 
+     * @return array<DocumentSection>
+     * @throws RuntimeException При ошибке анализа структуры
+     */
+    private function getOrAnalyzeSections(DocumentProcessing $documentProcessing): array
+    {
+        $metadata = $documentProcessing->processing_metadata;
+        
+        // Пытаемся получить секции из сохраненных метаданных
+        if (is_array($metadata) && 
+            isset($metadata[self::STRUCTURE_ANALYSIS_KEY]) && 
+            is_array($metadata[self::STRUCTURE_ANALYSIS_KEY]) &&
+            isset($metadata[self::STRUCTURE_ANALYSIS_KEY][self::SECTIONS_KEY]) &&
+            is_array($metadata[self::STRUCTURE_ANALYSIS_KEY][self::SECTIONS_KEY])) {
+            
+            $sectionsData = $metadata[self::STRUCTURE_ANALYSIS_KEY][self::SECTIONS_KEY];
+            $sections = [];
+            
+            foreach ($sectionsData as $sectionData) {
+                if (!is_array($sectionData)) {
+                    continue;
+                }
+                
+                $sections[] = new DocumentSection(
+                    id: $sectionData['id'] ?? '',
+                    title: $sectionData['title'] ?? '',
+                    content: '', // Content not stored in metadata
+                    level: $sectionData['level'] ?? 1,
+                    startPosition: $sectionData['start_position'] ?? 0,
+                    endPosition: $sectionData['end_position'] ?? 0,
+                    anchor: $sectionData['anchor'] ?? '',
+                    elements: [], // Elements not stored in metadata
+                    subsections: [],
+                    confidence: $sectionData['confidence'] ?? 0.0
+                );
+            }
+            
+            if (count($sections) > self::MAX_SECTIONS_COUNT) {
+                throw new InvalidArgumentException(
+                    "Too many sections in document: " . count($sections) . ". Max: " . self::MAX_SECTIONS_COUNT
+                );
+            }
+            
+            return $sections;
+        }
+        
+        // Если секций нет в метаданных, выполняем новый анализ
+        Log::info('Sections not found in metadata, performing new structure analysis', [
+            'uuid' => $documentProcessing->uuid,
+        ]);
+        
+        $extractedDocument = $this->extractorManager->extract(
+            Storage::disk('local')->path($documentProcessing->file_path)
+        );
+
+        return $this->structureAnalyzer->analyze($extractedDocument)->sections;
+    }
+
+    /**
+     * Извлекает оригинальный контент документа.
+     * 
+     * @throws RuntimeException|Exception При ошибке извлечения контента
+     */
+    private function extractContent(DocumentProcessing $documentProcessing): string
+    {
+        $extractedDocument = $this->extractorManager->extract(
+            Storage::disk('local')->path($documentProcessing->file_path)
+        );
+        
+        $content = $extractedDocument->getPlainText();
+        
+        if (strlen($content) > self::MAX_CONTENT_LENGTH) {
+            throw new InvalidArgumentException(
+                "Document content too large for markup: " . strlen($content) . " bytes. Max: " . self::MAX_CONTENT_LENGTH
+            );
+        }
+        
+        return $content;
+    }
+
+    /**
+     * Формирует ответ с разметкой документа.
+     * 
+     * @param array<DocumentSection> $sections
+     * @return array{original_content: string, content_with_anchors: string, sections_count: int, anchors: array, structure_analysis: ?array}
+     */
+    private function buildMarkupResponse(string $originalContent, string $contentWithAnchors, array $sections): array
+    {
+        $anchors = array_map(fn(DocumentSection $section) => [
+            'id' => $section->id,
+            'title' => $section->title,
+            'anchor' => $section->anchor,
+            'level' => $section->level,
+            'confidence' => $section->confidence,
+        ], $sections);
+        
+        return [
+            'original_content' => $originalContent,
+            'content_with_anchors' => $contentWithAnchors,
+            'sections_count' => count($sections),
+            'anchors' => $anchors,
+            'structure_analysis' => null, // Можно добавить дополнительную аналитику при необходимости
+        ];
     }
 }

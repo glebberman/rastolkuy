@@ -416,6 +416,57 @@ if (estimated.estimation.has_sufficient_balance) {
 }
 ```
 
+### Просмотр документа с разметкой якорями
+
+Новая функциональность позволяет просматривать документ с якорями **до** отправки в LLM:
+
+```typescript
+// Получение документа с якорями после estimation
+const markupResponse = await fetch(`/api/v1/documents/${document.id}/markup`, {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+const { data: markup } = await markupResponse.json();
+
+console.log('Секций найдено:', markup.sections_count);
+console.log('Оригинальный текст:', markup.original_content);
+console.log('Текст с якорями:', markup.content_with_anchors);
+console.log('Информация о якорях:', markup.anchors);
+```
+
+Пример ответа:
+```json
+{
+  "data": {
+    "document_id": "9e8c624e-559e-4392-8a6c-c991a0856b0c",
+    "status": "estimated",
+    "original_filename": "contract.txt",
+    "sections_count": 5,
+    "original_content": "1. ПРЕДМЕТ ДОГОВОРА\nНастоящий договор...",
+    "content_with_anchors": "1. ПРЕДМЕТ ДОГОВОРА\nНастоящий договор...\n\n<!-- SECTION_ANCHOR_... -->\n\n2. ПРАВА И ОБЯЗАННОСТИ СТОРОН\n...",
+    "anchors": [
+      {
+        "id": "section_68bf5b3d0ac850_89413922",
+        "title": "1. ПРЕДМЕТ ДОГОВОРА", 
+        "anchor": "<!-- SECTION_ANCHOR_section_68bf5b3d0ac850_89413922_1_predmet_dogovora -->",
+        "level": 3,
+        "confidence": 0.9
+      }
+    ],
+    "structure_analysis": {
+      "sections_count": 5,
+      "average_confidence": 0.9,
+      "analysis_duration_ms": 45
+    }
+  }
+}
+```
+
+**Особенности размещения якорей:**
+- Якоря размещаются в **конце каждой секции**
+- Якорь вставляется **перед заголовком следующей секции**
+- Якорь последней секции размещается в конце документа
+- Якоря окружены пустыми строками для читабельности
+
 ### Legacy совместимость
 
 Для обратной совместимости сохранен старый endpoint:

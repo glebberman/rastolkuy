@@ -246,7 +246,17 @@ public function deleteProcessing(DocumentProcessing $documentProcessing): void
 // Аналитика
 public function getStatistics(): array
 public function estimateProcessingCost(int $fileSizeBytes, ?string $model = null): array
+
+// Новая функциональность: разметка документов
+public function getDocumentWithMarkup(DocumentProcessing $doc): array
 ```
+
+**Новый метод `getDocumentWithMarkup()`**:
+- Создает документ с якорями без отправки в LLM
+- Использует сохраненные данные структурного анализа
+- Fallback на повторный анализ если данных нет
+- Поддерживает режимы `addAnchorAtStart`
+- Возвращает оригинал, разметку, якоря и метаданные
 
 ### 4. PromptManager - Оркестрация LLM взаимодействий
 
