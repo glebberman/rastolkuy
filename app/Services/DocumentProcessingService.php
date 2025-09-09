@@ -11,6 +11,10 @@ use App\Jobs\ProcessDocumentJob;
 use App\Models\DocumentProcessing;
 use App\Models\User;
 use App\Services\LLM\CostCalculator;
+use App\Services\Parser\Extractors\ExtractorManager;
+use App\Services\Structure\DTOs\DocumentSection;
+use App\Services\Structure\StructureAnalyzer;
+use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -21,9 +25,17 @@ use RuntimeException;
 
 readonly class DocumentProcessingService
 {
+    // Константы для лимитов и конфигурации
+    private const string STRUCTURE_ANALYSIS_KEY = 'structure_analysis';
+    private const string SECTIONS_KEY = 'sections';
+    private const int MAX_SECTIONS_COUNT = 1000;
+    private const int MAX_CONTENT_LENGTH = 10 * 1024 * 1024; // 10MB для разметки
+
     public function __construct(
         private CostCalculator $costCalculator,
         private CreditService $creditService,
+        private ExtractorManager $extractorManager,
+        private StructureAnalyzer $structureAnalyzer,
     ) {
     }
 
@@ -129,8 +141,94 @@ readonly class DocumentProcessingService
             throw new InvalidArgumentException('Document must be in uploaded status for estimation');
         }
 
+        Log::info('Starting document structure analysis and cost estimation', [
+            'uuid' => $documentProcessing->uuid,
+            'file_path' => $documentProcessing->file_path,
+            'file_size' => $documentProcessing->file_size,
+        ]);
+
+        // Проверяем размер файла для анализа структуры
+        $maxFileSizeMb = config('document.structure_analysis.max_file_size_mb', 50);
+        assert(is_numeric($maxFileSizeMb));
+        $maxFileSizeMb = (int) $maxFileSizeMb;
+        $fileSizeMb = $documentProcessing->file_size / (1024 * 1024);
+        $skipStructureAnalysis = $fileSizeMb > $maxFileSizeMb;
+
+        if ($skipStructureAnalysis) {
+            Log::info('Skipping structure analysis due to file size limit', [
+                'uuid' => $documentProcessing->uuid,
+                'file_size_mb' => round($fileSizeMb, 2),
+                'max_size_mb' => $maxFileSizeMb,
+            ]);
+        }
+
+        // Пытаемся выполнить анализ структуры с обработкой ошибок
         $model = $dto->model ?? $this->getDefaultModel();
-        $estimation = $this->estimateProcessingCost($documentProcessing->file_size, $model);
+
+        try {
+            if ($skipStructureAnalysis) {
+                throw new RuntimeException('File too large for structure analysis');
+            }
+            // Парсинг документа
+            $extractedDocument = $this->extractorManager->extract(
+                Storage::disk('local')->path($documentProcessing->file_path),
+            );
+
+            // Анализ структуры и генерация якорей
+            $structureResult = $this->structureAnalyzer->analyze($extractedDocument);
+
+            // Сохраняем данные структурного анализа
+            $structuralData = [
+                'sections_count' => count($structureResult->sections),
+                'average_confidence' => $structureResult->averageConfidence,
+                'analysis_duration_ms' => (int) ($structureResult->analysisTime * 1000),
+                'sections' => array_map(fn ($section) => [
+                    'id' => $section->id,
+                    'title' => $section->title,
+                    'anchor' => $section->anchor,
+                    'level' => $section->level,
+                    'confidence' => $section->confidence,
+                    'start_position' => $section->startPosition,
+                    'end_position' => $section->endPosition,
+                ], $structureResult->sections),
+            ];
+
+            // Более точная оценка стоимости на основе структуры
+            $estimation = $this->estimateProcessingCostWithStructure(
+                $documentProcessing->file_size,
+                count($structureResult->sections),
+                $model,
+            );
+
+            Log::info('Document structure analysis completed successfully', [
+                'uuid' => $documentProcessing->uuid,
+                'sections_found' => count($structureResult->sections),
+                'average_confidence' => $structureResult->averageConfidence,
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Document structure analysis failed, falling back to simple estimation', [
+                'uuid' => $documentProcessing->uuid,
+                'error' => $e->getMessage(),
+                'file_path' => $documentProcessing->file_path,
+            ]);
+
+            // Fallback к простой оценке без структуры
+            $structuralData = [
+                'sections_count' => 0,
+                'average_confidence' => 0.0,
+                'analysis_duration_ms' => 0,
+                'sections' => [],
+                'analysis_failed' => true,
+                'error_message' => 'Structure analysis failed: ' . $e->getMessage(),
+                'fallback_used' => true,
+            ];
+
+            // Простая оценка стоимости без учета структуры
+            $estimation = $this->estimateProcessingCost(
+                $documentProcessing->file_size,
+                $model,
+            );
+        }
 
         // Конвертируем USD в кредиты
         $creditsNeeded = $this->creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
@@ -148,14 +246,18 @@ readonly class DocumentProcessingService
             'user_balance' => $this->creditService->getBalance($user),
         ]);
 
-        // Отмечаем как оцененный
-        $documentProcessing->markAsEstimated($estimationData);
+        // Сохраняем все данные в метаданных
+        $documentProcessing->markAsEstimatedWithStructure($estimationData, $structuralData);
 
-        Log::info('Document cost estimated', [
+        Log::info('Document cost estimation completed', [
             'uuid' => $documentProcessing->uuid,
+            'sections_found' => $structuralData['sections_count'],
+            'average_confidence' => $structuralData['average_confidence'],
             'estimated_cost_usd' => $estimation['estimated_cost_usd'],
             'credits_needed' => $creditsNeeded,
             'model' => $model,
+            'analysis_failed' => $structuralData['analysis_failed'] ?? false,
+            'fallback_used' => $structuralData['fallback_used'] ?? false,
         ]);
 
         $refreshed = $documentProcessing->fresh();
@@ -165,6 +267,151 @@ readonly class DocumentProcessingService
         }
 
         return $refreshed;
+    }
+
+    /**
+     * Получить документ с разметкой якорями (без обработки LLM).
+     * 
+     * @param DocumentProcessing $documentProcessing Документ в статусе estimated/completed
+     * @return array{
+     *   original_content: string,
+     *   content_with_anchors: string,
+     *   sections_count: int,
+     *   anchors: array<array{id: string, title: string, anchor: string, level: int, confidence: float}>,
+     *   structure_analysis: ?array
+     * }
+     * @throws InvalidArgumentException При неверном статусе документа
+     * @throws RuntimeException При ошибке генерации разметки
+     */
+    public function getDocumentWithMarkup(DocumentProcessing $documentProcessing): array
+    {
+        $this->validateDocumentStatus($documentProcessing);
+        $this->validateDocumentSize($documentProcessing);
+
+        Log::info('Generating document markup', [
+            'uuid' => $documentProcessing->uuid,
+            'status' => $documentProcessing->status,
+        ]);
+
+        try {
+            $sections = $this->getOrAnalyzeSections($documentProcessing);
+            $originalContent = $this->extractContent($documentProcessing);
+            $contentWithAnchors = $this->addAnchorsToDocument($originalContent, $sections, $documentProcessing->anchor_at_start);
+            
+            return $this->buildMarkupResponse($originalContent, $contentWithAnchors, $sections);
+
+        } catch (Exception $e) {
+            Log::error('Failed to generate document markup', [
+                'uuid' => $documentProcessing->uuid,
+                'error' => $e->getMessage(),
+            ]);
+            
+            throw new RuntimeException('Failed to generate document markup: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Добавляет якоря к документу на основе секций.
+     * 
+     * Якоря размещаются в конце каждой секции, определяя границы логически:
+     * - В конце секции перед началом следующей секции
+     * - В конце документа для последней секции
+     * - В начале секции, если addAnchorAtStart = true
+     */
+    private function addAnchorsToDocument(string $content, array $sections, bool $addAnchorAtStart = false): string
+    {
+        if (empty($sections)) {
+            return $content;
+        }
+
+        // Сортируем секции по названиям (по порядку в документе)
+        usort($sections, function ($a, $b) {
+            if (!($a instanceof DocumentSection) ||
+                !($b instanceof DocumentSection)) {
+                return 0;
+            }
+            
+            // Извлекаем номера из заголовков (например, "1. SUBJECT" -> 1)
+            $aNumber = $this->extractSectionNumber($a->title);
+            $bNumber = $this->extractSectionNumber($b->title);
+            
+            return $aNumber <=> $bNumber;
+        });
+
+        $lines = explode("\n", $content);
+        $result = [];
+        
+        if ($addAnchorAtStart) {
+            // Якоря в начале секций
+            foreach ($lines as $line) {
+                $result[] = $line;
+                
+                // Проверяем, является ли эта строка заголовком секции
+                foreach ($sections as $section) {
+                    if (!($section instanceof DocumentSection)) {
+                        continue;
+                    }
+                    
+                    if (trim($line) === trim($section->title)) {
+                        $result[] = $section->anchor;
+                        break;
+                    }
+                }
+            }
+        } else {
+            // Якоря в конце секций (по умолчанию)
+            $sectionTitles = array_map(static fn($section) =>
+                ($section instanceof DocumentSection) ? trim($section->title) : '',
+                $sections
+            );
+            
+            $currentSectionIndex = -1;
+            
+            foreach ($lines as $lineIndex => $line) {
+                // Проверяем, начинается ли новая секция ПЕРЕД добавлением строки
+                $trimmedLine = trim($line);
+                $nextSectionIndex = array_search($trimmedLine, $sectionTitles, true);
+                
+                if ($nextSectionIndex !== false && $nextSectionIndex > $currentSectionIndex) {
+                    // Если мы нашли новую секцию и у нас уже была предыдущая,
+                    // добавляем якорь для предыдущей секции ПЕРЕД заголовком новой
+                    if ($currentSectionIndex >= 0) {
+                        $prevSection = $sections[$currentSectionIndex];
+                        if ($prevSection instanceof DocumentSection) {
+                            $result[] = '';
+                            $result[] = $prevSection->anchor;
+                            $result[] = '';
+                        }
+                    }
+                    $currentSectionIndex = $nextSectionIndex;
+                }
+                
+                $result[] = $line;
+            }
+            
+            // Добавляем якорь для последней секции в конец документа
+            if ($currentSectionIndex >= 0 && isset($sections[$currentSectionIndex])) {
+                $lastSection = $sections[$currentSectionIndex];
+                if ($lastSection instanceof DocumentSection) {
+                    $result[] = '';
+                    $result[] = $lastSection->anchor;
+                }
+            }
+        }
+
+        return implode("\n", $result);
+    }
+
+    /**
+     * Извлекает номер секции из заголовка.
+     */
+    private function extractSectionNumber(string $title): int
+    {
+        if (preg_match('/^(\d+)/', trim($title), $matches)) {
+            return (int) $matches[1];
+        }
+        
+        return 0;
     }
 
     /**
@@ -368,6 +615,42 @@ readonly class DocumentProcessingService
     }
 
     /**
+     * Получить более точную оценку стоимости с учетом структуры документа.
+     */
+    public function estimateProcessingCostWithStructure(int $fileSizeBytes, int $sectionsCount, ?string $model = null): array
+    {
+        $estimatedInputTokens = $this->costCalculator->estimateTokensFromFileSize($fileSizeBytes);
+
+        // Коррекция на основе количества секций из конфигурации
+        $sectionCostMultiplier = config('document.cost_estimation.section_cost_multiplier', 0.1);
+        assert(is_numeric($sectionCostMultiplier));
+        $sectionCostMultiplier = (float) $sectionCostMultiplier;
+
+        $maxSectionMultiplier = config('document.cost_estimation.max_section_multiplier', 3.0);
+        assert(is_numeric($maxSectionMultiplier));
+        $maxSectionMultiplier = (float) $maxSectionMultiplier;
+
+        // Больше секций = больше контекста для LLM = больше output токенов
+        $sectionMultiplier = max(1.0, 1.0 + ($sectionsCount * $sectionCostMultiplier));
+        $sectionMultiplier = min($sectionMultiplier, $maxSectionMultiplier); // Ограничиваем максимум
+
+        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5 * $sectionMultiplier);
+
+        $estimatedCost = $this->costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
+
+        return [
+            'estimated_input_tokens' => $estimatedInputTokens,
+            'estimated_output_tokens' => $estimatedOutputTokens,
+            'estimated_total_tokens' => $estimatedInputTokens + $estimatedOutputTokens,
+            'estimated_cost_usd' => $estimatedCost,
+            'model_used' => $model ?? $this->getDefaultModel(),
+            'pricing_info' => $this->costCalculator->getPricingInfo($model ?? $this->getDefaultModel()),
+            'sections_count' => $sectionsCount,
+            'section_multiplier' => $sectionMultiplier,
+        ];
+    }
+
+    /**
      * Получить модель по умолчанию.
      */
     private function getDefaultModel(): string
@@ -385,5 +668,146 @@ readonly class DocumentProcessingService
         if ($filePath && Storage::disk('local')->exists($filePath)) {
             Storage::disk('local')->delete($filePath);
         }
+    }
+
+    /**
+     * Проверяет статус документа для генерации разметки.
+     * 
+     * @throws InvalidArgumentException При неверном статусе
+     */
+    private function validateDocumentStatus(DocumentProcessing $documentProcessing): void
+    {
+        if (!$documentProcessing->isEstimated() && !$documentProcessing->isCompleted()) {
+            throw new InvalidArgumentException(
+                'Document must be in estimated or completed status for markup generation. Current status: ' . $documentProcessing->status
+            );
+        }
+    }
+
+    /**
+     * Проверяет размер документа для генерации разметки.
+     * 
+     * @throws InvalidArgumentException При превышении лимита размера
+     */
+    private function validateDocumentSize(DocumentProcessing $documentProcessing): void
+    {
+        $maxFileSizeMb = config('document.structure_analysis.max_file_size_mb', 50);
+        assert(is_numeric($maxFileSizeMb));
+        $maxFileSizeMb = (int) $maxFileSizeMb;
+        
+        $fileSizeMb = $documentProcessing->file_size / (1024 * 1024);
+        
+        if ($fileSizeMb > $maxFileSizeMb) {
+            throw new InvalidArgumentException(
+                "Document is too large for markup generation. Size: {$fileSizeMb}MB, Max: {$maxFileSizeMb}MB"
+            );
+        }
+    }
+
+    /**
+     * Получает секции документа из метаданных или выполняет новый анализ.
+     * 
+     * @return array<DocumentSection>
+     * @throws RuntimeException При ошибке анализа структуры
+     */
+    private function getOrAnalyzeSections(DocumentProcessing $documentProcessing): array
+    {
+        $metadata = $documentProcessing->processing_metadata;
+        
+        // Пытаемся получить секции из сохраненных метаданных
+        if (is_array($metadata) && 
+            isset($metadata[self::STRUCTURE_ANALYSIS_KEY]) && 
+            is_array($metadata[self::STRUCTURE_ANALYSIS_KEY]) &&
+            isset($metadata[self::STRUCTURE_ANALYSIS_KEY][self::SECTIONS_KEY]) &&
+            is_array($metadata[self::STRUCTURE_ANALYSIS_KEY][self::SECTIONS_KEY])) {
+            
+            $sectionsData = $metadata[self::STRUCTURE_ANALYSIS_KEY][self::SECTIONS_KEY];
+            $sections = [];
+            
+            foreach ($sectionsData as $sectionData) {
+                if (!is_array($sectionData)) {
+                    continue;
+                }
+                
+                $sections[] = new DocumentSection(
+                    id: $sectionData['id'] ?? '',
+                    title: $sectionData['title'] ?? '',
+                    content: '', // Content not stored in metadata
+                    level: $sectionData['level'] ?? 1,
+                    startPosition: $sectionData['start_position'] ?? 0,
+                    endPosition: $sectionData['end_position'] ?? 0,
+                    anchor: $sectionData['anchor'] ?? '',
+                    elements: [], // Elements not stored in metadata
+                    subsections: [],
+                    confidence: $sectionData['confidence'] ?? 0.0
+                );
+            }
+            
+            if (count($sections) > self::MAX_SECTIONS_COUNT) {
+                throw new InvalidArgumentException(
+                    "Too many sections in document: " . count($sections) . ". Max: " . self::MAX_SECTIONS_COUNT
+                );
+            }
+            
+            return $sections;
+        }
+        
+        // Если секций нет в метаданных, выполняем новый анализ
+        Log::info('Sections not found in metadata, performing new structure analysis', [
+            'uuid' => $documentProcessing->uuid,
+        ]);
+        
+        $extractedDocument = $this->extractorManager->extract(
+            Storage::disk('local')->path($documentProcessing->file_path)
+        );
+
+        return $this->structureAnalyzer->analyze($extractedDocument)->sections;
+    }
+
+    /**
+     * Извлекает оригинальный контент документа.
+     * 
+     * @throws RuntimeException|Exception При ошибке извлечения контента
+     */
+    private function extractContent(DocumentProcessing $documentProcessing): string
+    {
+        $extractedDocument = $this->extractorManager->extract(
+            Storage::disk('local')->path($documentProcessing->file_path)
+        );
+        
+        $content = $extractedDocument->getPlainText();
+        
+        if (strlen($content) > self::MAX_CONTENT_LENGTH) {
+            throw new InvalidArgumentException(
+                "Document content too large for markup: " . strlen($content) . " bytes. Max: " . self::MAX_CONTENT_LENGTH
+            );
+        }
+        
+        return $content;
+    }
+
+    /**
+     * Формирует ответ с разметкой документа.
+     * 
+     * @param array<DocumentSection> $sections
+     * @return array{original_content: string, content_with_anchors: string, sections_count: int, anchors: array, structure_analysis: ?array}
+     */
+    private function buildMarkupResponse(string $originalContent, string $contentWithAnchors, array $sections): array
+    {
+        $anchors = array_map(fn(DocumentSection $section) => [
+            'id' => $section->id,
+            'title' => $section->title,
+            'anchor' => $section->anchor,
+            'level' => $section->level,
+            'confidence' => $section->confidence,
+        ], $sections);
+        
+        return [
+            'original_content' => $originalContent,
+            'content_with_anchors' => $contentWithAnchors,
+            'sections_count' => count($sections),
+            'anchors' => $anchors,
+            'structure_analysis' => null, // Можно добавить дополнительную аналитику при необходимости
+        ];
     }
 }

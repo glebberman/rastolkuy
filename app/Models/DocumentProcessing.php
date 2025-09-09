@@ -169,6 +169,21 @@ class DocumentProcessing extends Model
     }
 
     /**
+     * Отмечает стоимость как оцененную с данными структурного анализа.
+     */
+    public function markAsEstimatedWithStructure(array $estimationData, array $structureData): void
+    {
+        $this->update([
+            'status' => self::STATUS_ESTIMATED,
+            'processing_metadata' => array_merge($this->processing_metadata ?? [], [
+                'estimated_at' => now()->toISOString(),
+                'estimation' => $estimationData,
+                'structure_analysis' => $structureData,
+            ]),
+        ]);
+    }
+
+    /**
      * Отмечает начало обработки.
      */
     public function markAsProcessing(): void

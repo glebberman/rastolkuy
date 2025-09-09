@@ -636,6 +636,73 @@ options: JSON (optional) - дополнительные опции обрабо�
 }
 ```
 
+### GET `/api/v1/documents/{uuid}/markup` 🔒
+Получение документа с разметкой якорями без LLM обработки.
+
+**Headers**: `Authorization: Bearer {token}`  
+**Permissions**: `documents.view`
+
+**Path Parameters**:
+- `uuid` - UUID документа в статусе "estimated" или "completed"
+
+**Описание**:
+Возвращает документ с размещенными якорями для предварительного просмотра структуры. Якоря размещаются в конце каждой секции перед заголовком следующей секции.
+
+**Response 200**:
+```json
+{
+  "data": {
+    "document_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "estimated",
+    "original_filename": "contract.pdf",
+    "file_type": "application/pdf", 
+    "file_size": 256000,
+    "sections_count": 5,
+    "original_content": "1. ПРЕДМЕТ ДОГОВОРА\nНастоящий договор определяет...",
+    "content_with_anchors": "1. ПРЕДМЕТ ДОГОВОРА\nНастоящий договор определяет...\n\n<!-- SECTION_ANCHOR_section_123_predmet_dogovora -->\n\n2. ПРАВА И ОБЯЗАННОСТИ СТОРОН\n...",
+    "anchors": [
+      {
+        "id": "section_68bf5b3d0ac850_89413922",
+        "title": "1. ПРЕДМЕТ ДОГОВОРА",
+        "anchor": "<!-- SECTION_ANCHOR_section_68bf5b3d0ac850_89413922_1_predmet_dogovora -->",
+        "level": 3,
+        "confidence": 0.9
+      },
+      {
+        "id": "section_68bf5b3d0ae567_00959719", 
+        "title": "2. ПРАВА И ОБЯЗАННОСТИ СТОРОН",
+        "anchor": "<!-- SECTION_ANCHOR_section_68bf5b3d0ae567_00959719_2_prava_i_obyazannosti_storon -->",
+        "level": 3,
+        "confidence": 0.9
+      }
+    ],
+    "structure_analysis": {
+      "sections_count": 5,
+      "average_confidence": 0.9,
+      "analysis_duration_ms": 45,
+      "sections": [
+        {
+          "id": "section_68bf5b3d0ac850_89413922",
+          "title": "1. ПРЕДМЕТ ДОГОВОРА",
+          "level": 3,
+          "confidence": 0.9,
+          "start_position": 0,
+          "end_position": 120
+        }
+      ]
+    }
+  }
+}
+```
+
+**Response 409** (неверный статус):
+```json
+{
+  "error": "Invalid document status",
+  "message": "Document must be estimated or completed to view markup"
+}
+```
+
 ### GET `/api/v1/documents/{uuid}/status` 🔒
 Получение статуса обработки документа.
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Http\Requests\Concerns\HandlesFileValidation;
 use App\Models\DocumentProcessing;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,6 +12,7 @@ use Illuminate\Validation\Rule;
 
 class ProcessDocumentRequest extends FormRequest
 {
+    use HandlesFileValidation;
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -26,12 +28,13 @@ class ProcessDocumentRequest extends FormRequest
      */
     public function rules(): array
     {
+        
         return [
             'file' => [
                 'required',
                 'file',
-                'mimes:pdf,doc,docx,txt',
-                'max:52428800', // 50MB максимум
+                'mimes:' . $this->getAllowedMimeTypes(),
+                'max:' . $this->getMaxFileSizeBytes(),
             ],
             'task_type' => [
                 'required',
@@ -81,11 +84,12 @@ class ProcessDocumentRequest extends FormRequest
      */
     public function messages(): array
     {
+        
         return [
             'file.required' => 'Файл для обработки обязателен.',
             'file.file' => 'Загруженный файл должен быть валидным файлом.',
-            'file.mimes' => 'Поддерживаются только файлы форматов: PDF, DOC, DOCX, TXT.',
-            'file.max' => 'Размер файла не должен превышать 50MB.',
+            'file.mimes' => 'Поддерживаются только файлы форматов: ' . $this->getFormatsString() . '.',
+            'file.max' => 'Размер файла не должен превышать ' . $this->getMaxFileSizeMb() . 'MB.',
             'task_type.required' => 'Тип задачи обязателен.',
             'task_type.in' => 'Недопустимый тип задачи. Разрешены: translation, contradiction, ambiguity.',
             'anchor_at_start.boolean' => 'Параметр anchor_at_start должен быть boolean.',

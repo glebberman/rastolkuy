@@ -283,6 +283,65 @@ class DocumentProcessingController extends Controller
     }
 
     /**
+     * Получить документ с разметкой якорями (без LLM обработки).
+     */
+    public function markup(ShowDocumentRequest $request): JsonResponse
+    {
+        /** @var string $uuid */
+        $uuid = $request->validated('uuid');
+        $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
+
+        if (!$documentProcessing) {
+            return response()->json([
+                'error' => 'Document not found',
+                'message' => 'Документ с указанным идентификатором не найден',
+            ], ResponseAlias::HTTP_NOT_FOUND);
+        }
+
+        $this->authorize('view', $documentProcessing);
+
+        try {
+            $markup = $this->documentProcessingService->getDocumentWithMarkup($documentProcessing);
+
+            /** @var User $user */
+            $user = $request->user();
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'markup_view');
+
+            return response()->json([
+                'data' => [
+                    'document_id' => $documentProcessing->uuid,
+                    'status' => $documentProcessing->status,
+                    'original_filename' => $documentProcessing->original_filename,
+                    'file_type' => $documentProcessing->file_type,
+                    'file_size' => $documentProcessing->file_size,
+                    'sections_count' => $markup['sections_count'],
+                    'original_content' => $markup['original_content'],
+                    'content_with_anchors' => $markup['content_with_anchors'],
+                    'anchors' => $markup['anchors'],
+                    'structure_analysis' => $markup['structure_analysis'],
+                ],
+            ]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'error' => 'Invalid document status',
+                'message' => $e->getMessage(),
+            ], ResponseAlias::HTTP_CONFLICT);
+        } catch (Exception $e) {
+            Log::error('Failed to generate document markup', [
+                'document_uuid' => $uuid,
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Markup generation failed',
+                'message' => 'Не удалось сгенерировать разметку документа',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
      * Получить список всех обработок (для админ панели).
      */
     public function index(Request $request): JsonResponse|JsonResource

@@ -173,6 +173,11 @@ Route::get('v1/documents/{uuid}/result', [DocumentProcessingController::class, '
     ->middleware(['auth:sanctum', 'permission:documents.view'])
     ->name('api.v1.documents.result');
 
+// Получение документа с разметкой якорями (без LLM обработки)
+Route::get('v1/documents/{uuid}/markup', [DocumentProcessingController::class, 'markup'])
+    ->middleware(['auth:sanctum', 'permission:documents.view'])
+    ->name('api.v1.documents.markup');
+
 // Отмена обработки документа (если в статусе pending)
 Route::post('v1/documents/{uuid}/cancel', [DocumentProcessingController::class, 'cancel'])
     ->middleware(['auth:sanctum', 'permission:documents.cancel'])

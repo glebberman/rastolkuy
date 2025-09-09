@@ -18,7 +18,7 @@ class AuditService
             return;
         }
 
-        Log::channel('audit')->info('Admin action performed', [
+        Log::info('Admin action performed', [
             'admin_id' => $admin->id,
             'admin_email' => $admin->email,
             'action' => $action,
@@ -39,7 +39,7 @@ class AuditService
             return;
         }
 
-        Log::channel('audit')->info('User data accessed', [
+        Log::info('User data accessed', [
             'accessor_id' => $accessor->id,
             'accessor_email' => $accessor->email,
             'target_user_id' => $targetUser->id,
@@ -56,7 +56,7 @@ class AuditService
      */
     public function logDocumentAccess(User $user, string $documentUuid, string $action): void
     {
-        Log::channel('audit')->info('Document accessed', [
+        Log::info('Document accessed', [
             'user_id' => $user->id,
             'user_email' => $user->email,
             'document_uuid' => $documentUuid,

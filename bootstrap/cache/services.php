@@ -38,7 +38,8 @@
     34 => 'Tighten\\Ziggy\\ZiggyServiceProvider',
     35 => 'App\\Providers\\AuthServiceProvider',
     36 => 'App\\Providers\\EventServiceProvider',
-    37 => 'App\\Providers\\StructureAnalysisServiceProvider',
+    37 => 'App\\Providers\\LLMServiceProvider',
+    38 => 'App\\Providers\\StructureAnalysisServiceProvider',
   ),
   'eager' => 
   array (
@@ -64,7 +65,8 @@
     19 => 'Tighten\\Ziggy\\ZiggyServiceProvider',
     20 => 'App\\Providers\\AuthServiceProvider',
     21 => 'App\\Providers\\EventServiceProvider',
-    22 => 'App\\Providers\\StructureAnalysisServiceProvider',
+    22 => 'App\\Providers\\LLMServiceProvider',
+    23 => 'App\\Providers\\StructureAnalysisServiceProvider',
   ),
   'deferred' => 
   array (

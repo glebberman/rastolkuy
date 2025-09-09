@@ -82,9 +82,17 @@ class ExtractorFactory
     private function registerDefaultExtractors(): void
     {
         $this->extractors = [
+            // Text files
             'text/plain' => TxtExtractor::class,
             'text/txt' => TxtExtractor::class,
             'application/txt' => TxtExtractor::class,
+            
+            // PDF files
+            'application/pdf' => PdfExtractor::class,
+            
+            // DOCX files
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => DocxExtractor::class,
+            'application/docx' => DocxExtractor::class,
         ];
     }
 
@@ -102,6 +110,14 @@ class ExtractorFactory
         return match ($extractorClass) {
             TxtExtractor::class => new TxtExtractor(
                 $this->encodingDetector,
+                $this->classifier,
+                $this->metrics,
+            ),
+            PdfExtractor::class => new PdfExtractor(
+                $this->classifier,
+                $this->metrics,
+            ),
+            DocxExtractor::class => new DocxExtractor(
                 $this->classifier,
                 $this->metrics,
             ),

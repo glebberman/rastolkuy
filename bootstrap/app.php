@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PermissionMiddleware;
 use App\Http\Middleware\RateLimitMiddleware;
 use App\Http\Middleware\RoleMiddleware;
 use App\Providers\AuthServiceProvider;
 use App\Providers\EventServiceProvider;
+use App\Providers\LLMServiceProvider;
 use App\Providers\StructureAnalysisServiceProvider;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,12 +24,17 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withProviders([
         AuthServiceProvider::class,
         EventServiceProvider::class,
+        LLMServiceProvider::class,
         StructureAnalysisServiceProvider::class,
     ])
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->web(append: [
             HandleInertiaRequests::class,
             AddLinkHeadersForPreloadedAssets::class,
+        ]);
+
+        $middleware->api(prepend: [
+            ForceJsonResponse::class,
         ]);
 
         $middleware->alias([
@@ -37,5 +44,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        // Force JSON responses for API routes
+        $exceptions->shouldRenderJsonWhen(function ($request) {
+            return $request->is('api/*') || $request->wantsJson() || $request->expectsJson();
+        });
     })->create();
