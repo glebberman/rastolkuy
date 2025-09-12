@@ -84,6 +84,53 @@ services:
     networks:
       - laravel
 
+  supervisor:
+    build:
+      context: .
+      dockerfile: docker/supervisor/Dockerfile.simple
+    container_name: laravel_supervisor
+    restart: unless-stopped
+    volumes:
+      - ./:/var/www
+      - ./storage/logs:/var/www/storage/logs
+    ports:
+      - "9001:9001"
+    networks:
+      - laravel
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - APP_NAME=${APP_NAME}
+      - APP_ENV=${APP_ENV}
+      - APP_KEY=${APP_KEY}
+      - APP_DEBUG=${APP_DEBUG}
+      - APP_URL=${APP_URL}
+      - DB_CONNECTION=${DB_CONNECTION}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - REDIS_HOST=${REDIS_HOST}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - REDIS_PORT=${REDIS_PORT}
+      - QUEUE_CONNECTION=${QUEUE_CONNECTION}
+      - CACHE_DRIVER=${CACHE_DRIVER}
+      - SESSION_DRIVER=${SESSION_DRIVER}
+      - DOCUMENT_ANALYSIS_QUEUE=${DOCUMENT_ANALYSIS_QUEUE}
+      - DOCUMENT_PROCESSING_QUEUE=${DOCUMENT_PROCESSING_QUEUE}
+      - ANALYSIS_JOB_MAX_TRIES=${ANALYSIS_JOB_MAX_TRIES}
+      - ANALYSIS_JOB_TIMEOUT=${ANALYSIS_JOB_TIMEOUT}
+      - ANALYSIS_JOB_RETRY_AFTER=${ANALYSIS_JOB_RETRY_AFTER}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - CLAUDE_DEFAULT_MODEL=${CLAUDE_DEFAULT_MODEL}
+      - CLAUDE_MAX_TOKENS=${CLAUDE_MAX_TOKENS}
+      - CLAUDE_TEMPERATURE=${CLAUDE_TEMPERATURE}
+      - CLAUDE_TIMEOUT=${CLAUDE_TIMEOUT}
+      - CLAUDE_MAX_RETRIES=${CLAUDE_MAX_RETRIES}
+      - CLAUDE_RETRY_DELAY=${CLAUDE_RETRY_DELAY}
+
 networks:
   laravel:
     driver: bridge

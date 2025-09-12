@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Jobs\AnalyzeDocumentStructureJob;
 use App\Models\DocumentProcessing;
 use App\Models\User;
 use App\Models\UserCredit;
@@ -155,61 +156,47 @@ class DocumentProcessingApiTest extends TestCase
                 'data' => [
                     'id',
                     'status',
-                    'estimation' => [
-                        'estimated_input_tokens',
-                        'estimated_output_tokens',
-                        'estimated_total_tokens',
-                        'estimated_cost_usd',
-                        'credits_needed',
-                        'model_selected',
-                        'has_sufficient_balance',
-                        'user_balance',
-                        'sections_count',
-                        'section_multiplier',
-                    ],
-                    'structure_analysis' => [
-                        'sections_count',
-                        'average_confidence',
-                        'analysis_duration_ms',
-                        'sections',
-                    ],
                 ],
             ])
             ->assertJson([
                 'data' => [
                     'id' => $document->uuid,
-                    'status' => DocumentProcessing::STATUS_ESTIMATED,
+                    'status' => DocumentProcessing::STATUS_ANALYZING,
                 ],
             ]);
 
+        // Verify document status is now "analyzing"
         $this->assertDatabaseHas('document_processings', [
             'uuid' => $document->uuid,
-            'status' => DocumentProcessing::STATUS_ESTIMATED,
+            'status' => DocumentProcessing::STATUS_ANALYZING,
         ]);
+
+        // Verify that AnalyzeDocumentStructureJob was dispatched
+        Queue::assertPushed(AnalyzeDocumentStructureJob::class);
     }
 
     public function testCanEstimateDocumentCostWithFileSizeFallback(): void
     {
-        // Temporarily set max file size to very small value to trigger fallback
-        config(['document.structure_analysis.max_file_size_mb' => 0.001]);
-
-        // Create document with file size larger than the limit (1024 bytes > 0.001 MB)
+        // Create document with file size larger than the limit
         $document = DocumentProcessing::factory()->create([
             'user_id' => $this->user->id,
             'status' => DocumentProcessing::STATUS_UPLOADED,
-            'file_size' => 1024, // 1KB which is > 0.001MB
+            'file_size' => 1024 * 1024 * 60, // 60MB - larger than default 50MB limit
         ]);
 
         $response = $this->postJson(route('api.v1.documents.estimate', $document->uuid));
 
         $response->assertStatus(200)
-            ->assertJsonPath('data.status', DocumentProcessing::STATUS_ESTIMATED)
-            ->assertJsonPath('data.structure_analysis.analysis_failed', true)
-            ->assertJsonPath('data.structure_analysis.fallback_used', true)
-            ->assertJsonPath('data.structure_analysis.sections_count', 0);
+            ->assertJsonPath('data.status', DocumentProcessing::STATUS_ANALYZING);
 
-        // Reset config
-        config(['document.structure_analysis.max_file_size_mb' => 50]);
+        // Verify that AnalyzeDocumentStructureJob was still dispatched (fallback will happen in the job)
+        Queue::assertPushed(AnalyzeDocumentStructureJob::class);
+
+        // Verify document status is now "analyzing"
+        $this->assertDatabaseHas('document_processings', [
+            'uuid' => $document->uuid,
+            'status' => DocumentProcessing::STATUS_ANALYZING,
+        ]);
     }
 
     public function testEstimateRequiresUploadedStatus(): void
@@ -630,6 +617,46 @@ class DocumentProcessingApiTest extends TestCase
         foreach ($documents as $doc) {
             $this->assertNotNull($doc['id']);
         }
+    }
+
+    public function testProgressPercentageIncludesAnalyzingStatus(): void
+    {
+        $document = DocumentProcessing::factory()->create([
+            'user_id' => $this->user->id,
+            'status' => DocumentProcessing::STATUS_ANALYZING,
+        ]);
+
+        $this->assertEquals(15, $document->getProgressPercentage());
+        $this->assertEquals('Анализ структуры', $document->getStatusDescription());
+    }
+
+    public function testCannotProcessAnalyzingDocument(): void
+    {
+        $document = DocumentProcessing::factory()->create([
+            'user_id' => $this->user->id,
+            'status' => DocumentProcessing::STATUS_ANALYZING,
+        ]);
+
+        $response = $this->postJson(route('api.v1.documents.process', $document->uuid));
+
+        $response->assertStatus(409)
+            ->assertJson([
+                'error' => 'Cannot process document',
+            ]);
+    }
+
+    public function testAnalyzingDocumentCannotBeCancelled(): void
+    {
+        $document = DocumentProcessing::factory()->create([
+            'user_id' => $this->user->id,
+            'status' => DocumentProcessing::STATUS_ANALYZING,
+        ]);
+
+        // Should not be able to cancel analyzing document since it's not in pending status
+        $response = $this->postJson(route('api.v1.documents.cancel', $document->uuid));
+
+        // Policy denies cancel action for analyzing documents, so we get 403
+        $response->assertStatus(403);
     }
 
     private function mockStructureAnalysisServices(): void

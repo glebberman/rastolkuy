@@ -14,7 +14,6 @@ use App\Services\Parser\Extractors\Support\ElementClassifier;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
 use Exception;
 use InvalidArgumentException;
-use RuntimeException;
 use Smalot\PdfParser\Parser;
 
 readonly class PdfExtractor implements ExtractorInterface
@@ -27,9 +26,7 @@ readonly class PdfExtractor implements ExtractorInterface
 
     public function supports(string $mimeType): bool
     {
-        return in_array($mimeType, [
-            'application/pdf',
-        ]);
+        return $mimeType === 'application/pdf';
     }
 
     public function extract(string $filePath, ?ExtractionConfig $config = null): ExtractedDocument
@@ -147,31 +144,31 @@ readonly class PdfExtractor implements ExtractorInterface
             // Use smalot/pdfparser library for PDF text extraction
             $parser = new Parser();
             $pdf = $parser->parseFile($filePath);
-            
+
             $text = $pdf->getText();
-            
+
             // Clean up the extracted text
             $text = $this->cleanExtractedText($text);
-            
+
             if (!empty(trim($text))) {
                 return $text;
             }
-            
         } catch (Exception $e) {
             // Log error but continue with fallback
-            error_log("PDF parsing failed: " . $e->getMessage());
+            error_log('PDF parsing failed: ' . $e->getMessage());
         }
 
         // Fallback: try simple extraction method as backup
         $text = $this->extractWithSimpleMethod($filePath);
+
         if ($text !== '') {
             return $this->cleanExtractedText($text);
         }
 
         // If no text could be extracted, provide a fallback message
-        return "PDF содержимое не может быть извлечено автоматически. " . 
-               "Возможно, это отсканированный документ или содержит только изображения. " . 
-               "Размер файла: " . $this->formatFileSize(filesize($filePath));
+        return 'PDF содержимое не может быть извлечено автоматически. ' .
+               'Возможно, это отсканированный документ или содержит только изображения. ' .
+               'Размер файла: ' . $this->formatFileSize(filesize($filePath));
     }
 
     private function cleanExtractedText(string $text): string
@@ -179,10 +176,10 @@ readonly class PdfExtractor implements ExtractorInterface
         // Remove excessive whitespace and normalize line breaks
         $text = preg_replace('/\s+/', ' ', $text) ?: $text;
         $text = preg_replace('/\s*\n\s*/', "\n", $text) ?: $text;
-        
+
         // Convert back to proper paragraph structure
         $text = preg_replace('/(?<=[.!?])\s+(?=[A-ZА-Я])/u', "\n\n", $text) ?: $text;
-        
+
         return trim($text);
     }
 
@@ -196,7 +193,7 @@ readonly class PdfExtractor implements ExtractorInterface
 
         // Simple text extraction from PDF streams (works only for text-based PDFs)
         $text = '';
-        
+
         // Look for text streams in PDF
         if (preg_match_all('/BT\s+(.*?)\s+ET/s', $content, $matches)) {
             foreach ($matches[1] as $match) {

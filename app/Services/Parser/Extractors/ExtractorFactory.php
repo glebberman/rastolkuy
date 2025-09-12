@@ -86,10 +86,10 @@ class ExtractorFactory
             'text/plain' => TxtExtractor::class,
             'text/txt' => TxtExtractor::class,
             'application/txt' => TxtExtractor::class,
-            
+
             // PDF files
             'application/pdf' => PdfExtractor::class,
-            
+
             // DOCX files
             'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => DocxExtractor::class,
             'application/docx' => DocxExtractor::class,

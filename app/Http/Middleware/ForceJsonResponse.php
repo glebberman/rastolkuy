@@ -13,13 +13,13 @@ class ForceJsonResponse
     /**
      * Handle an incoming request.
      *
-     * @param  Closure(Request): (Response)  $next
+     * @param Closure(Request): (Response) $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         // Force JSON response for all API requests
         $request->headers->set('Accept', 'application/json');
-        
+
         return $next($request);
     }
 }
