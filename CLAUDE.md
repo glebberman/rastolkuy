@@ -346,22 +346,35 @@ services:
       - app
   
   postgres:
-    image: postgres:15
+    image: postgres:16-alpine
     environment:
-      - POSTGRES_DB=legal_translator
+      - POSTGRES_DB=laravel
       - POSTGRES_USER=laravel
       - POSTGRES_PASSWORD=secret
   
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
   
   minio:
     image: minio/minio
     ports:
       - "9000:9000"
     environment:
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+
+  # 🚀 Supervisor для управления очередями Laravel
+  supervisor:
+    build:
+      dockerfile: docker/supervisor/Dockerfile
+    ports:
+      - "9001:9001"  # Web-интерфейс Supervisor
+    depends_on:
+      - postgres
+      - redis
+    environment:
+      - QUEUE_CONNECTION=redis
+      - REDIS_HOST=redis
 ```
 
 ### Переменные окружения
@@ -381,9 +394,30 @@ DB_DATABASE=legal_translator
 FILESYSTEM_DISK=minio
 MINIO_ENDPOINT=http://minio:9000
 
-# Queue
+# Queue & Supervisor
 QUEUE_CONNECTION=redis
 REDIS_HOST=redis
+
+# Очереди документообработки  
+DOCUMENT_ANALYSIS_QUEUE=document-analysis
+DOCUMENT_PROCESSING_QUEUE=document-processing
+ANALYSIS_JOB_MAX_TRIES=3
+ANALYSIS_JOB_TIMEOUT=300
+```
+
+### Управление очередями
+
+```bash
+# Управление через скрипт
+./bin/queue-status.sh status    # Статус worker'ов
+./bin/queue-status.sh restart   # Перезапуск всех worker'ов
+./bin/queue-status.sh logs document-analysis  # Логи анализа
+./bin/queue-status.sh web       # Supervisor web-интерфейс
+
+# Laravel команды
+php artisan queue:monitor       # Мониторинг очередей
+php artisan queue:failed        # Неудачные задачи
+php artisan queue:retry all     # Повтор всех неудачных задач
 ```
 
 ## 📚 Правила разработки

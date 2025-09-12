@@ -1,0 +1,53 @@
+FROM php:8.3-cli-alpine
+
+# Install basic dependencies
+RUN apk add --no-cache \
+    supervisor \
+    postgresql-dev \
+    curl \
+    netcat-openbsd \
+    gettext \
+    zip \
+    libzip-dev \
+    && docker-php-ext-install \
+    pdo \
+    pdo_pgsql \
+    pcntl \
+    zip
+
+# Install Redis extension
+RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del .build-deps
+
+# Install Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
+# Set working directory
+WORKDIR /var/www
+
+# Copy application code
+COPY . .
+
+# Copy supervisor configs
+COPY docker/supervisor/supervisord.conf /etc/supervisord.conf
+COPY docker/supervisor/conf.d/laravel-worker.conf /etc/supervisor/conf.d/laravel-worker.conf
+
+# Copy and set entrypoint
+COPY docker/supervisor/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create log directories
+RUN mkdir -p /var/www/storage/logs
+
+# Create www-data user if it doesn't exist and set permissions
+RUN addgroup -g 82 -S www-data || true \
+    && adduser -u 82 -D -S -G www-data www-data || true \
+    && chown -R www-data:www-data /var/www/storage
+
+# Expose supervisor web interface
+EXPOSE 9001
+
+# Start supervisor directly for debugging
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]

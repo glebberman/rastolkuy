@@ -67,7 +67,49 @@ export default function DocumentProcessor({
         }
     }, [selectedFile, state]);
 
-    const startPolling = useCallback((documentId: string) => {
+    const startEstimationPolling = useCallback((documentId: string) => {
+        if (pollingInterval) {
+            clearInterval(pollingInterval);
+        }
+
+        const interval = setInterval(async () => {
+            try {
+                const response = await axios.get(`/api/v1/documents/${documentId}/status`);
+                const documentData = response.data.data;
+
+                if (documentData.status === 'estimated' && documentData.estimation) {
+                    // Analysis completed, update UI with estimation data
+                    const estimation = documentData.estimation;
+                    setData(prev => ({
+                        ...prev,
+                        estimatedCost: estimation.estimated_cost_usd,
+                        creditsNeeded: estimation.credits_needed,
+                        hasSufficientBalance: estimation.has_sufficient_balance,
+                        currentBalance: estimation.user_balance
+                    }));
+
+                    if (estimation.has_sufficient_balance) {
+                        setState('ready');
+                    } else {
+                        setState('insufficient_credits');
+                    }
+                    
+                    clearInterval(interval);
+                } else if (documentData.status === 'failed') {
+                    setState('failed');
+                    setError('Анализ документа завершился с ошибкой');
+                    clearInterval(interval);
+                }
+                // Continue polling if still analyzing
+            } catch (err) {
+                console.error('Estimation polling error:', err);
+            }
+        }, 3000); // 3 seconds for estimation polling
+
+        setPollingInterval(interval);
+    }, [pollingInterval]);
+
+    const startProcessingPolling = useCallback((documentId: string) => {
         if (pollingInterval) {
             clearInterval(pollingInterval);
         }
@@ -98,7 +140,7 @@ export default function DocumentProcessor({
                     }));
                 }
             } catch (err) {
-                console.error('Polling error:', err);
+                console.error('Processing polling error:', err);
             }
         }, 5000); // 5 seconds as per RAS-17 requirements
 
@@ -141,20 +183,31 @@ export default function DocumentProcessor({
                 anchor_at_start: false
             });
 
-            const estimation = estimateResponse.data.data.estimation;
+            const documentData = estimateResponse.data.data;
 
-            setData(prev => ({
-                ...prev,
-                estimatedCost: estimation.estimated_cost_usd,
-                creditsNeeded: estimation.credits_needed,
-                hasSufficientBalance: estimation.has_sufficient_balance,
-                currentBalance: estimation.current_balance
-            }));
+            // With async workflow, document might be in 'analyzing' status
+            if (documentData.status === 'analyzing') {
+                setState('analyzing');
+                // Start polling for estimation completion
+                startEstimationPolling(documentId);
+            } else if (documentData.status === 'estimated' && documentData.estimation) {
+                // Immediate estimation available (fallback case)
+                const estimation = documentData.estimation;
+                setData(prev => ({
+                    ...prev,
+                    estimatedCost: estimation.estimated_cost_usd,
+                    creditsNeeded: estimation.credits_needed,
+                    hasSufficientBalance: estimation.has_sufficient_balance,
+                    currentBalance: estimation.user_balance
+                }));
 
-            if (estimation.has_sufficient_balance) {
-                setState('ready');
+                if (estimation.has_sufficient_balance) {
+                    setState('ready');
+                } else {
+                    setState('insufficient_credits');
+                }
             } else {
-                setState('insufficient_credits');
+                throw new Error('Unexpected document status: ' + documentData.status);
             }
 
         } catch (err: any) {
@@ -179,15 +232,15 @@ export default function DocumentProcessor({
                 onCreditsUpdated?.(newBalance);
             }
 
-            // Start polling for status
-            startPolling(data.documentId);
+            // Start polling for processing status
+            startProcessingPolling(data.documentId);
 
         } catch (err: any) {
             console.error('Processing error:', err);
             setError(err.response?.data?.message || 'Ошибка при запуске обработки');
             setState('failed');
         }
-    }, [data.documentId, data.creditsNeeded, data.currentBalance, onCreditsUpdated, startPolling]);
+    }, [data.documentId, data.creditsNeeded, data.currentBalance, onCreditsUpdated, startProcessingPolling]);
 
     const handleDeleteDocument = useCallback(async () => {
         if (!data.documentId) return;

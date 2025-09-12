@@ -83,4 +83,64 @@ return [
         */
         'max_section_multiplier' => env('COST_MAX_SECTION_MULTIPLIER', 3.0),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for document processing queues, workers, and job settings.
+    |
+    */
+    'queue' => [
+        /*
+        |--------------------------------------------------------------------------
+        | Document Analysis Queue
+        |--------------------------------------------------------------------------
+        |
+        | Queue name for document structure analysis jobs. This allows isolation
+        | of analysis jobs from other background processing.
+        |
+        */
+        'document_analysis_queue' => env('DOCUMENT_ANALYSIS_QUEUE', 'document-analysis'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Document Processing Queue
+        |--------------------------------------------------------------------------
+        |
+        | Queue name for main document processing jobs (LLM processing).
+        |
+        */
+        'document_processing_queue' => env('DOCUMENT_PROCESSING_QUEUE', 'document-processing'),
+
+        /*
+        |--------------------------------------------------------------------------
+        | Analysis Job Settings
+        |--------------------------------------------------------------------------
+        |
+        | Configuration for document analysis jobs including retries, timeout,
+        | and delay settings.
+        |
+        */
+        'analysis_job' => [
+            'max_tries' => env('ANALYSIS_JOB_MAX_TRIES', 3),
+            'timeout_seconds' => env('ANALYSIS_JOB_TIMEOUT', 300), // 5 minutes
+            'retry_after_seconds' => env('ANALYSIS_JOB_RETRY_AFTER', 60),
+        ],
+
+        /*
+        |--------------------------------------------------------------------------
+        | Processing Job Settings
+        |--------------------------------------------------------------------------
+        |
+        | Configuration for main document processing jobs (LLM processing).
+        |
+        */
+        'processing_job' => [
+            'max_tries' => env('PROCESSING_JOB_MAX_TRIES', 5),
+            'timeout_seconds' => env('PROCESSING_JOB_TIMEOUT', 600), // 10 minutes
+            'retry_after_seconds' => env('PROCESSING_JOB_RETRY_AFTER', 120),
+        ],
+    ],
 ];

@@ -24,7 +24,7 @@ use Illuminate\Support\Carbon;
  * @property string $task_type Тип задачи (translation, contradiction, ambiguity)
  * @property array<string, mixed> $options Опции обработки
  * @property bool $anchor_at_start Позиция якорей (true = начало, false = конец)
- * @property 'completed'|'estimated'|'failed'|'pending'|'processing'|'uploaded' $status Статус обработки
+ * @property 'analyzing'|'completed'|'estimated'|'failed'|'pending'|'processing'|'uploaded' $status Статус обработки
  * @property string|null $result Результат обработки
  * @property array<string, mixed>|null $error_details Детали ошибки
  * @property array<string, mixed>|null $processing_metadata Метаданные обработки
@@ -47,6 +47,7 @@ class DocumentProcessing extends Model
      * Возможные статусы обработки.
      */
     public const string STATUS_UPLOADED = 'uploaded';
+    public const string STATUS_ANALYZING = 'analyzing';
     public const string STATUS_ESTIMATED = 'estimated';
     public const string STATUS_PENDING = 'pending';
     public const string STATUS_PROCESSING = 'processing';
@@ -137,6 +138,14 @@ class DocumentProcessing extends Model
     }
 
     /**
+     * Проверяет, выполняется ли анализ структуры.
+     */
+    public function isAnalyzing(): bool
+    {
+        return $this->status === self::STATUS_ANALYZING;
+    }
+
+    /**
      * Проверяет, оценена ли стоимость.
      */
     public function isEstimated(): bool
@@ -151,6 +160,19 @@ class DocumentProcessing extends Model
     {
         $this->update([
             'status' => self::STATUS_UPLOADED,
+        ]);
+    }
+
+    /**
+     * Отмечает документ как анализируемый.
+     */
+    public function markAsAnalyzing(): void
+    {
+        $this->update([
+            'status' => self::STATUS_ANALYZING,
+            'processing_metadata' => array_merge($this->processing_metadata ?? [], [
+                'analysis_started_at' => now()->toISOString(),
+            ]),
         ]);
     }
 
@@ -233,6 +255,7 @@ class DocumentProcessing extends Model
     {
         return match ($this->status) {
             self::STATUS_UPLOADED => 10,
+            self::STATUS_ANALYZING => 15,
             self::STATUS_ESTIMATED => 20,
             self::STATUS_PENDING => 25,
             self::STATUS_PROCESSING => 50,
@@ -248,6 +271,7 @@ class DocumentProcessing extends Model
     {
         return match ($this->status) {
             self::STATUS_UPLOADED => 'Файл загружен',
+            self::STATUS_ANALYZING => 'Анализ структуры',
             self::STATUS_ESTIMATED => 'Стоимость рассчитана',
             self::STATUS_PENDING => 'Ожидает обработки',
             self::STATUS_PROCESSING => 'Обрабатывается',
@@ -284,6 +308,7 @@ class DocumentProcessing extends Model
     {
         return $query->whereIn('status', [
             self::STATUS_UPLOADED,
+            self::STATUS_ANALYZING,
             self::STATUS_ESTIMATED,
             self::STATUS_PENDING,
             self::STATUS_PROCESSING,

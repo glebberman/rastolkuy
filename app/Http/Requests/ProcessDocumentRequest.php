@@ -13,6 +13,7 @@ use Illuminate\Validation\Rule;
 class ProcessDocumentRequest extends FormRequest
 {
     use HandlesFileValidation;
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -28,7 +29,6 @@ class ProcessDocumentRequest extends FormRequest
      */
     public function rules(): array
     {
-        
         return [
             'file' => [
                 'required',
@@ -84,7 +84,6 @@ class ProcessDocumentRequest extends FormRequest
      */
     public function messages(): array
     {
-        
         return [
             'file.required' => 'Файл для обработки обязателен.',
             'file.file' => 'Загруженный файл должен быть валидным файлом.',

@@ -13,6 +13,7 @@ use App\Services\Parser\Extractors\Elements\TextElement;
 use App\Services\Parser\Extractors\Support\ElementClassifier;
 use App\Services\Parser\Extractors\Support\MetricsCollector;
 use DOMDocument;
+use DOMXPath;
 use Exception;
 use InvalidArgumentException;
 use RuntimeException;
@@ -140,6 +141,7 @@ readonly class DocxExtractor implements ExtractorInterface
 
         // Check for required DOCX structure files
         $requiredFiles = ['[Content_Types].xml', 'word/document.xml'];
+
         foreach ($requiredFiles as $file) {
             if ($zip->locateName($file) === false) {
                 $zip->close();
@@ -184,7 +186,7 @@ readonly class DocxExtractor implements ExtractorInterface
         $dom->loadXML($xmlContent);
 
         // Get all text nodes
-        $xpath = new \DOMXPath($dom);
+        $xpath = new DOMXPath($dom);
         $xpath->registerNamespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main');
 
         $textNodes = $xpath->query('//w:t');
