@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import { 
-    IconPlus, 
     IconFile, 
     IconClock, 
     IconCheck, 
@@ -81,29 +81,34 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
 
     // Auto-refresh credits balance periodically
     useEffect(() => {
+        if (!isAuthenticated) return;
+
         const refreshCredits = async () => {
             try {
-                const response = await fetch('/api/v1/user/stats');
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.data?.credits_balance !== undefined) {
-                        setCurrentStats(prev => ({
-                            ...prev,
-                            credits_balance: data.data.credits_balance
-                        }));
-                    }
+                const response = await axios.get('/api/v1/user/stats');
+                if (response.data?.data) {
+                    const { credits_balance, total_documents, processed_today } = response.data.data;
+                    setCurrentStats(prev => ({
+                        ...prev,
+                        credits_balance: credits_balance ?? prev.credits_balance,
+                        total_documents: total_documents ?? prev.total_documents,
+                        processed_today: processed_today ?? prev.processed_today,
+                    }));
                 }
             } catch (error) {
-                console.error('Failed to refresh credits:', error);
+                console.error('Failed to refresh stats:', error);
             }
         };
+
+        // Initial stats load
+        refreshCredits();
 
         // Refresh credits based on configuration
         const refreshInterval = (props.config?.polling?.dashboard?.credits_refresh_interval || 30) * 1000;
         const interval = setInterval(refreshCredits, refreshInterval);
         
         return () => clearInterval(interval);
-    }, []);
+    }, [isAuthenticated]);
 
     const handleStartNewUpload = () => {
         setSelectedFile(null);
@@ -191,24 +196,6 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                     Главная панель
                                 </h2>
                             </div>
-                            <div className="col-auto ms-auto d-print-none">
-                                <div className="btn-list">
-                                    <Link
-                                        href="/documents/upload"
-                                        className="btn btn-primary d-none d-sm-inline-block"
-                                    >
-                                        <IconPlus className="me-1" size={16} />
-                                        Загрузить документ
-                                    </Link>
-                                    <Link
-                                        href="/documents/upload"
-                                        className="btn btn-primary d-sm-none btn-icon"
-                                        aria-label="Загрузить документ"
-                                    >
-                                        <IconPlus size={16} />
-                                    </Link>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -288,23 +275,6 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
 
                         {/* Quick Actions */}
                         <div className="row row-cards mt-3">
-                            <div className="col-md-6 col-lg-4">
-                                <div className="card card-link">
-                                    <Link href="/documents/upload" className="d-block">
-                                        <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <span className="avatar avatar-md me-3 bg-primary-lt">
-                                                    <IconPlus size={24} />
-                                                </span>
-                                                <div>
-                                                    <div className="font-weight-medium">Загрузить документ</div>
-                                                    <div className="text-muted">Добавить новый договор для анализа</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </div>
-                            </div>
 
                             <div className="col-md-6 col-lg-4">
                                 <div className="card card-link">
