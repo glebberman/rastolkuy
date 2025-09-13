@@ -35,8 +35,14 @@ return [
     // Document processing specific settings
     'document_processing' => [
         'interval' => env('POLLING_DOCUMENT_INTERVAL', 5), // 5 seconds as per RAS-17
+        'estimation_interval' => env('POLLING_ESTIMATION_INTERVAL', 3), // 3 seconds for estimation polling
         'max_wait_time' => env('POLLING_DOCUMENT_MAX_WAIT', 600), // 10 minutes
         'statuses_to_poll' => ['pending', 'processing', 'estimated', 'uploaded'],
+    ],
+
+    // Dashboard credits refresh interval
+    'dashboard' => [
+        'credits_refresh_interval' => env('DASHBOARD_CREDITS_REFRESH_INTERVAL', 30), // 30 seconds
     ],
 
     // Cache settings for polling data

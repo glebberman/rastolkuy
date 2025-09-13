@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { usePage } from '@inertiajs/react';
 import { 
     IconFile, 
     IconCheck, 
@@ -46,6 +47,7 @@ export default function DocumentProcessor({
     onStartNewUpload,
     onCreditsUpdated
 }: DocumentProcessorProps) {
+    const { props } = usePage<{ config: { polling: { document_processing: { interval: number; estimation_interval: number } } } }>();
     const [state, setState] = useState<ProcessingState>('idle');
     const [data, setData] = useState<ProcessingData>({});
     const [error, setError] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export default function DocumentProcessor({
             } catch (err) {
                 console.error('Estimation polling error:', err);
             }
-        }, 3000); // 3 seconds for estimation polling
+        }, (props.config?.polling?.document_processing?.estimation_interval || 3) * 1000); // Configurable estimation polling
 
         setPollingInterval(interval);
     }, [pollingInterval]);
@@ -142,7 +144,7 @@ export default function DocumentProcessor({
             } catch (err) {
                 console.error('Processing polling error:', err);
             }
-        }, 5000); // 5 seconds as per RAS-17 requirements
+        }, (props.config?.polling?.document_processing?.interval || 5) * 1000); // Configurable processing polling as per RAS-17
 
         setPollingInterval(interval);
     }, [pollingInterval, onDocumentComplete]);
