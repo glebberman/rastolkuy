@@ -28,6 +28,12 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy())->toArray(),
                 'location' => $request->url(),
             ],
+            'config' => [
+                'polling' => [
+                    'document_processing' => config('polling.document_processing'),
+                    'dashboard' => config('polling.dashboard'),
+                ],
+            ],
         ];
     }
 }

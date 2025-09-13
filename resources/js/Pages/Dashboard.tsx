@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { 
     IconPlus, 
     IconFile, 
@@ -31,6 +31,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ recentDocuments = [], stats }: DashboardProps) {
+    const { props } = usePage<{ config: { polling: { dashboard: { credits_refresh_interval: number } } } }>();
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [currentStats, setCurrentStats] = useState(stats);
@@ -77,6 +78,32 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
             credits_balance: newBalance
         }));
     };
+
+    // Auto-refresh credits balance periodically
+    useEffect(() => {
+        const refreshCredits = async () => {
+            try {
+                const response = await fetch('/api/v1/user/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.data?.credits_balance !== undefined) {
+                        setCurrentStats(prev => ({
+                            ...prev,
+                            credits_balance: data.data.credits_balance
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to refresh credits:', error);
+            }
+        };
+
+        // Refresh credits based on configuration
+        const refreshInterval = (props.config?.polling?.dashboard?.credits_refresh_interval || 30) * 1000;
+        const interval = setInterval(refreshCredits, refreshInterval);
+        
+        return () => clearInterval(interval);
+    }, []);
 
     const handleStartNewUpload = () => {
         setSelectedFile(null);
@@ -197,7 +224,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                             <div className="subheader">Кредиты</div>
                                         </div>
                                         <div className="d-flex align-items-center">
-                                            <div className="h1 mb-0 me-2">{currentStats?.credits_balance || 0} кр.</div>
+                                            <div className="h1 mb-0 me-2">{currentStats?.credits_balance || 0}&nbsp;кр.</div>
                                             <div className="me-auto">
                                                 <IconCoins size={24} className="text-primary" />
                                             </div>
