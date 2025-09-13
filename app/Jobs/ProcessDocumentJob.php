@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\DocumentProcessing;
 use App\Services\DocumentProcessor;
+use App\Services\FileStorageService;
 use App\Services\LLM\CostCalculator;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -14,7 +15,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 
 class ProcessDocumentJob implements ShouldQueue
 {
@@ -34,7 +34,7 @@ class ProcessDocumentJob implements ShouldQueue
         $this->onQueue('document-processing');
     }
 
-    public function handle(DocumentProcessor $processor, CostCalculator $costCalculator): void
+    public function handle(DocumentProcessor $processor, CostCalculator $costCalculator, FileStorageService $fileStorageService): void
     {
         $documentProcessing = DocumentProcessing::find($this->documentProcessingId);
 
@@ -56,7 +56,7 @@ class ProcessDocumentJob implements ShouldQueue
         }
 
         // Проверяем существование файла
-        if (!Storage::disk('local')->exists($documentProcessing->file_path)) {
+        if (!$fileStorageService->exists($documentProcessing->file_path)) {
             $documentProcessing->markAsFailed('File not found', [
                 'file_path' => $documentProcessing->file_path,
             ]);
@@ -75,7 +75,7 @@ class ProcessDocumentJob implements ShouldQueue
             $documentProcessing->markAsProcessing();
 
             // Получаем полный путь к файлу
-            $fullFilePath = Storage::disk('local')->path($documentProcessing->file_path);
+            $fullFilePath = $fileStorageService->path($documentProcessing->file_path);
 
             // Обрабатываем документ
             $result = $processor->processFile(

@@ -57,7 +57,9 @@ class DocumentProcessingApiTest extends TestCase
         ]);
 
         Sanctum::actingAs($this->user);
-        Storage::fake('local');
+        Storage::fake('local'); // Still fake local for backward compatibility
+        Storage::fake('minio'); // Also fake the minio disk
+        Storage::fake('s3'); // And s3 disk
         Queue::fake();
     }
 
@@ -113,7 +115,9 @@ class DocumentProcessingApiTest extends TestCase
         // Verify file was stored
         $documentProcessing = DocumentProcessing::where('user_id', $this->user->id)->first();
         $this->assertNotNull($documentProcessing);
-        Storage::disk('local')->assertExists($documentProcessing->file_path);
+        // Use the default filesystem disk (minio in this case)
+        $defaultDisk = config('filesystems.default');
+        Storage::disk(is_string($defaultDisk) ? $defaultDisk : 'local')->assertExists($documentProcessing->file_path);
     }
 
     public function testUploadValidatesRequiredFields(): void
@@ -426,7 +430,8 @@ class DocumentProcessingApiTest extends TestCase
         ]);
 
         // Create a fake file
-        Storage::disk('local')->put($document->file_path, 'fake content');
+        $defaultDisk = config('filesystems.default');
+        Storage::disk(is_string($defaultDisk) ? $defaultDisk : 'local')->put($document->file_path, 'fake content');
 
         $response = $this->deleteJson(route('api.v1.documents.destroy', $document->uuid));
 
@@ -440,7 +445,8 @@ class DocumentProcessingApiTest extends TestCase
         ]);
 
         // Verify file was deleted
-        Storage::disk('local')->assertMissing($document->file_path);
+        $defaultDisk = config('filesystems.default');
+        Storage::disk(is_string($defaultDisk) ? $defaultDisk : 'local')->assertMissing($document->file_path);
     }
 
     public function testBackwardCompatibilityWithOldStoreEndpoint(): void
