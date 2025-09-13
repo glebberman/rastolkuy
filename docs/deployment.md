@@ -19,12 +19,18 @@
 │   (PHP 8.3)     │◄───┤   (Cache &      │
 │                 │    │    Queue)       │
 └─────────────────┘    └─────────────────┘
-         │
-         ▼
+         │                       ▲
+         ▼                       │
 ┌─────────────────┐    ┌─────────────────┐
-│   PostgreSQL    │    │     MinIO       │
-│   (Database)    │    │  (S3 Storage)   │
+│   PostgreSQL    │    │   Supervisor    │ ← RAS-27
+│   (Database)    │    │ (Queue Workers) │
 └─────────────────┘    └─────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │     MinIO       │
+                    │  (S3 Storage)   │
+                    └─────────────────┘
 ```
 
 ---
@@ -123,10 +129,22 @@ MAIL_ENCRYPTION=tls
 MAIL_FROM_ADDRESS=noreply@your-domain.com
 MAIL_FROM_NAME="${APP_NAME}"
 
-# Очереди
+# Очереди (обновлено в RAS-27)
 QUEUE_CONNECTION=redis
 CACHE_STORE=redis
 SESSION_DRIVER=redis
+
+# Document Queue Configuration
+DOCUMENT_ANALYSIS_QUEUE=document-analysis
+DOCUMENT_PROCESSING_QUEUE=document-processing
+ANALYSIS_JOB_MAX_TRIES=3
+ANALYSIS_JOB_TIMEOUT=300
+ANALYSIS_JOB_RETRY_DELAY=60
+
+# Processing Job Configuration  
+PROCESSING_JOB_MAX_TRIES=5
+PROCESSING_JOB_TIMEOUT=600
+PROCESSING_JOB_RETRY_AFTER=120
 
 # Логирование
 LOG_CHANNEL=stack
@@ -304,6 +322,76 @@ minio:
   volumes:
     - minio_data:/data
   command: server /data --console-address ":9001" --address ":9000"
+```
+
+### 5. Supervisor (Queue Workers) - Новое в RAS-27
+
+**Конфигурация**:
+- Веб интерфейс: http://localhost:9001
+- Управление queue workers для асинхронной обработки
+- Persistent logs: `storage/logs/worker.log`
+
+**Очереди**:
+- **default**: 2 воркера для общих задач
+- **document-analysis**: 1 воркер для анализа структуры документов
+- **document-processing**: 2 воркера для LLM-обработки
+
+**Управление**:
+```bash
+# Статус всех воркеров
+./bin/queue-status.sh status
+
+# Перезапуск воркеров
+./bin/queue-status.sh restart
+
+# Логи конкретной очереди
+./bin/queue-status.sh logs document-analysis
+
+# Просмотр неудачных задач
+./bin/queue-status.sh failed
+```
+
+**Продакшн настройки**:
+```yaml
+supervisor:
+  build:
+    context: .
+    dockerfile: docker/supervisor/Dockerfile.simple
+  restart: unless-stopped
+  volumes:
+    - .:/var/www
+    - ./storage/logs:/var/www/storage/logs
+  environment:
+    # Все переменные окружения передаются автоматически
+    - QUEUE_CONNECTION=${QUEUE_CONNECTION}
+    - DOCUMENT_ANALYSIS_QUEUE=${DOCUMENT_ANALYSIS_QUEUE}
+    - DOCUMENT_PROCESSING_QUEUE=${DOCUMENT_PROCESSING_QUEUE}
+    # ... остальные переменные
+  depends_on:
+    - postgres
+    - redis
+  networks:
+    - app-network
+```
+
+**Конфигурация worker'ов**:
+```ini
+# docker/supervisor/conf.d/laravel-worker.conf
+[program:laravel-worker-document-analysis]
+command=php /var/www/artisan queue:work redis --queue=document-analysis --tries=3 --timeout=300
+numprocs=1
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/www/storage/logs/worker.log
+
+[program:laravel-worker-document-processing]
+command=php /var/www/artisan queue:work redis --queue=document-processing --tries=3 --timeout=600
+numprocs=2
+autostart=true
+autorestart=true
+redirect_stderr=true
+stdout_logfile=/var/www/storage/logs/worker.log
 ```
 
 ---

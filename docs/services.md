@@ -384,6 +384,7 @@ InsufficientBalance::dispatch($user, $amount, $currentBalance, $operation);
 ### Обработка на основе очередей
 
 **Асинхронные задачи**:
+- `AnalyzeDocumentStructureJob` - Асинхронный анализ структуры документа (RAS-27)
 - `ProcessDocumentJob` - Основной рабочий процесс обработки документов
 - `ProcessLLMBatchTranslationJob` - Batch обработка переводов
 - `ProcessCreditRefund` - Асинхронная обработка возвратов
@@ -391,9 +392,13 @@ InsufficientBalance::dispatch($user, $amount, $currentBalance, $operation);
 
 **Конфигурация очередей**:
 - Система очередей на основе Redis
-- Выделенные очереди для разных операций
+- **Выделенные очереди** (обновлено в RAS-27):
+  - `default` - Основная очередь для общих задач
+  - `document-analysis` - Анализ структуры документов
+  - `document-processing` - LLM-обработка документов
 - Механизмы повторов с экспоненциальной задержкой
 - Dead letter очереди для неудачных задач
+- Supervisor для управления worker'ами в продакшене
 
 ### Стратегии кеширования
 
