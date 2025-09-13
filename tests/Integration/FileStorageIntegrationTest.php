@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Integration;
 
 use App\Services\FileStorageService;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
@@ -20,7 +21,7 @@ class FileStorageIntegrationTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        
+
         // Skip integration tests if S3/MinIO not configured
         if (!$this->isS3ConfigurationAvailable()) {
             $this->markTestSkipped('S3/MinIO configuration not available for integration testing');
@@ -93,7 +94,7 @@ class FileStorageIntegrationTest extends TestCase
 
         // Copy to local storage
         $localStorage = new FileStorageService('local');
-        
+
         // Get content from MinIO and store in local
         $content = $minioStorage->get($sourcePath);
         $localStorage->put($targetPath, $content);
@@ -118,14 +119,14 @@ class FileStorageIntegrationTest extends TestCase
         $testPath = 'integration-tests/disk-test-' . time() . '.txt';
 
         $diskTypes = ['local', 'minio'];
-        
+
         if ($this->isS3ConfigurationAvailable('s3')) {
             $diskTypes[] = 's3';
         }
 
         foreach ($diskTypes as $diskType) {
             $storage = new FileStorageService($diskType);
-            
+
             // Store file
             $success = $storage->put($testPath, $testContent);
             $this->assertTrue($success, "Failed to store file on {$diskType} disk");
@@ -167,12 +168,12 @@ class FileStorageIntegrationTest extends TestCase
     public function testFileStorageServiceGetStorageInfo(): void
     {
         $storageInfo = $this->fileStorageService->getStorageInfo();
-        
+
         $this->assertIsArray($storageInfo);
         $this->assertArrayHasKey('disk_name', $storageInfo);
         $this->assertArrayHasKey('supports_public_urls', $storageInfo);
         $this->assertArrayHasKey('driver', $storageInfo);
-        
+
         $this->assertEquals('minio', $storageInfo['disk_name']);
         $this->assertTrue($storageInfo['supports_public_urls']);
         $this->assertEquals('s3', $storageInfo['driver']);
@@ -184,24 +185,24 @@ class FileStorageIntegrationTest extends TestCase
     private function isS3ConfigurationAvailable(string $disk = 'minio'): bool
     {
         $config = Config::get("filesystems.disks.{$disk}");
-        
+
         if (!is_array($config)) {
             return false;
         }
 
         // For MinIO, check if we have at least endpoint and credentials
         if ($disk === 'minio') {
-            return !empty($config['endpoint'] ?? '') && 
-                   !empty($config['key'] ?? '') && 
-                   !empty($config['secret'] ?? '') &&
-                   !empty($config['bucket'] ?? '');
+            return !empty($config['endpoint'] ?? '')
+                   && !empty($config['key'] ?? '')
+                   && !empty($config['secret'] ?? '')
+                   && !empty($config['bucket'] ?? '');
         }
 
         // For S3, check if we have credentials and bucket
         if ($disk === 's3') {
-            return !empty($config['key'] ?? '') && 
-                   !empty($config['secret'] ?? '') &&
-                   !empty($config['bucket'] ?? '');
+            return !empty($config['key'] ?? '')
+                   && !empty($config['secret'] ?? '')
+                   && !empty($config['bucket'] ?? '');
         }
 
         return true;
@@ -214,43 +215,45 @@ class FileStorageIntegrationTest extends TestCase
     {
         try {
             $diskTypes = ['local', 'minio'];
-            
+
             if ($this->isS3ConfigurationAvailable('s3')) {
                 $diskTypes[] = 's3';
             }
 
             foreach ($diskTypes as $diskType) {
                 $storage = new FileStorageService($diskType);
-                
+
                 // Try to list and clean up test files
                 $disk = $storage->getDisk();
-                
+
                 // Clean up integration-tests folder
                 $testFiles = $disk->files('integration-tests');
+
                 foreach ($testFiles as $file) {
                     if (str_contains($file, 'test-') || str_contains($file, 'migration-test-')) {
                         $storage->delete($file);
                         echo "Cleaned up integration test file: {$file}\n";
                     }
                 }
-                
+
                 // Also clean up documents folder from any test files
                 if ($disk->exists('documents')) {
                     $documentFiles = $disk->files('documents');
+
                     foreach ($documentFiles as $file) {
-                        if (str_contains($file, 'test-') || 
-                            str_contains($file, 'connection-test') ||
+                        if (str_contains($file, 'test-')
+                            || str_contains($file, 'connection-test')
                             // Files with UUID pattern from tests
-                            preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/', basename($file))) {
+                            || preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/', basename($file))) {
                             $storage->delete($file);
                             echo "Cleaned up document test file: {$file}\n";
                         }
                     }
                 }
             }
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             // Ignore cleanup errors but show warning
-            echo "Cleanup warning: " . $e->getMessage() . "\n";
+            echo 'Cleanup warning: ' . $e->getMessage() . "\n";
         }
     }
 }

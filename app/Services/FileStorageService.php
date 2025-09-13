@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use Exception;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Contracts\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 
 /**
- * File Storage Service
- * 
+ * File Storage Service.
+ *
  * Provides an abstraction layer for file storage operations with support for
  * multiple storage drivers: local, MinIO, AWS S3, and custom S3-compatible services.
- * 
+ *
  * This service encapsulates file operations and provides a unified interface
  * regardless of the underlying storage implementation.
  */
 class FileStorageService
 {
     private Filesystem $disk;
+
     private string $diskName;
 
     public function __construct(?string $diskName = null)
@@ -33,12 +35,14 @@ class FileStorageService
     }
 
     /**
-     * Store an uploaded file
+     * Store an uploaded file.
      *
      * @param UploadedFile $file The uploaded file to store
      * @param string $path The path where to store the file
-     * @return string The stored file path
+     *
      * @throws InvalidArgumentException If file storage fails
+     *
+     * @return string The stored file path
      */
     public function store(UploadedFile $file, string $path): string
     {
@@ -53,7 +57,7 @@ class FileStorageService
             $storedPath = $file->storeAs(
                 dirname($path),
                 basename($path),
-                $this->diskName
+                $this->diskName,
             );
 
             if (!$storedPath) {
@@ -66,28 +70,30 @@ class FileStorageService
             ]);
 
             return $storedPath;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('File storage failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             throw new InvalidArgumentException('File storage failed: ' . $e->getMessage());
         }
     }
 
     /**
-     * Store file content directly
+     * Store file content directly.
      *
      * @param string $path The path where to store the content
      * @param string $content The content to store
+     *
      * @return bool True if successful
      */
     public function put(string $path, string $content): bool
     {
         try {
             $result = $this->disk->put($path, $content);
-            
+
             Log::info('Content stored successfully', [
                 'path' => $path,
                 'size' => strlen($content),
@@ -95,42 +101,47 @@ class FileStorageService
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('Content storage failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             throw new InvalidArgumentException('Content storage failed: ' . $e->getMessage());
         }
     }
 
     /**
-     * Check if a file exists
+     * Check if a file exists.
      *
      * @param string $path The file path to check
+     *
      * @return bool True if file exists
      */
     public function exists(string $path): bool
     {
         try {
             return $this->disk->exists($path);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::warning('File existence check failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             return false;
         }
     }
 
     /**
-     * Get file content
+     * Get file content.
      *
      * @param string $path The file path
-     * @return string File content
+     *
      * @throws InvalidArgumentException If file cannot be read
+     *
+     * @return string File content
      */
     public function get(string $path): string
     {
@@ -140,27 +151,29 @@ class FileStorageService
             }
 
             $content = $this->disk->get($path);
-            
+
             if ($content === null) {
                 throw new InvalidArgumentException("Failed to read file: {$path}");
             }
 
             return $content;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('File read failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             throw new InvalidArgumentException('File read failed: ' . $e->getMessage());
         }
     }
 
     /**
      * Get the full path to a file
-     * For local storage returns filesystem path, for S3-like storage returns URL
+     * For local storage returns filesystem path, for S3-like storage returns URL.
      *
      * @param string $path The relative file path
+     *
      * @return string The full path or URL
      */
     public function path(string $path): string
@@ -175,11 +188,13 @@ class FileStorageService
     }
 
     /**
-     * Get a public URL for a file
+     * Get a public URL for a file.
      *
      * @param string $path The file path
-     * @return string The public URL
+     *
      * @throws InvalidArgumentException If URL generation fails
+     *
+     * @return string The public URL
      */
     public function url(string $path): string
     {
@@ -187,25 +202,28 @@ class FileStorageService
             if ($this->diskName === 'local') {
                 // For local storage, return app URL with storage link
                 $appUrl = Config::get('app.url', 'http://localhost');
+
                 return $appUrl . '/storage/' . $path;
             }
 
             // For S3-like storage, generate temporary URL
             return $this->disk->temporaryUrl($path, now()->addHours(24));
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('URL generation failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             throw new InvalidArgumentException('URL generation failed: ' . $e->getMessage());
         }
     }
 
     /**
-     * Delete a file
+     * Delete a file.
      *
      * @param string $path The file path to delete
+     *
      * @return bool True if successful
      */
     public function delete(string $path): bool
@@ -216,32 +234,35 @@ class FileStorageService
                     'path' => $path,
                     'disk' => $this->diskName,
                 ]);
+
                 return true;
             }
 
             $result = $this->disk->delete($path);
-            
+
             Log::info('File deleted successfully', [
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('File deletion failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             return false;
         }
     }
 
     /**
-     * Copy a file from one location to another
+     * Copy a file from one location to another.
      *
      * @param string $from Source path
      * @param string $to Destination path
+     *
      * @return bool True if successful
      */
     public function copy(string $from, string $to): bool
@@ -252,7 +273,7 @@ class FileStorageService
             }
 
             $result = $this->disk->copy($from, $to);
-            
+
             Log::info('File copied successfully', [
                 'from' => $from,
                 'to' => $to,
@@ -260,23 +281,26 @@ class FileStorageService
             ]);
 
             return $result;
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('File copy failed', [
                 'error' => $e->getMessage(),
                 'from' => $from,
                 'to' => $to,
                 'disk' => $this->diskName,
             ]);
+
             return false;
         }
     }
 
     /**
-     * Get file size in bytes
+     * Get file size in bytes.
      *
      * @param string $path The file path
-     * @return int File size in bytes
+     *
      * @throws InvalidArgumentException If file size cannot be determined
+     *
+     * @return int File size in bytes
      */
     public function size(string $path): int
     {
@@ -286,22 +310,25 @@ class FileStorageService
             }
 
             return $this->disk->size($path);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('File size check failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             throw new InvalidArgumentException('File size check failed: ' . $e->getMessage());
         }
     }
 
     /**
-     * Get file last modified timestamp
+     * Get file last modified timestamp.
      *
      * @param string $path The file path
-     * @return int Unix timestamp
+     *
      * @throws InvalidArgumentException If timestamp cannot be determined
+     *
+     * @return int Unix timestamp
      */
     public function lastModified(string $path): int
     {
@@ -311,18 +338,19 @@ class FileStorageService
             }
 
             return $this->disk->lastModified($path);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             Log::error('File last modified check failed', [
                 'error' => $e->getMessage(),
                 'path' => $path,
                 'disk' => $this->diskName,
             ]);
+
             throw new InvalidArgumentException('File last modified check failed: ' . $e->getMessage());
         }
     }
 
     /**
-     * Get the current disk name
+     * Get the current disk name.
      *
      * @return string Current disk name
      */
@@ -332,9 +360,7 @@ class FileStorageService
     }
 
     /**
-     * Get the underlying filesystem instance
-     *
-     * @return Filesystem
+     * Get the underlying filesystem instance.
      */
     public function getDisk(): Filesystem
     {
@@ -342,7 +368,7 @@ class FileStorageService
     }
 
     /**
-     * Check if current storage supports public URLs
+     * Check if current storage supports public URLs.
      *
      * @return bool True if public URLs are supported
      */
@@ -352,7 +378,7 @@ class FileStorageService
     }
 
     /**
-     * Get storage statistics
+     * Get storage statistics.
      *
      * @return array Storage information
      */

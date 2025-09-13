@@ -41,6 +41,22 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
     public int $timeout;
 
     /**
+     * Create a new job instance.
+     */
+    public function __construct(
+        private readonly int $documentProcessingId,
+        private readonly ?string $model = null,
+    ) {
+        $queueConfig = app(QueueConfigurationService::class);
+
+        $this->onQueue($queueConfig->getDocumentAnalysisQueue());
+
+        $jobConfig = $queueConfig->getAnalysisJobConfig();
+        $this->tries = $jobConfig['max_tries'];
+        $this->timeout = $jobConfig['timeout_seconds'];
+    }
+
+    /**
      * Calculate the number of seconds to wait before retrying the job.
      */
     public function backoff(): array
@@ -48,7 +64,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
         $queueConfig = app(QueueConfigurationService::class);
         $jobConfig = $queueConfig->getAnalysisJobConfig();
         $baseDelay = $jobConfig['retry_after_seconds'];
-        
+
         // Exponential backoff: 60s, 120s, 240s
         return [
             $baseDelay,
@@ -63,22 +79,6 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
     public function uniqueId(): string
     {
         return "analyze_document_{$this->documentProcessingId}";
-    }
-
-    /**
-     * Create a new job instance.
-     */
-    public function __construct(
-        private readonly int $documentProcessingId,
-        private readonly ?string $model = null,
-    ) {
-        $queueConfig = app(QueueConfigurationService::class);
-        
-        $this->onQueue($queueConfig->getDocumentAnalysisQueue());
-        
-        $jobConfig = $queueConfig->getAnalysisJobConfig();
-        $this->tries = $jobConfig['max_tries'];
-        $this->timeout = $jobConfig['timeout_seconds'];
     }
 
     /**

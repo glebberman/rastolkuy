@@ -8,7 +8,6 @@ use App\Models\DocumentProcessing;
 use App\Services\FileStorageService;
 use Exception;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -42,15 +41,16 @@ class MigrateStorageFiles extends Command
 
         if (!is_string($fromDisk) || !is_string($toDisk)) {
             $this->error('From and to disk options must be strings');
+
             return self::FAILURE;
         }
 
-        $this->info("Storage Migration Tool");
+        $this->info('Storage Migration Tool');
         $this->info("From: {$fromDisk}");
         $this->info("To: {$toDisk}");
-        
+
         if ($dryRun) {
-            $this->warn("DRY RUN MODE - No files will be actually moved");
+            $this->warn('DRY RUN MODE - No files will be actually moved');
         }
 
         // Validate storage disks exist
@@ -68,6 +68,7 @@ class MigrateStorageFiles extends Command
 
         if ($totalDocuments === 0) {
             $this->info('No documents found to migrate.');
+
             return self::SUCCESS;
         }
 
@@ -75,6 +76,7 @@ class MigrateStorageFiles extends Command
 
         if (!$dryRun && !$this->confirm('Do you want to proceed with the migration?')) {
             $this->info('Migration cancelled.');
+
             return self::SUCCESS;
         }
 
@@ -103,17 +105,17 @@ class MigrateStorageFiles extends Command
                         $document,
                         $fromStorage,
                         $toStorage,
-                        $dryRun
+                        $dryRun,
                     );
 
                     if ($result === 'migrated') {
-                        $migrated++;
+                        ++$migrated;
                     } elseif ($result === 'skipped') {
-                        $skipped++;
+                        ++$skipped;
                     }
                 } catch (Exception $e) {
-                    $failed++;
-                    
+                    ++$failed;
+
                     Log::error('Failed to migrate document file', [
                         'document_uuid' => $document->uuid,
                         'file_path' => $document->file_path,
@@ -123,6 +125,7 @@ class MigrateStorageFiles extends Command
                     if (!$continueOnError) {
                         $progressBar->finish();
                         $this->error("\nMigration failed for document {$document->uuid}: {$e->getMessage()}");
+
                         return false;
                     }
                 }
@@ -135,17 +138,19 @@ class MigrateStorageFiles extends Command
 
         // Summary
         $this->newLine(2);
-        $this->info("Migration Summary:");
+        $this->info('Migration Summary:');
         $this->info("  Migrated: {$migrated}");
         $this->info("  Skipped: {$skipped}");
         $this->info("  Failed: {$failed}");
 
         if ($failed > 0) {
-            $this->warn("Some files failed to migrate. Check the logs for details.");
+            $this->warn('Some files failed to migrate. Check the logs for details.');
+
             return $continueOnError ? self::SUCCESS : self::FAILURE;
         }
 
-        $this->info("Migration completed successfully!");
+        $this->info('Migration completed successfully!');
+
         return self::SUCCESS;
     }
 
@@ -161,11 +166,13 @@ class MigrateStorageFiles extends Command
 
             if (!$fromConfig) {
                 $this->error("Source storage disk '{$fromDisk}' is not configured");
+
                 return false;
             }
 
             if (!$toConfig) {
                 $this->error("Target storage disk '{$toDisk}' is not configured");
+
                 return false;
             }
 
@@ -178,19 +185,22 @@ class MigrateStorageFiles extends Command
             $testContent = 'This is a test file for storage migration validation';
 
             $toStorage->put($testFile, $testContent);
-            
+
             if (!$toStorage->exists($testFile)) {
                 $this->error("Cannot write to target storage disk '{$toDisk}'");
+
                 return false;
             }
 
             // Clean up test file
             $toStorage->delete($testFile);
 
-            $this->info("✓ Storage disks validated successfully");
+            $this->info('✓ Storage disks validated successfully');
+
             return true;
         } catch (Exception $e) {
             $this->error("Storage validation failed: {$e->getMessage()}");
+
             return false;
         }
     }
@@ -202,24 +212,27 @@ class MigrateStorageFiles extends Command
         DocumentProcessing $document,
         FileStorageService $fromStorage,
         FileStorageService $toStorage,
-        bool $dryRun
+        bool $dryRun,
     ): string {
         $filePath = $document->file_path;
 
         // Check if source file exists
         if (!$fromStorage->exists($filePath)) {
             $this->warn("Source file does not exist: {$filePath}");
+
             return 'skipped';
         }
 
         // Check if target file already exists
         if ($toStorage->exists($filePath)) {
             $this->warn("Target file already exists: {$filePath}");
+
             return 'skipped';
         }
 
         if ($dryRun) {
             $this->line("Would migrate: {$filePath}");
+
             return 'migrated';
         }
 
@@ -240,6 +253,7 @@ class MigrateStorageFiles extends Command
         }
 
         $this->line("✓ Migrated: {$filePath}");
+
         return 'migrated';
     }
 }

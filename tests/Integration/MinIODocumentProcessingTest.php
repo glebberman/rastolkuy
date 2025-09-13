@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
-use App\Jobs\AnalyzeDocumentStructureJob;
 use App\Models\DocumentProcessing;
 use App\Models\User;
 use App\Models\UserCredit;
 use App\Services\AuditService;
 use App\Services\FileStorageService;
 use App\Services\LLM\CostCalculator;
+use App\Services\Parser\Extractors\ExtractorManager;
+use App\Services\Structure\Contracts\AnchorGeneratorInterface;
+use App\Services\Structure\Contracts\SectionDetectorInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Config;
@@ -21,7 +23,7 @@ use Tests\TestCase;
 
 /**
  * Integration tests for document processing with MinIO storage.
- * 
+ *
  * These tests require a running MinIO instance (via docker-compose).
  */
 class MinIODocumentProcessingTest extends TestCase
@@ -29,6 +31,7 @@ class MinIODocumentProcessingTest extends TestCase
     use RefreshDatabase;
 
     private User $user;
+
     private FileStorageService $fileStorageService;
 
     /**
@@ -73,7 +76,7 @@ class MinIODocumentProcessingTest extends TestCase
 
         // Use MinIO for file storage
         $this->fileStorageService = new FileStorageService('minio');
-        
+
         // Override default filesystem config for this test
         Config::set('filesystems.default', 'minio');
     }
@@ -119,14 +122,14 @@ class MinIODocumentProcessingTest extends TestCase
         // Verify file was stored in MinIO
         $documentProcessing = DocumentProcessing::where('user_id', $this->user->id)->first();
         $this->assertNotNull($documentProcessing);
-        
+
         // Check that file exists in MinIO
         $this->assertTrue($this->fileStorageService->exists($documentProcessing->file_path));
-        
+
         // Verify we can retrieve the file (fake file might have minimal content)
         $fileContent = $this->fileStorageService->get($documentProcessing->file_path);
         $this->assertIsString($fileContent);
-        
+
         // Verify file size is reasonable (fake files might have different sizes)
         $storedSize = $this->fileStorageService->size($documentProcessing->file_path);
         $this->assertGreaterThanOrEqual(0, $storedSize);
@@ -143,7 +146,7 @@ class MinIODocumentProcessingTest extends TestCase
         // Create the file in MinIO
         $testContent = 'fake content for MinIO test';
         $this->fileStorageService->put($document->file_path, $testContent);
-        
+
         // Verify file exists
         $this->assertTrue($this->fileStorageService->exists($document->file_path));
 
@@ -167,17 +170,17 @@ class MinIODocumentProcessingTest extends TestCase
     {
         $testContent = 'Test content for URL generation';
         $testPath = 'documents/url-test-' . time() . '.txt';
-        
+
         // Store file in MinIO
         $this->fileStorageService->put($testPath, $testContent);
-        
+
         // Generate URL
         $url = $this->fileStorageService->url($testPath);
-        
+
         $this->assertIsString($url);
         $this->assertNotEmpty($url);
         $this->assertStringContainsString('minio', $url);
-        
+
         // Cleanup
         $this->fileStorageService->delete($testPath);
     }
@@ -185,7 +188,7 @@ class MinIODocumentProcessingTest extends TestCase
     public function testFileStorageServiceInfoForMinIO(): void
     {
         $storageInfo = $this->fileStorageService->getStorageInfo();
-        
+
         $this->assertEquals('minio', $storageInfo['disk_name']);
         $this->assertTrue($storageInfo['supports_public_urls']);
         $this->assertEquals('s3', $storageInfo['driver']);
@@ -230,7 +233,7 @@ class MinIODocumentProcessingTest extends TestCase
         // Test delete operation
         $this->fileStorageService->delete($sourcePath);
         $this->assertFalse($this->fileStorageService->exists($sourcePath));
-        
+
         $this->fileStorageService->delete($targetPath);
         $this->assertFalse($this->fileStorageService->exists($targetPath));
     }
@@ -242,7 +245,7 @@ class MinIODocumentProcessingTest extends TestCase
     {
         try {
             $config = Config::get('filesystems.disks.minio');
-            
+
             if (!is_array($config) || empty($config['endpoint'] ?? '')) {
                 return false;
             }
@@ -250,13 +253,15 @@ class MinIODocumentProcessingTest extends TestCase
             // Try to connect to MinIO by creating a test file
             $testStorage = new FileStorageService('minio');
             $testPath = 'connection-test-' . time() . '.txt';
-            
+
             $success = $testStorage->put($testPath, 'connection test');
+
             if ($success) {
                 $testStorage->delete($testPath);
+
                 return true;
             }
-            
+
             return false;
         } catch (\Exception $e) {
             return false;
@@ -271,41 +276,40 @@ class MinIODocumentProcessingTest extends TestCase
         try {
             $disk = $this->fileStorageService->getDisk();
             $allFiles = $disk->allFiles('documents');
-            
+
             foreach ($allFiles as $file) {
                 // Clean up ALL test files (fake files from tests)
-                if (str_contains($file, '-test-') || 
-                    str_contains($file, 'test-') || 
-                    str_contains($file, 'connection-test') ||
-                    str_contains($file, 'url-test') ||
+                if (str_contains($file, '-test-')
+                    || str_contains($file, 'test-')
+                    || str_contains($file, 'connection-test')
+                    || str_contains($file, 'url-test')
                     // Clean up files with UUID pattern (from fake uploads)
-                    preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/', basename($file))) {
-                    
+                    || preg_match('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/', basename($file))) {
                     $this->fileStorageService->delete($file);
                     echo "Cleaned up test file: {$file}\n";
                 }
             }
         } catch (\Exception $e) {
             // Ignore cleanup errors but log them
-            echo "Cleanup warning: " . $e->getMessage() . "\n";
+            echo 'Cleanup warning: ' . $e->getMessage() . "\n";
         }
     }
 
     private function mockStructureAnalysisServices(): void
     {
         // Create mock for SectionDetectorInterface
-        $sectionDetectorMock = $this->createMock(\App\Services\Structure\Contracts\SectionDetectorInterface::class);
+        $sectionDetectorMock = $this->createMock(SectionDetectorInterface::class);
         $sectionDetectorMock->method('detectSections')->willReturn([]);
-        $this->app->instance(\App\Services\Structure\Contracts\SectionDetectorInterface::class, $sectionDetectorMock);
+        $this->app->instance(SectionDetectorInterface::class, $sectionDetectorMock);
 
         // Create mock for AnchorGeneratorInterface
-        $anchorGeneratorMock = $this->createMock(\App\Services\Structure\Contracts\AnchorGeneratorInterface::class);
+        $anchorGeneratorMock = $this->createMock(AnchorGeneratorInterface::class);
         $anchorGeneratorMock->method('generate')->willReturn('<!-- SECTION_ANCHOR_test_123 -->');
         $anchorGeneratorMock->method('resetUsedAnchors');
-        $this->app->instance(\App\Services\Structure\Contracts\AnchorGeneratorInterface::class, $anchorGeneratorMock);
+        $this->app->instance(AnchorGeneratorInterface::class, $anchorGeneratorMock);
 
         // Mock ExtractorManager
-        $extractorManagerMock = $this->createMock(\App\Services\Parser\Extractors\ExtractorManager::class);
+        $extractorManagerMock = $this->createMock(ExtractorManager::class);
         $extractedDocumentMock = new \App\Services\Parser\Extractors\DTOs\ExtractedDocument(
             originalPath: '/test/path.pdf',
             mimeType: 'application/pdf',
@@ -317,6 +321,6 @@ class MinIODocumentProcessingTest extends TestCase
             errors: null,
         );
         $extractorManagerMock->method('extract')->willReturn($extractedDocumentMock);
-        $this->app->instance(\App\Services\Parser\Extractors\ExtractorManager::class, $extractorManagerMock);
+        $this->app->instance(ExtractorManager::class, $extractorManagerMock);
     }
 }

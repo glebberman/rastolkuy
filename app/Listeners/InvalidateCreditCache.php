@@ -7,6 +7,7 @@ namespace App\Listeners;
 use App\Events\CreditAdded;
 use App\Events\CreditDebited;
 use App\Events\CreditRefunded;
+use BadMethodCallException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\Cache;
 
@@ -26,7 +27,7 @@ class InvalidateCreditCache implements ShouldQueue
         // Invalidate credit history cache for this user using tags if supported
         try {
             Cache::tags(["user_credits_{$event->user->id}"])->flush();
-        } catch (\BadMethodCallException $e) {
+        } catch (BadMethodCallException $e) {
             // Cache store doesn't support tagging, fallback to individual key invalidation
             // This is acceptable for testing with array cache driver
             Cache::forget("user_credit_history_{$event->user->id}");
