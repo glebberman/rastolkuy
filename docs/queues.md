@@ -15,12 +15,22 @@
 ### Workflow обработки:
 
 ```
-Document Upload → AnalyzeDocumentStructureJob (document-analysis)
+Document Upload → Status: 'uploaded'
                 ↓
-              Document Estimation → ProcessDocumentJob (document-processing)
+              estimateDocumentCost() → Status: 'analyzing'
                 ↓
-            Document Completed
+              AnalyzeDocumentStructureJob (document-analysis)
+                ↓
+              Status: 'estimated' → Ready for processing
+                ↓
+              processDocument() → Status: 'processing' 
+                ↓
+              ProcessDocumentJob (document-processing)
+                ↓
+              Status: 'completed'
 ```
+
+**Новое в RAS-27**: Анализ структуры документа теперь выполняется асинхронно через очередь `document-analysis`, что позволяет обрабатывать большие документы без блокировки пользовательского интерфейса.
 
 ## 🔧 Настройка
 
@@ -156,6 +166,11 @@ DOCUMENT_PROCESSING_QUEUE=document-processing
 ANALYSIS_JOB_MAX_TRIES=3
 ANALYSIS_JOB_TIMEOUT=300
 ANALYSIS_JOB_RETRY_DELAY=60
+
+# Настройки обработки (Processing Job)
+PROCESSING_JOB_MAX_TRIES=5
+PROCESSING_JOB_TIMEOUT=600
+PROCESSING_JOB_RETRY_AFTER=120
 
 # Claude API для worker'ов
 CLAUDE_API_KEY=your-claude-api-key

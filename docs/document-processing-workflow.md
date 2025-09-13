@@ -61,45 +61,91 @@ public function uploadDocument(UploadDocumentDto $dto, User $user): DocumentProc
 
 **Endpoint**: `POST /v1/documents/{uuid}/estimate`
 
+**Изменения в RAS-27**: Анализ структуры документа теперь выполняется асинхронно через очередь `document-analysis`.
+
 **Что происходит:**
 1. Проверяется статус документа (должен быть `uploaded`)
-2. Анализируется размер файла и сложность задачи
-3. Рассчитывается примерное количество токенов
-4. Определяется стоимость в USD и кредитах
+2. **Новое**: Статус меняется на `analyzing` и запускается `AnalyzeDocumentStructureJob`
+3. Асинхронно выполняется анализ структуры документа
+4. После завершения анализа рассчитывается стоимость в USD и кредитах
 5. Проверяется достаточность баланса пользователя
 6. Статус меняется на `estimated`
 
-**Статус документа**: `estimated` (progress: 20%)
+**Статусы документа**: `uploaded` → `analyzing` (15%) → `estimated` (20%)
 
 ```php
-// DocumentProcessingService.php
-public function estimateDocumentCost(DocumentProcessing $doc, EstimateDocumentDto $dto): DocumentProcessing
+// DocumentProcessingService.php - Обновленная версия с асинхронным анализом (RAS-27)
+public function estimateDocumentCost(DocumentProcessing $documentProcessing, EstimateDocumentDto $dto): DocumentProcessing
 {
     // 1. Проверка статуса
-    if (!$doc->isUploaded()) {
-        throw new InvalidArgumentException('Document must be in uploaded status');
+    if (!$documentProcessing->isUploaded()) {
+        throw new InvalidArgumentException('Document must be in uploaded status for estimation');
     }
+
+    // 2. Переход к статусу анализа
+    $documentProcessing->markAsAnalyzing();
+
+    // 3. Запуск асинхронного анализа структуры через очередь
+    $queueName = config('document.queue.document_analysis_queue', 'document-analysis');
     
-    // 2. Расчет стоимости
-    $estimation = $this->estimateProcessingCost($doc->file_size, $model);
-    $creditsNeeded = $this->creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
-    
-    // 3. Проверка баланса
-    $hasSufficientBalance = $this->creditService->hasSufficientBalance($user, $creditsNeeded);
-    
-    // 4. Сохранение оценки в метаданных
-    $estimationData = [
-        'estimation' => [
+    AnalyzeDocumentStructureJob::dispatch($documentProcessing->id, $dto->model)
+        ->onQueue($queueName)
+        ->delay(now()->addSeconds(1));
+
+    return $documentProcessing->fresh();
+}
+
+// Теперь анализ и расчет стоимости происходит в AnalyzeDocumentStructureJob:
+// app/Jobs/AnalyzeDocumentStructureJob.php
+public function handle(
+    DocumentProcessingService $documentProcessingService,
+    CostCalculator $costCalculator,
+    CreditService $creditService
+): void {
+    $documentProcessing = DocumentProcessing::find($this->documentProcessingId);
+
+    if (!$documentProcessing || !$documentProcessing->isAnalyzing()) {
+        return;
+    }
+
+    try {
+        // Анализ структуры документа
+        $extractedDocument = $this->extractDocument($documentProcessing);
+        $structureAnalysis = $this->analyzeStructure($extractedDocument);
+
+        // Расчет стоимости на основе анализа
+        $estimation = $costCalculator->estimateProcessingCost(
+            fileSize: $documentProcessing->file_size,
+            model: $this->model,
+            structureComplexity: $structureAnalysis->averageConfidence
+        );
+
+        $creditsNeeded = $creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
+        $user = $documentProcessing->user;
+        $hasSufficientBalance = $creditService->hasSufficientBalance($user, $creditsNeeded);
+
+        // Сохранение результатов анализа и оценки
+        $estimationData = [
             'estimated_cost_usd' => $estimation['estimated_cost_usd'],
             'credits_needed' => $creditsNeeded,
             'has_sufficient_balance' => $hasSufficientBalance,
-            'model_selected' => $model,
-            // ... другие данные
-        ]
-    ];
-    
-    $doc->markAsEstimated($estimationData);
-    return $doc->fresh();
+            'user_balance' => $creditService->getBalance($user),
+            'model_selected' => $this->model,
+            'analysis_duration_ms' => $structureAnalysis->analysisTime * 1000,
+        ];
+
+        $documentProcessing->markAsEstimatedWithStructure($estimationData, [
+            'sections_count' => $structureAnalysis->getSectionsCount(),
+            'average_confidence' => $structureAnalysis->averageConfidence,
+            'analysis_warnings' => $structureAnalysis->warnings,
+        ]);
+
+    } catch (Exception $e) {
+        $documentProcessing->markAsFailed('Structure analysis failed', [
+            'error' => $e->getMessage(),
+            'stage' => 'structure_analysis',
+        ]);
+    }
 }
 ```
 
@@ -192,6 +238,7 @@ public function processEstimatedDocument(DocumentProcessing $doc): DocumentProce
 ```php
 // DocumentProcessing Model
 public const string STATUS_UPLOADED = 'uploaded';    // Файл загружен (10%)
+public const string STATUS_ANALYZING = 'analyzing';  // Анализ структуры (15%) - Новое в RAS-27
 public const string STATUS_ESTIMATED = 'estimated';  // Стоимость рассчитана (20%) 
 public const string STATUS_PENDING = 'pending';      // В очереди на обработку (25%)
 public const string STATUS_PROCESSING = 'processing'; // Обрабатывается (50%)
@@ -204,14 +251,17 @@ public const string STATUS_CANCELLED = 'cancelled';  // Отменено пол�
 
 ```mermaid
 graph LR
-    A[uploaded] --> B[estimated]
-    B --> C[pending]
-    C --> D[processing]
-    D --> E[completed]
-    D --> F[failed]
-    A --> G[cancelled]
-    B --> G[cancelled]
-    C --> G[cancelled]
+    A[uploaded] --> B[analyzing]
+    B --> C[estimated]
+    C --> D[pending]
+    D --> E[processing]
+    E --> F[completed]
+    E --> G[failed]
+    A --> H[cancelled]
+    B --> H[cancelled]
+    C --> H[cancelled]
+    D --> H[cancelled]
+    B --> G[failed]
 ```
 
 ### Ключевые поля БД
