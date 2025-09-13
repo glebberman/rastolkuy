@@ -40,6 +40,21 @@ tasks:
     cmds:
       - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/phpunit {{.CLI_ARGS}}"
 
+  test-integration:
+    desc: "Run integration tests with MinIO (requires running docker services)"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/phpunit --configuration phpunit-integration.xml {{.CLI_ARGS}}"
+
+  test-storage:
+    desc: "Run storage-specific integration tests"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/phpunit tests/Integration/FileStorageIntegrationTest.php {{.CLI_ARGS}}"
+
+  test-minio:
+    desc: "Run MinIO document processing tests"
+    cmds:
+      - "{{.DOCKER_COMPOSE}} exec {{.CONTAINER_APP}} vendor/bin/phpunit tests/Integration/MinIODocumentProcessingTest.php {{.CLI_ARGS}}"
+
   # Дополнительные полезные команды
   install:
     desc: "Install composer dependencies"

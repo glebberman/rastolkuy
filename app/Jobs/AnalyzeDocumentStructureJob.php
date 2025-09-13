@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\DocumentProcessing;
 use App\Services\CreditService;
+use App\Services\FileStorageService;
 use App\Services\LLM\CostCalculator;
 use App\Services\Parser\Extractors\ExtractorManager;
 use App\Services\Queue\QueueConfigurationService;
@@ -19,7 +20,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -89,6 +89,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
         StructureAnalyzer $structureAnalyzer,
         CostCalculator $costCalculator,
         CreditService $creditService,
+        FileStorageService $fileStorageService,
     ): void {
         Log::info('Starting async document structure analysis job', [
             'document_processing_id' => $this->documentProcessingId,
@@ -121,6 +122,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
                 $structureAnalyzer,
                 $costCalculator,
                 $creditService,
+                $fileStorageService,
             );
 
             Log::info('Document structure analysis job completed successfully', [
@@ -173,6 +175,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
         StructureAnalyzer $structureAnalyzer,
         CostCalculator $costCalculator,
         CreditService $creditService,
+        FileStorageService $fileStorageService,
     ): void {
         // Check file size limits
         $maxFileSizeMb = config('document.structure_analysis.max_file_size_mb', 50);
@@ -186,7 +189,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
 
         // Extract document content
         $extractedDocument = $extractorManager->extract(
-            Storage::disk('local')->path($documentProcessing->file_path),
+            $fileStorageService->path($documentProcessing->file_path),
         );
 
         // Analyze structure

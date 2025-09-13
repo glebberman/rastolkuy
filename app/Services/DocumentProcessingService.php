@@ -11,6 +11,7 @@ use App\Jobs\AnalyzeDocumentStructureJob;
 use App\Jobs\ProcessDocumentJob;
 use App\Models\DocumentProcessing;
 use App\Models\User;
+use App\Services\FileStorageService;
 use App\Services\LLM\CostCalculator;
 use App\Services\Parser\Extractors\ExtractorManager;
 use App\Services\Structure\DTOs\DocumentSection;
@@ -19,7 +20,6 @@ use Exception;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
@@ -37,6 +37,7 @@ readonly class DocumentProcessingService
         private CreditService $creditService,
         private ExtractorManager $extractorManager,
         private StructureAnalyzer $structureAnalyzer,
+        private FileStorageService $fileStorageService,
     ) {
     }
 
@@ -54,7 +55,7 @@ readonly class DocumentProcessingService
         $filename = $uuid . '.' . $extension;
 
         // Сохраняем файл
-        $filePath = $file->storeAs('documents', $filename, 'local');
+        $filePath = $this->fileStorageService->store($file, "documents/{$filename}");
 
         if (!$filePath) {
             throw new RuntimeException('Failed to store uploaded file');
@@ -102,7 +103,7 @@ readonly class DocumentProcessingService
         $filename = $uuid . '.' . $extension;
 
         // Сохраняем файл
-        $filePath = $dto->file->storeAs('documents', $filename, 'local');
+        $filePath = $this->fileStorageService->store($dto->file, "documents/{$filename}");
 
         if (!$filePath) {
             throw new RuntimeException('Failed to store uploaded file');
@@ -570,8 +571,8 @@ readonly class DocumentProcessingService
      */
     private function deleteFileIfExists(?string $filePath): void
     {
-        if ($filePath && Storage::disk('local')->exists($filePath)) {
-            Storage::disk('local')->delete($filePath);
+        if ($filePath && $this->fileStorageService->exists($filePath)) {
+            $this->fileStorageService->delete($filePath);
         }
     }
 
@@ -663,7 +664,7 @@ readonly class DocumentProcessingService
         ]);
 
         $extractedDocument = $this->extractorManager->extract(
-            Storage::disk('local')->path($documentProcessing->file_path),
+            $this->fileStorageService->path($documentProcessing->file_path),
         );
 
         return $this->structureAnalyzer->analyze($extractedDocument)->sections;
@@ -677,7 +678,7 @@ readonly class DocumentProcessingService
     private function extractContent(DocumentProcessing $documentProcessing): string
     {
         $extractedDocument = $this->extractorManager->extract(
-            Storage::disk('local')->path($documentProcessing->file_path),
+            $this->fileStorageService->path($documentProcessing->file_path),
         );
 
         $content = $extractedDocument->getPlainText();
