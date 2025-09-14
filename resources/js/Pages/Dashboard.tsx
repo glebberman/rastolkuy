@@ -78,6 +78,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
     const [documentsLoading, setDocumentsLoading] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+    const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -169,10 +170,13 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         console.log('Document completed:', documentId);
     };
 
-    const loadDocuments = async (page: number = 1) => {
+    const loadDocuments = async (page: number = 1, silent: boolean = false) => {
         if (!isAuthenticated) return;
         
-        setDocumentsLoading(true);
+        if (!silent) {
+            setDocumentsLoading(true);
+        }
+        
         try {
             const response = await axios.get(`/api/v1/documents?page=${page}&per_page=20`);
             if (response.data?.data && response.data?.meta?.pagination) {
@@ -182,7 +186,9 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         } catch (error) {
             console.error('Failed to load documents:', error);
         } finally {
-            setDocumentsLoading(false);
+            if (!silent) {
+                setDocumentsLoading(false);
+            }
         }
     };
 
@@ -221,12 +227,29 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         if (!documentToDelete) return;
         
         try {
-            await axios.delete(`/api/v1/documents/${documentToDelete.id}`);
+            setDeletingDocumentId(documentToDelete.id);
             setShowDeleteModal(false);
-            setDocumentToDelete(null);
-            loadDocuments(documentsPagination.current_page);
+            
+            // Wait for animation to start
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            await axios.delete(`/api/v1/documents/${documentToDelete.id}`);
+            
+            // Wait for delete animation to complete
+            setTimeout(() => {
+                // Remove from local state first to prevent page jump
+                setDocuments(prevDocs => prevDocs.filter(doc => doc.id !== documentToDelete.id));
+                setDocumentsPagination(prev => ({ ...prev, total: prev.total - 1 }));
+                
+                setDeletingDocumentId(null);
+                setDocumentToDelete(null);
+                
+                // Reload documents in background to sync with server (silent)
+                loadDocuments(documentsPagination.current_page, true);
+            }, 300); // Match CSS animation duration
         } catch (error) {
             console.error('Failed to delete document:', error);
+            setDeletingDocumentId(null);
         }
     };
 
@@ -397,7 +420,17 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                 </thead>
                                                 <tbody>
                                                     {documents.map((document) => (
-                                                        <tr key={document.id}>
+                                                        <tr 
+                                                            key={document.id}
+                                                            className={deletingDocumentId === document.id ? 'deleting-row' : ''}
+                                                            style={{
+                                                                transition: 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease',
+                                                                opacity: deletingDocumentId === document.id ? 0 : 1,
+                                                                transform: deletingDocumentId === document.id ? 'scale(0.95)' : 'scale(1)',
+                                                                maxHeight: deletingDocumentId === document.id ? '0' : '80px',
+                                                                overflow: 'hidden'
+                                                            }}
+                                                        >
                                                             <td>
                                                                 <div className="d-flex align-items-center">
                                                                     {getStatusIcon(document.status)}
@@ -534,7 +567,10 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                 <button 
                                     type="button" 
                                     className="btn-close" 
-                                    onClick={() => setShowDeleteModal(false)}
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setDocumentToDelete(null);
+                                    }}
                                 ></button>
                             </div>
                             <div className="modal-body">
@@ -545,7 +581,10 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                 <button 
                                     type="button" 
                                     className="btn btn-secondary" 
-                                    onClick={() => setShowDeleteModal(false)}
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setDocumentToDelete(null);
+                                    }}
                                 >
                                     Отмена
                                 </button>
