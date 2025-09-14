@@ -454,7 +454,18 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                                 }
                                                             </td>
                                                             <td className="text-muted">
-                                                                {new Date(document.created_at).toLocaleDateString('ru-RU')}
+                                                                {(() => {
+                                                                    try {
+                                                                        const date = new Date(document.created_at);
+                                                                        return date.getTime() ? date.toLocaleDateString('ru-RU', {
+                                                                            day: '2-digit',
+                                                                            month: '2-digit', 
+                                                                            year: 'numeric'
+                                                                        }) : '—';
+                                                                    } catch {
+                                                                        return '—';
+                                                                    }
+                                                                })()}
                                                             </td>
                                                             <td>
                                                                 <div className="btn-group btn-group-sm">
