@@ -25,9 +25,14 @@ interface Document {
     status: 'uploaded' | 'estimated' | 'pending' | 'processing' | 'completed' | 'failed';
     status_description: string;
     cost_usd: number | null;
-    created_at: string;
     file_type: string;
     task_description: string;
+    timestamps: {
+        created_at: string | null;
+        started_at: string | null;
+        completed_at: string | null;
+        updated_at: string | null;
+    };
     estimation?: {
         credits_needed?: number;
         estimated_cost_usd?: number;
@@ -456,7 +461,10 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                             <td className="text-muted">
                                                                 {(() => {
                                                                     try {
-                                                                        const date = new Date(document.created_at);
+                                                                        const dateStr = document.timestamps?.created_at;
+                                                                        if (!dateStr) return '—';
+                                                                        
+                                                                        const date = new Date(dateStr);
                                                                         return date.getTime() ? date.toLocaleDateString('ru-RU', {
                                                                             day: '2-digit',
                                                                             month: '2-digit', 
