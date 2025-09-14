@@ -388,7 +388,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                         <th>Статус</th>
                                                         <th>Стоимость</th>
                                                         <th>Дата</th>
-                                                        <th width={150}>Действия</th>
+                                                        <th style={{ width: '150px' }}>Действия</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
