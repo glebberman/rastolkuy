@@ -28,6 +28,10 @@ interface Document {
     created_at: string;
     file_type: string;
     task_description: string;
+    estimation?: {
+        credits_needed?: number;
+        estimated_cost_usd?: number;
+    };
 }
 
 interface DocumentsResponse {
@@ -409,7 +413,12 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                                 </span>
                                                             </td>
                                                             <td>
-                                                                {document.cost_usd ? `$${document.cost_usd.toFixed(2)}` : '—'}
+                                                                {document.estimation?.credits_needed 
+                                                                    ? `${document.estimation.credits_needed.toFixed(0)} кр.` 
+                                                                    : document.cost_usd 
+                                                                        ? `${Math.ceil(document.cost_usd * 100)} кр.`
+                                                                        : '—'
+                                                                }
                                                             </td>
                                                             <td className="text-muted">
                                                                 {new Date(document.created_at).toLocaleDateString('ru-RU')}
