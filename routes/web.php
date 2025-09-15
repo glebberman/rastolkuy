@@ -29,6 +29,16 @@ Route::get('/', [DashboardController::class, 'index'])->name('home');
 // Dashboard (with real user data)
 Route::get('dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+// Profile page (placeholder)
+Route::get('profile', function () {
+    return redirect()->route('dashboard');
+})->name('profile');
+
+// Profile password change endpoint
+Route::put('profile/password', [App\Http\Controllers\ProfileController::class, 'updatePassword'])
+    ->middleware('auth')
+    ->name('profile.password.update');
+
 // Documents (placeholder for future implementation)
 Route::get('documents', static function () {
     return Inertia::render('Documents/Index', []);

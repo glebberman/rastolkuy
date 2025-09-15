@@ -98,11 +98,6 @@ export default function FileUploadZone({
         <div className="card">
             <div className="card-header">
                 <h3 className="card-title">Загрузка документа</h3>
-                <div className="card-actions">
-                    <a href="/documents" className="btn btn-outline-primary btn-sm">
-                        Все документы
-                    </a>
-                </div>
             </div>
             <div className="card-body">
                 <div

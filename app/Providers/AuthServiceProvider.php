@@ -39,9 +39,11 @@ class AuthServiceProvider extends ServiceProvider
         Gate::define('auth.updateUser', [AuthPolicy::class, 'updateUser']);
         Gate::define('auth.forgotPassword', [AuthPolicy::class, 'forgotPassword']);
         Gate::define('auth.resetPassword', [AuthPolicy::class, 'resetPassword']);
+        Gate::define('auth.changePassword', [AuthPolicy::class, 'changePassword']);
         Gate::define('auth.verifyEmail', [AuthPolicy::class, 'verifyEmail']);
         Gate::define('auth.resendVerification', [AuthPolicy::class, 'resendVerification']);
         Gate::define('auth.refreshToken', [AuthPolicy::class, 'refreshToken']);
+        Gate::define('auth.stats', [AuthPolicy::class, 'stats']);
 
         // Register admin super-user gate
         Gate::before(function (?User $user, string $ability) {

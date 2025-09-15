@@ -23,17 +23,29 @@ export class ThemeManager {
         const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
         if (savedTheme && ['light', 'dark', 'auto'].includes(savedTheme)) {
             this.currentTheme = savedTheme;
+        } else {
+            // If no saved theme, set default to 'auto' and save it
+            this.currentTheme = 'auto';
+            localStorage.setItem(THEME_STORAGE_KEY, 'auto');
         }
 
         // Apply theme immediately
         this.applyTheme();
 
-        // Listen for system theme changes
+        // Listen for system theme changes and time changes
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
             if (this.currentTheme === 'auto') {
                 this.applyTheme();
             }
         });
+
+        // Check time every minute to update auto theme
+        setInterval(() => {
+            if (this.currentTheme === 'auto') {
+                this.applyTheme();
+                this.notifyListeners();
+            }
+        }, 60000); // Check every minute
     }
 
     public getTheme(): Theme {
@@ -56,9 +68,16 @@ export class ThemeManager {
 
     public getEffectiveTheme(): 'light' | 'dark' {
         if (this.currentTheme === 'auto') {
-            return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            return this.getThemeByTimeOfDay();
         }
         return this.currentTheme as 'light' | 'dark';
+    }
+
+    private getThemeByTimeOfDay(): 'light' | 'dark' {
+        const hour = new Date().getHours();
+        // Светлая тема: 6:00 - 19:59 (6 утра - 8 вечера)
+        // Тёмная тема: 20:00 - 5:59 (8 вечера - 6 утра)
+        return (hour >= 6 && hour < 20) ? 'light' : 'dark';
     }
 
     private applyTheme(): void {

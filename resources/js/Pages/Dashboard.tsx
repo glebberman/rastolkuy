@@ -6,16 +6,11 @@ import {
     IconClock, 
     IconCheck, 
     IconAlertTriangle,
-    IconTrendingUp,
-    IconUsers,
-    IconCoins,
-    IconPlus,
-    IconSettings,
-    IconLogout,
     IconDownload,
     IconTrash
 } from '@tabler/icons-react';
 import { authService } from '@/Utils/auth';
+import Header from '@/Components/Layout/Header';
 import FileUploadZone from '../Components/Document/FileUploadZone';
 import DocumentProcessor from '../Components/Document/DocumentProcessor';
 
@@ -258,17 +253,6 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         }
     };
 
-    const handleLogout = async () => {
-        try {
-            await axios.post('/api/logout');
-            authService.logout();
-            router.visit('/login');
-        } catch (error) {
-            console.error('Logout failed:', error);
-            authService.logout();
-            router.visit('/login');
-        }
-    };
 
     if (isLoading) {
         return (
@@ -329,45 +313,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         <div className="min-vh-100 d-flex flex-column">
             <Head title="Растолкуй" />
             
-            {/* Compact Header */}
-            <header className="bg-white border-bottom py-3">
-                <div className="container-fluid">
-                    <div className="d-flex justify-content-end align-items-center gap-3">
-                        {/* Credits */}
-                        <div className="d-flex align-items-center text-muted">
-                            <IconCoins size={20} className="me-1" />
-                            <span className="fw-medium">{currentStats?.credits_balance || 0}&nbsp;кр.</span>
-                        </div>
-                        
-                        {/* Add Button */}
-                        <button 
-                            className="btn btn-outline-primary btn-sm d-flex align-items-center"
-                            onClick={() => {/* TODO: Add credits functionality */}}
-                            title="Пополнить кредиты"
-                        >
-                            <IconPlus size={16} />
-                        </button>
-                        
-                        {/* Settings Button */}
-                        <button 
-                            className="btn btn-outline-secondary btn-sm d-flex align-items-center"
-                            onClick={() => router.visit('/profile')}
-                            title="Настройки"
-                        >
-                            <IconSettings size={16} />
-                        </button>
-                        
-                        {/* Logout Button */}
-                        <button 
-                            className="btn btn-outline-danger btn-sm d-flex align-items-center"
-                            onClick={handleLogout}
-                            title="Выйти"
-                        >
-                            <IconLogout size={16} />
-                        </button>
-                    </div>
-                </div>
-            </header>
+            <Header />
 
             {/* Main Content */}
             <main className="flex-grow-1 py-4">
@@ -419,7 +365,7 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                         <th>Документ</th>
                                                         <th>Статус</th>
                                                         <th>Стоимость</th>
-                                                        <th>Дата</th>
+                                                        <th>Загружен</th>
                                                         <th style={{ width: '150px' }}>Действия</th>
                                                     </tr>
                                                 </thead>
@@ -465,10 +411,12 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                                         if (!dateStr) return '—';
                                                                         
                                                                         const date = new Date(dateStr);
-                                                                        return date.getTime() ? date.toLocaleDateString('ru-RU', {
+                                                                        return date.getTime() ? date.toLocaleString('ru-RU', {
                                                                             day: '2-digit',
                                                                             month: '2-digit', 
-                                                                            year: 'numeric'
+                                                                            year: 'numeric',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit'
                                                                         }) : '—';
                                                                     } catch {
                                                                         return '—';

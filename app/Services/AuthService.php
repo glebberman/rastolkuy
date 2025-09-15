@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Http\Requests\Api\ChangePasswordRequest;
 use App\Http\Requests\Api\ForgotPasswordRequest;
 use App\Http\Requests\Api\LoginRequest;
 use App\Http\Requests\Api\RegisterRequest;
@@ -174,6 +175,28 @@ class AuthService
                 'email' => ['Недействительный или истекший токен сброса пароля.'],
             ]);
         }
+    }
+
+    /**
+     * Change user password.
+     */
+    public function changePassword(User $user, ChangePasswordRequest $request): void
+    {
+        $validated = $request->validated();
+
+        // Verify current password
+        if (!Hash::check($validated['current_password'], $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Неверный текущий пароль.'],
+            ]);
+        }
+
+        // Update password
+        $user->password = Hash::make($validated['password']);
+        $user->save();
+
+        // Optionally, delete all tokens for security
+        // $user->tokens()->delete();
     }
 
     /**
