@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\ChangePasswordRequest;
 use App\Http\Requests\Api\ForgotPasswordRequest;
 use App\Http\Requests\Api\LoginRequest;
 use App\Http\Requests\Api\RegisterRequest;
@@ -240,6 +241,58 @@ class AuthController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'error' => 'Password reset failed',
+                'message' => 'Не удалось изменить пароль',
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Change user password.
+     */
+    public function changePassword(ChangePasswordRequest $request): JsonResponse
+    {
+        $this->authorize('auth.changePassword');
+
+        try {
+            /** @var \App\Models\User|null $user */
+            $user = $request->user();
+
+            if (!$user) {
+                return response()->json([
+                    'error' => 'Unauthenticated',
+                    'message' => 'Пользователь не аутентифицирован',
+                ], ResponseAlias::HTTP_UNAUTHORIZED);
+            }
+
+            $this->authService->changePassword($user, $request);
+
+            Log::info('Password changed successfully', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
+
+            return response()->json([
+                'message' => 'Пароль успешно изменен',
+            ]);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'error' => 'Validation failed',
+                'message' => 'Неверный текущий пароль',
+                'errors' => $e->errors(),
+            ], ResponseAlias::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (Exception $e) {
+            Log::error('Password change failed', [
+                'user_id' => $request->user()?->id,
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Password change failed',
                 'message' => 'Не удалось изменить пароль',
             ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
         }

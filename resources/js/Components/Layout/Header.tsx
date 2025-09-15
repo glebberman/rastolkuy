@@ -1,93 +1,93 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from '@inertiajs/react';
-import { User } from '@/Types';
-import ThemeSwitcher from '@/Components/UI/ThemeSwitcher';
-import UserDropdown from '@/Components/Layout/UserDropdown';
-import { IconGavel } from '@tabler/icons-react';
+import { router } from '@inertiajs/react';
+import { IconCoins, IconPlus, IconLogout } from '@tabler/icons-react';
 import { authService } from '@/Utils/auth';
-import { route } from '@/Utils/route';
+import SettingsModal from '@/Components/UI/SettingsModal';
+import { themeManager } from '@/Utils/theme';
+import axios from 'axios';
 
 export default function Header() {
-    const [user, setUser] = useState<User | null>(null);
+    const [creditsBalance, setCreditsBalance] = useState<number>(0);
+    const [currentTheme, setCurrentTheme] = useState<string>('auto');
 
     useEffect(() => {
-        const currentUser = authService.getUser();
-        setUser(currentUser);
+        // Load credits balance
+        const loadCredits = async () => {
+            try {
+                const response = await axios.get('/api/v1/user/stats');
+                if (response.data?.data?.credits_balance) {
+                    setCreditsBalance(response.data.data.credits_balance);
+                }
+            } catch (error) {
+                console.error('Failed to load credits:', error);
+            }
+        };
 
-        // If user is logged in but not loaded, try to fetch from API
-        if (authService.isAuthenticated() && !currentUser) {
-            authService.getCurrentUser()
-                .then(setUser)
-                .catch(() => setUser(null));
+        if (authService.isAuthenticated()) {
+            loadCredits();
         }
+
+        // Subscribe to theme changes
+        const updateTheme = () => {
+            setCurrentTheme(themeManager.getEffectiveTheme());
+        };
+
+        updateTheme();
+        themeManager.addListener(updateTheme);
+
+        return () => {
+            themeManager.removeListener(updateTheme);
+        };
     }, []);
 
+    const handleLogout = async () => {
+        try {
+            await axios.post('/api/logout');
+            authService.logout();
+            router.visit('/login');
+        } catch (error) {
+            console.error('Logout failed:', error);
+            authService.logout();
+            router.visit('/login');
+        }
+    };
+
     return (
-        <header className="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+        <header 
+            className="py-3"
+            data-bs-theme={currentTheme}
+            style={{
+                backgroundColor: 'transparent'
+            }}
+        >
             <div className="container-fluid">
-                {/* Brand */}
-                <Link className="navbar-brand d-flex align-items-center" href={route('dashboard')}>
-                    <IconGavel className="me-2" size={28} />
-                    <span className="fw-bold">Legal Translator</span>
-                </Link>
-
-                {/* Mobile menu toggle */}
-                <button
-                    className="navbar-toggler"
-                    type="button"
-                    data-bs-toggle="collapse"
-                    data-bs-target="#navbarNav"
-                    aria-controls="navbarNav"
-                    aria-expanded="false"
-                    aria-label="Toggle navigation"
-                >
-                    <span className="navbar-toggler-icon"></span>
-                </button>
-
-                {/* Navigation */}
-                <div className="collapse navbar-collapse" id="navbarNav">
-                    <nav className="navbar-nav me-auto">
-                        {user && (
-                            <>
-                                <Link
-                                    className="nav-link"
-                                    href={route('dashboard')}
-                                >
-                                    Главная
-                                </Link>
-                                <Link
-                                    className="nav-link"
-                                    href={route('documents.index') || '/documents'}
-                                >
-                                    Документы
-                                </Link>
-                            </>
-                        )}
-                    </nav>
-
-                    {/* Right side */}
-                    <div className="d-flex align-items-center gap-3">
-                        <ThemeSwitcher />
-                        
-                        {user ? (
-                            <UserDropdown user={user} />
-                        ) : (
-                            <div className="d-flex align-items-center gap-2">
-                                <Link
-                                    href={route('login')}
-                                    className="btn btn-outline-primary btn-sm"
-                                >
-                                    Войти
-                                </Link>
-                                <Link
-                                    href={route('register')}
-                                    className="btn btn-primary btn-sm"
-                                >
-                                    Регистрация
-                                </Link>
-                            </div>
-                        )}
+                <div className="d-flex justify-content-end align-items-center gap-3">
+                    {/* Credits */}
+                    <div className="d-flex align-items-center text-muted">
+                        <IconCoins size={20} className="me-1" />
+                        <span className="fw-medium">{creditsBalance || 0}&nbsp;кр.</span>
                     </div>
+                    
+                    {/* Add Button */}
+                    <button 
+                        className="btn btn-ghost btn-sm d-flex align-items-center"
+                        onClick={() => {/* TODO: Add credits functionality */}}
+                        title="Пополнить кредиты"
+                    >
+                        <IconPlus size={16} />
+                    </button>
+
+                    {/* Settings */}
+                    <SettingsModal />
+
+                    {/* Logout Button */}
+                    <button 
+                        className="btn btn-ghost btn-sm d-flex align-items-center"
+                        onClick={handleLogout}
+                        title="Выйти"
+                    >
+                        <IconLogout size={16} />
+                    </button>
                 </div>
             </div>
         </header>

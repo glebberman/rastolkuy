@@ -50,3 +50,36 @@ body {
 .text-decoration-none:hover {
   text-decoration: none !important;
 }
+
+// Header button styles
+.btn-ghost {
+  border: none !important;
+  background: none !important;
+  box-shadow: none !important;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.08) !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  &:focus, &:active {
+    background-color: rgba(0, 0, 0, 0.12) !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}
+
+// Dark theme header buttons
+[data-bs-theme="dark"] {
+  .btn-ghost {
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.08) !important;
+    }
+    
+    &:focus, &:active {
+      background-color: rgba(255, 255, 255, 0.12) !important;
+    }
+  }
+}

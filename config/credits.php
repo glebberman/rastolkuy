@@ -39,8 +39,8 @@ return [
 
     'exchange_rates' => [
         'RUB' => 1.0,      // Base currency
-        'USD' => 95.0,     // 1 USD = 95 RUB
-        'EUR' => 105.0,    // 1 EUR = 105 RUB
+        'USD' => 85.0,     // 1 USD = 95 RUB
+        'EUR' => 100.0,    // 1 EUR = 105 RUB
     ],
 
     /*
@@ -54,9 +54,9 @@ return [
     */
 
     'credit_cost' => [
-        'RUB' => 1.0,      // 1 credit = 1 RUB
-        'USD' => 0.01,     // 1 credit = 1 cent USD
-        'EUR' => 0.009,    // 1 credit = 0.009 EUR
+        'RUB' => 50.0,
+        'USD' => 0.6,
+        'EUR' => 0.5,
     ],
 
     /*

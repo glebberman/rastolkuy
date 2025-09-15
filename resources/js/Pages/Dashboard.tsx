@@ -6,14 +6,45 @@ import {
     IconClock, 
     IconCheck, 
     IconAlertTriangle,
-    IconTrendingUp,
-    IconUsers,
-    IconCoins
+    IconDownload,
+    IconTrash
 } from '@tabler/icons-react';
-import AppLayout from '../Layouts/AppLayout';
 import { authService } from '@/Utils/auth';
+import Header from '@/Components/Layout/Header';
 import FileUploadZone from '../Components/Document/FileUploadZone';
 import DocumentProcessor from '../Components/Document/DocumentProcessor';
+
+interface Document {
+    id: string;
+    filename: string;
+    status: 'uploaded' | 'estimated' | 'pending' | 'processing' | 'completed' | 'failed';
+    status_description: string;
+    cost_usd: number | null;
+    file_type: string;
+    task_description: string;
+    timestamps: {
+        created_at: string | null;
+        started_at: string | null;
+        completed_at: string | null;
+        updated_at: string | null;
+    };
+    estimation?: {
+        credits_needed?: number;
+        estimated_cost_usd?: number;
+    };
+}
+
+interface DocumentsResponse {
+    data: Document[];
+    meta: {
+        pagination: {
+            current_page: number;
+            last_page: number;
+            per_page: number;
+            total: number;
+        };
+    };
+}
 
 interface DashboardProps {
     recentDocuments: Array<{
@@ -37,6 +68,17 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
     const [currentStats, setCurrentStats] = useState(stats);
     const [showProcessor, setShowProcessor] = useState(false);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [documents, setDocuments] = useState<Document[]>([]);
+    const [documentsPagination, setDocumentsPagination] = useState({
+        current_page: 1,
+        last_page: 1,
+        per_page: 20,
+        total: 0
+    });
+    const [documentsLoading, setDocumentsLoading] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
+    const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null);
 
     useEffect(() => {
         const checkAuth = async () => {
@@ -110,31 +152,118 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         return () => clearInterval(interval);
     }, [isAuthenticated]);
 
+    // Load documents when authenticated
+    useEffect(() => {
+        if (isAuthenticated) {
+            loadDocuments();
+        }
+    }, [isAuthenticated]);
+
     const handleStartNewUpload = () => {
         setSelectedFile(null);
         setShowProcessor(false);
     };
 
     const handleDocumentComplete = (documentId: string) => {
-        // Could refresh stats here if needed
+        // Refresh documents list and stats
+        loadDocuments(documentsPagination.current_page);
         console.log('Document completed:', documentId);
     };
 
+    const loadDocuments = async (page: number = 1, silent: boolean = false) => {
+        if (!isAuthenticated) return;
+        
+        if (!silent) {
+            setDocumentsLoading(true);
+        }
+        
+        try {
+            const response = await axios.get(`/api/v1/documents?page=${page}&per_page=20`);
+            if (response.data?.data && response.data?.meta?.pagination) {
+                setDocuments(response.data.data);
+                setDocumentsPagination(response.data.meta.pagination);
+            }
+        } catch (error) {
+            console.error('Failed to load documents:', error);
+        } finally {
+            if (!silent) {
+                setDocumentsLoading(false);
+            }
+        }
+    };
+
+    const handleProcessDocument = async (documentId: string) => {
+        try {
+            await axios.post(`/api/v1/documents/${documentId}/process`);
+            loadDocuments(documentsPagination.current_page);
+        } catch (error) {
+            console.error('Failed to process document:', error);
+        }
+    };
+
+    const handleDownloadDocument = async (documentId: string) => {
+        try {
+            const response = await axios.get(`/api/v1/documents/${documentId}/result`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', 'processed_document.html');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error('Failed to download document:', error);
+        }
+    };
+
+    const confirmDeleteDocument = (document: Document) => {
+        setDocumentToDelete(document);
+        setShowDeleteModal(true);
+    };
+
+    const handleDeleteDocument = async () => {
+        if (!documentToDelete) return;
+        
+        try {
+            setDeletingDocumentId(documentToDelete.id);
+            setShowDeleteModal(false);
+            
+            // Wait for animation to start
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            await axios.delete(`/api/v1/documents/${documentToDelete.id}`);
+            
+            // Wait for delete animation to complete
+            setTimeout(() => {
+                // Remove from local state first to prevent page jump
+                setDocuments(prevDocs => prevDocs.filter(doc => doc.id !== documentToDelete.id));
+                setDocumentsPagination(prev => ({ ...prev, total: prev.total - 1 }));
+                
+                setDeletingDocumentId(null);
+                setDocumentToDelete(null);
+                
+                // Reload documents in background to sync with server (silent)
+                loadDocuments(documentsPagination.current_page, true);
+            }, 300); // Match CSS animation duration
+        } catch (error) {
+            console.error('Failed to delete document:', error);
+            setDeletingDocumentId(null);
+        }
+    };
+
+
     if (isLoading) {
         return (
-            <AppLayout title="Загрузка...">
-                <div className="page-wrapper">
-                    <div className="page-body">
-                        <div className="container-xl">
-                            <div className="text-center">
-                                <div className="spinner-border" role="status">
-                                    <span className="visually-hidden">Загрузка...</span>
-                                </div>
-                            </div>
-                        </div>
+            <div className="min-vh-100 d-flex align-items-center justify-content-center">
+                <div className="text-center">
+                    <div className="spinner-border text-primary" role="status">
+                        <span className="visually-hidden">Загрузка...</span>
                     </div>
+                    <div className="mt-3">Загрузка...</div>
                 </div>
-            </AppLayout>
+            </div>
         );
     }
 
@@ -181,140 +310,263 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
     };
 
     return (
-        <AppLayout title="Главная панель">
-            <Head title="Главная панель" />
+        <div className="min-vh-100 d-flex flex-column">
+            <Head title="Растолкуй" />
+            
+            <Header />
 
-            <div className="page-wrapper">
-                <div className="page-header d-print-none">
-                    <div className="container-xl">
-                        <div className="row g-2 align-items-center">
-                            <div className="col">
-                                <div className="page-pretitle">
-                                    Обзор
-                                </div>
-                                <h2 className="page-title">
-                                    Главная панель
-                                </h2>
-                            </div>
+            {/* Main Content */}
+            <main className="flex-grow-1 py-4">
+                <div className="container-fluid">
+                    {/* Upload/Processing Zone */}
+                    <div className="row">
+                        <div className="col-12">
+                            {showProcessor ? (
+                                <DocumentProcessor
+                                    selectedFile={selectedFile || undefined}
+                                    onDocumentComplete={handleDocumentComplete}
+                                    onStartNewUpload={handleStartNewUpload}
+                                    onCreditsUpdated={handleCreditsUpdated}
+                                />
+                            ) : (
+                                <FileUploadZone
+                                    onFileSelect={handleFileSelect}
+                                    acceptedTypes={['.pdf', '.docx', '.txt']}
+                                    maxSizeMB={50}
+                                />
+                            )}
                         </div>
                     </div>
-                </div>
 
-                <div className="page-body">
-                    <div className="container-xl">
-                        {/* Statistics Cards */}
-                        <div className="row row-deck row-cards">
-                            <div className="col-sm-6 col-lg-4">
-                                <div className="card">
-                                    <div className="card-body">
-                                        <div className="d-flex align-items-center">
-                                            <div className="subheader">Кредиты</div>
-                                        </div>
-                                        <div className="d-flex align-items-center">
-                                            <div className="h1 mb-0 me-2">{currentStats?.credits_balance || 0}&nbsp;кр.</div>
-                                            <div className="me-auto">
-                                                <IconCoins size={24} className="text-primary" />
+                    {/* Documents Table */}
+                    <div className="row mt-4">
+                        <div className="col-12">
+                            <div className="card">
+                                <div className="card-header">
+                                    <h3 className="card-title">Мои документы</h3>
+                                </div>
+                                <div className="card-body p-0">
+                                    {documentsLoading ? (
+                                        <div className="text-center py-4">
+                                            <div className="spinner-border spinner-border-sm" role="status">
+                                                <span className="visually-hidden">Загрузка...</span>
                                             </div>
                                         </div>
-                                    </div>
+                                    ) : documents.length === 0 ? (
+                                        <div className="text-center py-5 text-muted">
+                                            <IconFile size={48} className="mb-2" />
+                                            <div>У вас пока нет загруженных документов</div>
+                                        </div>
+                                    ) : (
+                                        <div className="table-responsive">
+                                            <table className="table table-hover table-vcenter">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Документ</th>
+                                                        <th>Статус</th>
+                                                        <th>Стоимость</th>
+                                                        <th>Загружен</th>
+                                                        <th style={{ width: '150px' }}>Действия</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {documents.map((document) => (
+                                                        <tr 
+                                                            key={document.id}
+                                                            className={deletingDocumentId === document.id ? 'deleting-row' : ''}
+                                                            style={{
+                                                                transition: 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease',
+                                                                opacity: deletingDocumentId === document.id ? 0 : 1,
+                                                                transform: deletingDocumentId === document.id ? 'scale(0.95)' : 'scale(1)',
+                                                                maxHeight: deletingDocumentId === document.id ? '0' : '80px',
+                                                                overflow: 'hidden'
+                                                            }}
+                                                        >
+                                                            <td>
+                                                                <div className="d-flex align-items-center">
+                                                                    {getStatusIcon(document.status)}
+                                                                    <div className="ms-2">
+                                                                        <div className="fw-medium">{document.filename}</div>
+                                                                        <div className="text-muted small">{document.task_description}</div>
+                                                                    </div>
+                                                                </div>
+                                                            </td>
+                                                            <td>
+                                                                <span className={getStatusBadgeClass(document.status)}>
+                                                                    {document.status_description}
+                                                                </span>
+                                                            </td>
+                                                            <td>
+                                                                {document.estimation?.credits_needed 
+                                                                    ? `${document.estimation.credits_needed.toFixed(0)} кр.` 
+                                                                    : document.cost_usd 
+                                                                        ? `${Math.ceil(document.cost_usd * 100)} кр.`
+                                                                        : '—'
+                                                                }
+                                                            </td>
+                                                            <td className="text-muted">
+                                                                {(() => {
+                                                                    try {
+                                                                        const dateStr = document.timestamps?.created_at;
+                                                                        if (!dateStr) return '—';
+                                                                        
+                                                                        const date = new Date(dateStr);
+                                                                        return date.getTime() ? date.toLocaleString('ru-RU', {
+                                                                            day: '2-digit',
+                                                                            month: '2-digit', 
+                                                                            year: 'numeric',
+                                                                            hour: '2-digit',
+                                                                            minute: '2-digit'
+                                                                        }) : '—';
+                                                                    } catch {
+                                                                        return '—';
+                                                                    }
+                                                                })()}
+                                                            </td>
+                                                            <td>
+                                                                <div className="btn-group btn-group-sm">
+                                                                    {document.status === 'completed' && (
+                                                                        <button
+                                                                            className="btn btn-outline-success"
+                                                                            onClick={() => handleDownloadDocument(document.id)}
+                                                                            title="Скачать"
+                                                                        >
+                                                                            <IconDownload size={14} />
+                                                                        </button>
+                                                                    )}
+                                                                    {(document.status === 'uploaded' || document.status === 'estimated') && (
+                                                                        <button
+                                                                            className="btn btn-outline-primary"
+                                                                            onClick={() => handleProcessDocument(document.id)}
+                                                                            title="Обработать"
+                                                                        >
+                                                                            Обработать
+                                                                        </button>
+                                                                    )}
+                                                                    <button
+                                                                        className="btn btn-outline-danger"
+                                                                        onClick={() => confirmDeleteDocument(document)}
+                                                                        title="Удалить"
+                                                                    >
+                                                                        <IconTrash size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                            
-                            <div className="col-sm-6 col-lg-4">
-                                <div className="card">
-                                    <div className="card-body">
-                                        <div className="d-flex align-items-center">
-                                            <div className="subheader">Всего документов</div>
+                                
+                                {/* Pagination */}
+                                {documentsPagination.last_page > 1 && (
+                                    <div className="card-footer d-flex align-items-center justify-content-between">
+                                        <div className="text-muted">
+                                            Всего документов: {documentsPagination.total}
                                         </div>
-                                        <div className="d-flex align-items-center">
-                                            <div className="h1 mb-0 me-2">{currentStats?.total_documents || 0}</div>
-                                            <div className="me-auto">
-                                                <IconFile size={24} className="text-muted" />
-                                            </div>
-                                        </div>
+                                        <nav>
+                                            <ul className="pagination pagination-sm m-0">
+                                                <li className={`page-item ${documentsPagination.current_page === 1 ? 'disabled' : ''}`}>
+                                                    <button 
+                                                        className="page-link"
+                                                        onClick={() => loadDocuments(documentsPagination.current_page - 1)}
+                                                        disabled={documentsPagination.current_page === 1}
+                                                    >
+                                                        Назад
+                                                    </button>
+                                                </li>
+                                                
+                                                {Array.from({ length: documentsPagination.last_page }, (_, i) => i + 1)
+                                                    .filter(page => 
+                                                        page === 1 || 
+                                                        page === documentsPagination.last_page ||
+                                                        Math.abs(page - documentsPagination.current_page) <= 2
+                                                    )
+                                                    .map((page, index, array) => {
+                                                        const prevPage = array[index - 1];
+                                                        return (
+                                                            <React.Fragment key={page}>
+                                                                {prevPage && page - prevPage > 1 && (
+                                                                    <li className="page-item disabled">
+                                                                        <span className="page-link">...</span>
+                                                                    </li>
+                                                                )}
+                                                                <li className={`page-item ${documentsPagination.current_page === page ? 'active' : ''}`}>
+                                                                    <button 
+                                                                        className="page-link"
+                                                                        onClick={() => loadDocuments(page)}
+                                                                    >
+                                                                        {page}
+                                                                    </button>
+                                                                </li>
+                                                            </React.Fragment>
+                                                        );
+                                                    })}
+                                                
+                                                <li className={`page-item ${documentsPagination.current_page === documentsPagination.last_page ? 'disabled' : ''}`}>
+                                                    <button 
+                                                        className="page-link"
+                                                        onClick={() => loadDocuments(documentsPagination.current_page + 1)}
+                                                        disabled={documentsPagination.current_page === documentsPagination.last_page}
+                                                    >
+                                                        Далее
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </nav>
                                     </div>
-                                </div>
-                            </div>
-
-                            <div className="col-sm-6 col-lg-4">
-                                <div className="card">
-                                    <div className="card-body">
-                                        <div className="d-flex align-items-center">
-                                            <div className="subheader">Обработано сегодня</div>
-                                        </div>
-                                        <div className="d-flex align-items-center">
-                                            <div className="h1 mb-0 me-2">{currentStats?.processed_today || 0}</div>
-                                            <div className="me-auto">
-                                                <IconTrendingUp size={24} className="text-success" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Central Upload/Processing Zone */}
-                        <div className="row row-cards mt-3">
-                            <div className="col-12">
-                                {showProcessor ? (
-                                    <DocumentProcessor
-                                        selectedFile={selectedFile || undefined}
-                                        onDocumentComplete={handleDocumentComplete}
-                                        onStartNewUpload={handleStartNewUpload}
-                                        onCreditsUpdated={handleCreditsUpdated}
-                                    />
-                                ) : (
-                                    <FileUploadZone
-                                        onFileSelect={handleFileSelect}
-                                        acceptedTypes={['.pdf', '.docx', '.txt']}
-                                        maxSizeMB={50}
-                                    />
                                 )}
                             </div>
                         </div>
+                    </div>
+                </div>
+            </main>
 
-                        {/* Quick Actions */}
-                        <div className="row row-cards mt-3">
-
-                            <div className="col-md-6 col-lg-4">
-                                <div className="card card-link">
-                                    <Link href="/documents" className="d-block">
-                                        <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <span className="avatar avatar-md me-3 bg-info-lt">
-                                                    <IconFile size={24} />
-                                                </span>
-                                                <div>
-                                                    <div className="font-weight-medium">Мои документы</div>
-                                                    <div className="text-muted">Просмотр всех загруженных файлов</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </div>
+            {/* Delete Confirmation Modal */}
+            {showDeleteModal && documentToDelete && (
+                <div className="modal d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+                    <div className="modal-dialog modal-dialog-centered">
+                        <div className="modal-content">
+                            <div className="modal-header">
+                                <h5 className="modal-title">Подтверждение удаления</h5>
+                                <button 
+                                    type="button" 
+                                    className="btn-close" 
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setDocumentToDelete(null);
+                                    }}
+                                ></button>
                             </div>
-
-                            <div className="col-md-6 col-lg-4">
-                                <div className="card card-link">
-                                    <Link href="/profile" className="d-block">
-                                        <div className="card-body">
-                                            <div className="d-flex align-items-center">
-                                                <span className="avatar avatar-md me-3 bg-success-lt">
-                                                    <IconUsers size={24} />
-                                                </span>
-                                                <div>
-                                                    <div className="font-weight-medium">Профиль</div>
-                                                    <div className="text-muted">Настройки аккаунта и тарифы</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Link>
-                                </div>
+                            <div className="modal-body">
+                                <p>Вы действительно хотите удалить документ <strong>{documentToDelete.filename}</strong>?</p>
+                                <p className="text-muted small">Это действие необратимо.</p>
+                            </div>
+                            <div className="modal-footer">
+                                <button 
+                                    type="button" 
+                                    className="btn btn-secondary" 
+                                    onClick={() => {
+                                        setShowDeleteModal(false);
+                                        setDocumentToDelete(null);
+                                    }}
+                                >
+                                    Отмена
+                                </button>
+                                <button 
+                                    type="button" 
+                                    className="btn btn-danger" 
+                                    onClick={handleDeleteDocument}
+                                >
+                                    Удалить
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </AppLayout>
+            )}
+        </div>
     );
 }

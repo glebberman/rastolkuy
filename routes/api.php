@@ -90,6 +90,11 @@ Route::post('v1/auth/resend-verification', [AuthController::class, 'resendVerifi
     ->middleware(['auth:sanctum', 'custom.throttle:3,1'])
     ->name('api.v1.auth.resend-verification');
 
+// Смена пароля
+Route::put('v1/auth/change-password', [AuthController::class, 'changePassword'])
+    ->middleware(['auth:sanctum', 'custom.throttle:5,1'])
+    ->name('api.v1.auth.change-password');
+
 // Получение статистики пользователя
 Route::get('v1/user/stats', [AuthController::class, 'stats'])
     ->middleware(['auth:sanctum', 'custom.throttle:60,1'])

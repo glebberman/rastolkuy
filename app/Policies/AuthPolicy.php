@@ -72,6 +72,15 @@ class AuthPolicy
     }
 
     /**
+     * Determine whether the user can change their password.
+     */
+    public function changePassword(User $user): bool
+    {
+        // Authenticated users can change their password
+        return $user->hasPermissionTo('auth.update-profile');
+    }
+
+    /**
      * Determine whether the user can verify email.
      */
     public function verifyEmail(User $user): bool
@@ -95,6 +104,15 @@ class AuthPolicy
     public function refreshToken(User $user): bool
     {
         // Authenticated users can refresh their token
+        return $user->hasPermissionTo('auth.refresh-token');
+    }
+
+    /**
+     * Determine whether the user can view their statistics.
+     */
+    public function stats(User $user): bool
+    {
+        // Authenticated users can view their statistics
         return $user->hasPermissionTo('auth.refresh-token');
     }
 }

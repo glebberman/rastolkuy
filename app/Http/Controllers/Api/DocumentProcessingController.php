@@ -425,9 +425,12 @@ class DocumentProcessingController extends Controller
         /** @var User $user */
         $user = $request->user();
 
+        $perPage = (int) $request->query('per_page', 10);
+        $perPage = max(1, min($perPage, 50)); // Limit between 1 and 50
+
         $documents = $user->documentProcessings()
             ->latest('created_at')
-            ->paginate(10);
+            ->paginate($perPage);
 
         return new DocumentListResource($documents);
     }
