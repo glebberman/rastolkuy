@@ -399,8 +399,16 @@ readonly class DocumentProcessingService
     public function estimateProcessingCost(int $fileSizeBytes, ?string $model = null): array
     {
         $estimatedInputTokens = $this->costCalculator->estimateTokensFromFileSize($fileSizeBytes);
-        // Для оценки output токенов используем коэффициент 1.5x от input (эмпирический)
-        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5);
+
+        // Use task-specific output token estimation
+        $taskType = 'translation'; // Default task type
+        $structureAnalysis = ['sections_count' => 5]; // Default sections count
+        $estimatedOutputTokens = $this->costCalculator->estimateOutputTokensByTaskType(
+            $estimatedInputTokens,
+            $taskType,
+            $structureAnalysis,
+        );
+
         $estimatedCost = $this->costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
 
         return [
@@ -410,6 +418,7 @@ readonly class DocumentProcessingService
             'estimated_cost_usd' => $estimatedCost,
             'model_used' => $model ?? $this->getDefaultModel(),
             'pricing_info' => $this->costCalculator->getPricingInfo($model ?? $this->getDefaultModel()),
+            'task_type' => $taskType,
         ];
     }
 
@@ -420,20 +429,14 @@ readonly class DocumentProcessingService
     {
         $estimatedInputTokens = $this->costCalculator->estimateTokensFromFileSize($fileSizeBytes);
 
-        // Коррекция на основе количества секций из конфигурации
-        $sectionCostMultiplier = config('document.cost_estimation.section_cost_multiplier', 0.1);
-        assert(is_numeric($sectionCostMultiplier));
-        $sectionCostMultiplier = (float) $sectionCostMultiplier;
-
-        $maxSectionMultiplier = config('document.cost_estimation.max_section_multiplier', 3.0);
-        assert(is_numeric($maxSectionMultiplier));
-        $maxSectionMultiplier = (float) $maxSectionMultiplier;
-
-        // Больше секций = больше контекста для LLM = больше output токенов
-        $sectionMultiplier = max(1.0, 1.0 + ($sectionsCount * $sectionCostMultiplier));
-        $sectionMultiplier = min($sectionMultiplier, $maxSectionMultiplier); // Ограничиваем максимум
-
-        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5 * $sectionMultiplier);
+        // Use task-specific output token estimation with structure analysis
+        $taskType = 'translation'; // Default task type
+        $structureAnalysis = ['sections_count' => $sectionsCount];
+        $estimatedOutputTokens = $this->costCalculator->estimateOutputTokensByTaskType(
+            $estimatedInputTokens,
+            $taskType,
+            $structureAnalysis,
+        );
 
         $estimatedCost = $this->costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
 
@@ -445,7 +448,7 @@ readonly class DocumentProcessingService
             'model_used' => $model ?? $this->getDefaultModel(),
             'pricing_info' => $this->costCalculator->getPricingInfo($model ?? $this->getDefaultModel()),
             'sections_count' => $sectionsCount,
-            'section_multiplier' => $sectionMultiplier,
+            'task_type' => $taskType,
         ];
     }
 

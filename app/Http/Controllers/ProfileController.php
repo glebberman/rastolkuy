@@ -6,11 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Api\ChangePasswordRequest;
 use App\Services\AuthService;
+use Exception;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
-use Exception;
 use Symfony\Component\HttpFoundation\Response as ResponseAlias;
 
 class ProfileController extends Controller

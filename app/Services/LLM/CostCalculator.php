@@ -104,4 +104,52 @@ class CostCalculator
         // Используем ту же эвристику
         return (int) ($fileSizeBytes / 4);
     }
+
+    /**
+     * Оценить количество выходных токенов по типу задачи.
+     */
+    public function estimateOutputTokensByTaskType(
+        int $inputTokens,
+        string $taskType,
+        array $structureAnalysis = [],
+    ): int {
+        $taskConfig = config("credits.output_token_multipliers.{$taskType}");
+
+        if (!is_array($taskConfig)) {
+            // Fallback к значениям по умолчанию для translation
+            $taskConfig = config('credits.output_token_multipliers.translation', [
+                'content_multiplier' => 0.5,
+                'json_overhead' => 0.3,
+                'summary_base_tokens' => 150,
+                'min_multiplier' => 0.4,
+                'max_multiplier' => 1.0,
+            ]);
+        }
+
+        // Базовые параметры с проверкой типов
+        $contentMultiplier = (float) (is_array($taskConfig) && isset($taskConfig['content_multiplier']) ? $taskConfig['content_multiplier'] : 0.5);
+        $jsonOverhead = (float) (is_array($taskConfig) && isset($taskConfig['json_overhead']) ? $taskConfig['json_overhead'] : 0.3);
+        $summaryBaseTokens = (int) (is_array($taskConfig) && isset($taskConfig['summary_base_tokens']) ? $taskConfig['summary_base_tokens'] : 150);
+        $minMultiplier = (float) (is_array($taskConfig) && isset($taskConfig['min_multiplier']) ? $taskConfig['min_multiplier'] : 0.4);
+        $maxMultiplier = (float) (is_array($taskConfig) && isset($taskConfig['max_multiplier']) ? $taskConfig['max_multiplier'] : 1.0);
+
+        // Расчет контентных токенов (сжатые объяснения)
+        $contentTokens = $inputTokens * $contentMultiplier;
+
+        // Коэффициент сложности на основе количества секций
+        $sectionsCount = $structureAnalysis['sections_count'] ?? 5;
+        $complexityMultiplier = 1.0 + ($sectionsCount * 0.02); // +2% за секцию
+
+        // Расчет JSON токенов (структура, якоря, риски)
+        $jsonTokens = $inputTokens * $jsonOverhead * $complexityMultiplier;
+
+        // Итого токенов
+        $totalTokens = $contentTokens + $jsonTokens + $summaryBaseTokens;
+
+        // Применение ограничений
+        $finalMultiplier = $totalTokens / $inputTokens;
+        $finalMultiplier = max($minMultiplier, min($maxMultiplier, $finalMultiplier));
+
+        return (int) round($inputTokens * $finalMultiplier);
+    }
 }

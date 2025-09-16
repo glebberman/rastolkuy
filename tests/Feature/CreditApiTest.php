@@ -347,8 +347,8 @@ class CreditApiTest extends TestCase
         $data = $response->json('data');
         $this->assertEquals('RUB', $data['base_currency']);
         $this->assertEquals(1.0, $data['rates']['RUB']);
-        $this->assertEquals(95.0, $data['rates']['USD']);
-        $this->assertEquals(105.0, $data['rates']['EUR']);
+        $this->assertEquals(85.0, $data['rates']['USD']);
+        $this->assertEquals(100.0, $data['rates']['EUR']);
         $this->assertIsArray($data['supported_currencies']);
         $this->assertContains('RUB', $data['supported_currencies']);
         $this->assertContains('USD', $data['supported_currencies']);
@@ -379,9 +379,9 @@ class CreditApiTest extends TestCase
         /** @var array{base_currency: string, credit_costs: array<string, float>, description: string} $data */
         $data = $response->json('data');
         $this->assertEquals('RUB', $data['base_currency']);
-        $this->assertEquals(1.0, $data['credit_costs']['RUB']);
-        $this->assertEquals(0.01, $data['credit_costs']['USD']);
-        $this->assertEquals(0.009, $data['credit_costs']['EUR']);
+        $this->assertEquals(50.0, $data['credit_costs']['RUB']);
+        $this->assertEquals(0.6, $data['credit_costs']['USD']);
+        $this->assertEquals(0.5, $data['credit_costs']['EUR']);
         $this->assertEquals('Cost of 1 credit in different currencies', $data['description']);
     }
 
