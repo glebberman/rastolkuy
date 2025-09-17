@@ -183,6 +183,11 @@ Route::get('v1/documents/{uuid}/markup', [DocumentProcessingController::class, '
     ->middleware(['auth:sanctum', 'permission:documents.view'])
     ->name('api.v1.documents.markup');
 
+// Предварительный просмотр промпта без отправки в LLM (для тестирования)
+Route::post('v1/documents/{uuid}/preview-prompt', [DocumentProcessingController::class, 'previewPrompt'])
+    ->middleware(['auth:sanctum', 'permission:documents.view'])
+    ->name('api.v1.documents.preview-prompt');
+
 // Отмена обработки документа (если в статусе pending)
 Route::post('v1/documents/{uuid}/cancel', [DocumentProcessingController::class, 'cancel'])
     ->middleware(['auth:sanctum', 'permission:documents.cancel'])
