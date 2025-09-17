@@ -220,8 +220,8 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
             $costCalculator,
         );
 
-        // Convert USD to credits
-        $creditsNeeded = $creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
+        // Convert USD to credits with markup
+        $creditsNeeded = $creditService->convertUsdToCreditsWithMarkup($estimation['estimated_cost_usd']);
 
         $user = $documentProcessing->user;
 
@@ -282,8 +282,8 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
             $costCalculator,
         );
 
-        // Convert USD to credits
-        $creditsNeeded = $creditService->convertUsdToCredits($estimation['estimated_cost_usd']);
+        // Convert USD to credits with markup
+        $creditsNeeded = $creditService->convertUsdToCreditsWithMarkup($estimation['estimated_cost_usd']);
 
         $user = $documentProcessing->user;
 
@@ -323,20 +323,15 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
     ): array {
         $estimatedInputTokens = $costCalculator->estimateTokensFromFileSize($fileSizeBytes);
 
-        // Section-based cost adjustment from config
-        $sectionCostMultiplier = config('document.cost_estimation.section_cost_multiplier', 0.1);
-        assert(is_numeric($sectionCostMultiplier));
-        $sectionCostMultiplier = (float) $sectionCostMultiplier;
+        // Use task-specific output token estimation (default to translation)
+        $taskType = 'translation'; // TODO: Get from document metadata
+        $structureAnalysis = ['sections_count' => $sectionsCount];
+        $estimatedOutputTokens = $costCalculator->estimateOutputTokensByTaskType(
+            $estimatedInputTokens,
+            $taskType,
+            $structureAnalysis,
+        );
 
-        $maxSectionMultiplier = config('document.cost_estimation.max_section_multiplier', 3.0);
-        assert(is_numeric($maxSectionMultiplier));
-        $maxSectionMultiplier = (float) $maxSectionMultiplier;
-
-        // More sections = more context for LLM = more output tokens
-        $sectionMultiplier = max(1.0, 1.0 + ($sectionsCount * $sectionCostMultiplier));
-        $sectionMultiplier = min($sectionMultiplier, $maxSectionMultiplier);
-
-        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5 * $sectionMultiplier);
         $estimatedCost = $costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
 
         return [
@@ -347,7 +342,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
             'model_used' => $model,
             'pricing_info' => $costCalculator->getPricingInfo($model),
             'sections_count' => $sectionsCount,
-            'section_multiplier' => $sectionMultiplier,
+            'task_type' => $taskType,
         ];
     }
 
@@ -357,7 +352,15 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
     private function estimateProcessingCost(int $fileSizeBytes, string $model, CostCalculator $costCalculator): array
     {
         $estimatedInputTokens = $costCalculator->estimateTokensFromFileSize($fileSizeBytes);
-        $estimatedOutputTokens = (int) ($estimatedInputTokens * 1.5);
+
+        // Use task-specific output token estimation with fallback
+        $taskType = 'translation'; // Default task type
+        $estimatedOutputTokens = $costCalculator->estimateOutputTokensByTaskType(
+            $estimatedInputTokens,
+            $taskType,
+            ['sections_count' => 5], // Default sections count
+        );
+
         $estimatedCost = $costCalculator->calculateCost($estimatedInputTokens, $estimatedOutputTokens, $model);
 
         return [
@@ -367,6 +370,7 @@ class AnalyzeDocumentStructureJob implements ShouldQueue, ShouldBeUnique
             'estimated_cost_usd' => $estimatedCost,
             'model_used' => $model,
             'pricing_info' => $costCalculator->getPricingInfo($model),
+            'task_type' => $taskType,
         ];
     }
 }

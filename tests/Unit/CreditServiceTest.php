@@ -151,6 +151,48 @@ class CreditServiceTest extends TestCase
         $this->assertEquals(150.0, $credits);
     }
 
+    public function testConvertUsdToCreditsWithMarkup(): void
+    {
+        Config::set('credits.markup_coefficient', 1.5);
+
+        $credits = $this->creditService->convertUsdToCreditsWithMarkup(0.021);
+
+        // Expected: ceil(0.021 * 1.5 * 100) = ceil(3.15) = 4
+        $this->assertEquals(4, $credits);
+    }
+
+    public function testConvertUsdToCreditsWithMarkupCustomCoefficient(): void
+    {
+        $credits = $this->creditService->convertUsdToCreditsWithMarkup(0.025, 2.0);
+
+        // Expected: ceil(0.025 * 2.0 * 100) = ceil(5.0) = 5
+        $this->assertEquals(5, $credits);
+    }
+
+    public function testConvertUsdToCreditsWithMarkupValidatesNegativeAmount(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('USD amount must be non-negative');
+
+        $this->creditService->convertUsdToCreditsWithMarkup(-0.1);
+    }
+
+    public function testConvertUsdToCreditsWithMarkupValidatesNegativeMarkup(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('Markup coefficient must be positive');
+
+        $this->creditService->convertUsdToCreditsWithMarkup(0.1, -1.0);
+    }
+
+    public function testConvertUsdToCreditsWithMarkupRoundsUp(): void
+    {
+        $credits = $this->creditService->convertUsdToCreditsWithMarkup(0.001, 1.5);
+
+        // Expected: ceil(0.001 * 1.5 * 100) = ceil(0.15) = 1
+        $this->assertEquals(1, $credits);
+    }
+
     public function testConvertCreditsToUsd(): void
     {
         $usd = $this->creditService->convertCreditsToUsd(150.0);

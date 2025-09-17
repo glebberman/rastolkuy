@@ -200,6 +200,27 @@ class CreditService
     }
 
     /**
+     * Конвертировать USD сумму в кредиты с применением бизнес-наценки и округлением вверх.
+     */
+    public function convertUsdToCreditsWithMarkup(float $usdAmount, ?float $markupCoefficient = null): int
+    {
+        if ($usdAmount < 0) {
+            throw new InvalidArgumentException('USD amount must be non-negative');
+        }
+
+        $markup = $markupCoefficient ?? Config::get('credits.markup_coefficient', 1.5);
+        $rate = Config::get('credits.usd_to_credits_rate', 100);
+
+        if ($markup <= 0) {
+            throw new InvalidArgumentException('Markup coefficient must be positive');
+        }
+
+        $creditsWithMarkup = $usdAmount * $markup * $rate;
+
+        return (int) ceil($creditsWithMarkup);
+    }
+
+    /**
      * Конвертировать кредиты в USD сумму.
      */
     public function convertCreditsToUsd(float $credits): float

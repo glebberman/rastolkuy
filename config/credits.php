@@ -152,4 +152,52 @@ return [
     */
 
     'usd_to_credits_rate' => env('CREDITS_USD_RATE', 100), // 1 USD = 100 credits
+
+    /*
+    |--------------------------------------------------------------------------
+    | Business Markup Coefficient
+    |--------------------------------------------------------------------------
+    |
+    | Markup coefficient applied to LLM costs before converting to credits.
+    | This represents the business value added on top of raw API costs.
+    | Example: 1.5 means 50% markup, 2.0 means 100% markup.
+    |
+    */
+
+    'markup_coefficient' => env('CREDITS_MARKUP_COEFFICIENT', 1.5),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Task-Specific Output Token Multipliers
+    |--------------------------------------------------------------------------
+    |
+    | Multipliers for estimating output tokens based on input tokens
+    | for different task types. These are used to improve cost estimation
+    | accuracy based on the nature of each task.
+    |
+    */
+
+    'output_token_multipliers' => [
+        'translation' => [
+            'content_multiplier' => 0.5,  // Simplified explanations are shorter
+            'json_overhead' => 0.3,       // JSON structure, anchors, risks
+            'summary_base_tokens' => 150, // Base tokens for document summary
+            'min_multiplier' => 0.4,      // Minimum total multiplier
+            'max_multiplier' => 1.0,      // Maximum total multiplier
+        ],
+        'analysis' => [
+            'content_multiplier' => 0.3,  // Analysis produces brief conclusions
+            'json_overhead' => 0.2,       // Less JSON structure
+            'summary_base_tokens' => 100, // Shorter summaries for analysis
+            'min_multiplier' => 0.25,
+            'max_multiplier' => 0.6,
+        ],
+        'ambiguity' => [
+            'content_multiplier' => 0.4,  // Finding ambiguities + explanations
+            'json_overhead' => 0.25,      // Medium JSON structure
+            'summary_base_tokens' => 120, // Medium summary length
+            'min_multiplier' => 0.3,
+            'max_multiplier' => 0.8,
+        ],
+    ],
 ];
