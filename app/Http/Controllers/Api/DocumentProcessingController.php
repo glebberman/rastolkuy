@@ -449,7 +449,7 @@ class DocumentProcessingController extends Controller
     public function previewPrompt(PreviewPromptRequest $request): JsonResponse
     {
         /** @var string $uuid */
-        $uuid = $request->validated('uuid');
+        $uuid = $request->route('uuid');
         $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
 
         if (!$documentProcessing) {

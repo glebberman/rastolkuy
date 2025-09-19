@@ -22,7 +22,6 @@ class PreviewPromptRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'uuid' => ['required', 'string', 'uuid'],
             'system_name' => ['string', 'max:255'],
             'template_name' => ['string', 'max:255'],
             'task_type' => ['string', 'in:translation,analysis,ambiguity'],
@@ -36,8 +35,6 @@ class PreviewPromptRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'uuid.required' => 'UUID документа обязателен',
-            'uuid.uuid' => 'UUID должен быть в корректном формате',
             'system_name.string' => 'Название системы промптов должно быть строкой',
             'template_name.string' => 'Название шаблона должно быть строкой',
             'task_type.in' => 'Тип задачи должен быть: translation, analysis или ambiguity',
