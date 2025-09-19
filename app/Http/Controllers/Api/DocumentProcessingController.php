@@ -475,29 +475,35 @@ class DocumentProcessingController extends Controller
             $optionsRaw = $request->validated('options');
             $options = is_array($optionsRaw) ? $optionsRaw : [];
 
-            // Извлекаем содержимое документа
-            $extractedDocument = $this->extractorManager->extract(
-                $this->fileStorageService->path($documentProcessing->file_path)
-            );
+            // Получаем содержимое документа с якорями (как в markup эндпоинте)
+            try {
+                $markup = $this->documentProcessingService->getDocumentWithMarkup($documentProcessing);
+                $documentWithAnchors = $markup['content_with_anchors'];
+                $anchors = $markup['anchors'];
+            } catch (Exception $markupException) {
+                // Fallback: если markup не работает, используем обычное извлечение
+                $extractedDocument = $this->extractorManager->extract(
+                    $this->fileStorageService->path($documentProcessing->file_path)
+                );
+                $documentWithAnchors = $extractedDocument->getPlainText();
+                $anchors = [];
+
+                Log::warning('Failed to get document with markup, using plain text fallback', [
+                    'document_uuid' => $uuid,
+                    'markup_error' => $markupException->getMessage(),
+                ]);
+            }
 
             // Подготавливаем переменные для промпта
             $variables = [
-                'document_text' => $extractedDocument->getPlainText(),
+                'document_with_anchors' => $documentWithAnchors,
                 'document_filename' => $documentProcessing->original_filename,
                 'file_type' => $documentProcessing->file_type,
                 'task_type' => $taskType,
-                'format_instructions' => 'Ответ должен быть в формате JSON с якорями',
+                'format_instructions' => 'Ответ должен быть в формате JSON: [{"anchor": "идентификатор_якоря", "translation": "Перевод-разъяснение простым языком предшествующего подраздела"}]',
                 'language_style' => 'простой и понятный язык',
+                'available_anchors' => implode(', ', array_column($anchors, 'id')),
             ];
-
-            // Добавляем структурные данные если есть
-            if ($documentProcessing->processing_metadata &&
-                isset($documentProcessing->processing_metadata['structure_analysis'])) {
-                $structureData = $documentProcessing->processing_metadata['structure_analysis'];
-                if (is_array($structureData) && isset($structureData['sections'])) {
-                    $variables['document_sections'] = $structureData['sections'];
-                }
-            }
 
             // Создаем запрос на рендеринг промпта
             $renderRequest = new PromptRenderRequest(
