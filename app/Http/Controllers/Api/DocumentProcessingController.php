@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\DTOs\EstimateDocumentDto;
 use App\DTOs\UploadDocumentDto;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\PreviewPromptRequest;
 use App\Http\Requests\CancelDocumentRequest;
 use App\Http\Requests\DeleteDocumentRequest;
 use App\Http\Requests\DocumentResultRequest;
@@ -27,6 +28,10 @@ use App\Http\Resources\DocumentUploadedResource;
 use App\Models\User;
 use App\Services\AuditService;
 use App\Services\DocumentProcessingService;
+use App\Services\FileStorageService;
+use App\Services\Parser\Extractors\ExtractorManager;
+use App\Services\Prompt\DTOs\PromptRenderRequest;
+use App\Services\Prompt\PromptManager;
 use Exception;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +49,9 @@ class DocumentProcessingController extends Controller
     public function __construct(
         private readonly DocumentProcessingService $documentProcessingService,
         private readonly AuditService $auditService,
+        private readonly PromptManager $promptManager,
+        private readonly ExtractorManager $extractorManager,
+        private readonly FileStorageService $fileStorageService,
     ) {
     }
 
@@ -433,6 +441,119 @@ class DocumentProcessingController extends Controller
             ->paginate($perPage);
 
         return new DocumentListResource($documents);
+    }
+
+    /**
+     * Получить предварительный просмотр промпта без отправки в LLM (для тестирования).
+     */
+    public function previewPrompt(PreviewPromptRequest $request): JsonResponse
+    {
+        /** @var string $uuid */
+        $uuid = $request->route('uuid');
+        $documentProcessing = $this->documentProcessingService->getByUuid($uuid);
+
+        if (!$documentProcessing) {
+            return response()->json([
+                'error' => 'Document not found',
+                'message' => 'Документ с указанным идентификатором не найден',
+            ], ResponseAlias::HTTP_NOT_FOUND);
+        }
+
+        $this->authorize('view', $documentProcessing);
+
+        try {
+            // Получаем параметры из запроса с дефолтными значениями
+            $systemNameRaw = $request->validated('system_name');
+            $systemName = is_string($systemNameRaw) ? $systemNameRaw : 'document_translation';
+
+            $templateNameRaw = $request->validated('template_name');
+            $templateName = is_string($templateNameRaw) ? $templateNameRaw : 'translate_legal_document';
+
+            $taskTypeRaw = $request->validated('task_type');
+            $taskType = is_string($taskTypeRaw) ? $taskTypeRaw : 'translation';
+
+            $optionsRaw = $request->validated('options');
+            $options = is_array($optionsRaw) ? $optionsRaw : [];
+
+            // Получаем содержимое документа с якорями (как в markup эндпоинте)
+            try {
+                $markup = $this->documentProcessingService->getDocumentWithMarkup($documentProcessing);
+                $documentWithAnchors = $markup['content_with_anchors'];
+                $anchors = $markup['anchors'];
+            } catch (Exception $markupException) {
+                // Fallback: если markup не работает, используем обычное извлечение
+                $extractedDocument = $this->extractorManager->extract(
+                    $this->fileStorageService->path($documentProcessing->file_path)
+                );
+                $documentWithAnchors = $extractedDocument->getPlainText();
+                $anchors = [];
+
+                Log::warning('Failed to get document with markup, using plain text fallback', [
+                    'document_uuid' => $uuid,
+                    'markup_error' => $markupException->getMessage(),
+                ]);
+            }
+
+            // Подготавливаем переменные для промпта
+            $variables = [
+                'document_with_anchors' => $documentWithAnchors,
+                'document_filename' => $documentProcessing->original_filename,
+                'file_type' => $documentProcessing->file_type,
+                'task_type' => $taskType,
+                'format_instructions' => 'Ответ должен быть в формате JSON: [{"anchor": "идентификатор_якоря", "translation": "Перевод-разъяснение простым языком предшествующего подраздела"}]',
+                'language_style' => 'простой и понятный язык',
+                'available_anchors' => implode(', ', array_column($anchors, 'id')),
+            ];
+
+            // Создаем запрос на рендеринг промпта
+            $renderRequest = new PromptRenderRequest(
+                systemName: $systemName,
+                templateName: $templateName,
+                variables: $variables,
+                options: $options
+            );
+
+            // Генерируем промпт без отправки в LLM
+            $renderedPrompt = $this->promptManager->renderTemplate($renderRequest);
+
+            /** @var User $user */
+            $user = $request->user();
+            $this->auditService->logDocumentAccess($user, $documentProcessing->uuid, 'prompt_preview');
+
+            return response()->json([
+                'data' => [
+                    'document_id' => $documentProcessing->uuid,
+                    'document_filename' => $documentProcessing->original_filename,
+                    'system_name' => $systemName,
+                    'template_name' => $templateName,
+                    'task_type' => $taskType,
+                    'variables_used' => array_keys($variables),
+                    'rendered_prompt' => $renderedPrompt,
+                    'prompt_length' => mb_strlen($renderedPrompt),
+                    'word_count' => str_word_count($renderedPrompt),
+                    'character_count' => mb_strlen($renderedPrompt),
+                    'estimated_tokens' => (int) (mb_strlen($renderedPrompt) / 4), // Приблизительная оценка
+                    'options' => $options,
+                ],
+            ]);
+        } catch (InvalidArgumentException $e) {
+            return response()->json([
+                'error' => 'Invalid document status',
+                'message' => $e->getMessage(),
+            ], ResponseAlias::HTTP_CONFLICT);
+        } catch (Exception $e) {
+            Log::error('Failed to preview prompt', [
+                'document_uuid' => $uuid,
+                'user_id' => $request->user()?->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => 'Prompt preview failed',
+                'message' => 'Не удалось сгенерировать предварительный просмотр промпта: ' . $e->getMessage(),
+            ], ResponseAlias::HTTP_INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**

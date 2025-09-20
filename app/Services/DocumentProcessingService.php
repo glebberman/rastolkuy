@@ -197,11 +197,36 @@ readonly class DocumentProcessingService
         ]);
 
         try {
+            // Check if we have cached marked-up content
+            $metadata = $documentProcessing->processing_metadata;
+            if (is_array($metadata) &&
+                isset($metadata['cached_markup']) &&
+                is_array($metadata['cached_markup']) &&
+                isset($metadata['cached_markup']['content_with_anchors']) &&
+                isset($metadata['cached_markup']['original_content']) &&
+                isset($metadata['cached_markup']['sections'])) {
+
+                $cachedMarkup = $metadata['cached_markup'];
+                return [
+                    'original_content' => $cachedMarkup['original_content'],
+                    'content_with_anchors' => $cachedMarkup['content_with_anchors'],
+                    'sections_count' => $cachedMarkup['sections_count'] ?? count($cachedMarkup['sections']),
+                    'anchors' => $cachedMarkup['sections'],
+                    'structure_analysis' => null,
+                ];
+            }
+
+            // Generate markup if not cached
             $sections = $this->getOrAnalyzeSections($documentProcessing);
             $originalContent = $this->extractContent($documentProcessing);
             $contentWithAnchors = $this->addAnchorsToDocument($originalContent, $sections, $documentProcessing->anchor_at_start);
 
-            return $this->buildMarkupResponse($originalContent, $contentWithAnchors, $sections);
+            $markupResponse = $this->buildMarkupResponse($originalContent, $contentWithAnchors, $sections);
+
+            // Cache the complete markup response
+            $this->cacheDocumentMarkup($documentProcessing, $markupResponse);
+
+            return $markupResponse;
         } catch (Exception $e) {
             Log::error('Failed to generate document markup', [
                 'uuid' => $documentProcessing->uuid,
@@ -703,7 +728,7 @@ readonly class DocumentProcessingService
      */
     private function buildMarkupResponse(string $originalContent, string $contentWithAnchors, array $sections): array
     {
-        $anchors = array_map(fn (DocumentSection $section) => [
+        $anchors = array_map(static fn (DocumentSection $section) => [
             'id' => $section->id,
             'title' => $section->title,
             'anchor' => $section->anchor,
@@ -718,5 +743,36 @@ readonly class DocumentProcessingService
             'anchors' => $anchors,
             'structure_analysis' => null, // Можно добавить дополнительную аналитику при необходимости
         ];
+    }
+
+    /**
+     * Cache complete document markup with anchors.
+     */
+    private function cacheDocumentMarkup(DocumentProcessing $documentProcessing, array $markupResponse): void
+    {
+        try {
+            $metadata = $documentProcessing->processing_metadata ?? [];
+            $metadata['cached_markup'] = [
+                'content_with_anchors' => $markupResponse['content_with_anchors'],
+                'original_content' => $markupResponse['original_content'],
+                'sections' => $markupResponse['anchors'],
+                'sections_count' => $markupResponse['sections_count'],
+                'cached_at' => now()->toISOString(),
+            ];
+
+            $documentProcessing->update(['processing_metadata' => $metadata]);
+
+            Log::info('Document markup cached successfully', [
+                'uuid' => $documentProcessing->uuid,
+                'sections_count' => $markupResponse['sections_count'],
+                'content_length' => strlen($markupResponse['content_with_anchors']),
+            ]);
+        } catch (Exception $e) {
+            Log::warning('Failed to cache document markup', [
+                'uuid' => $documentProcessing->uuid,
+                'error' => $e->getMessage(),
+            ]);
+            // Don't throw - caching failure shouldn't break the response
+        }
     }
 }
