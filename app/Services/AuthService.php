@@ -186,6 +186,7 @@ readonly class AuthService
 
         // Verify current password
         $currentPassword = $validated['current_password'];
+
         if (!is_string($currentPassword)) {
             throw ValidationException::withMessages([
                 'current_password' => ['Неверный формат текущего пароля.'],
@@ -200,6 +201,7 @@ readonly class AuthService
 
         // Update password
         $newPassword = $validated['password'];
+
         if (!is_string($newPassword)) {
             throw ValidationException::withMessages([
                 'password' => ['Неверный формат нового пароля.'],

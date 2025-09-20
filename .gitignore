@@ -34,6 +34,6 @@ log/*
 *.log
 
 .idea
-.claude
+.claude/settings.local.json
 .composer
 tmp
