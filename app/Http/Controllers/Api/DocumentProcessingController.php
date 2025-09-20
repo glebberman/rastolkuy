@@ -483,7 +483,7 @@ class DocumentProcessingController extends Controller
             } catch (Exception $markupException) {
                 // Fallback: если markup не работает, используем обычное извлечение
                 $extractedDocument = $this->extractorManager->extract(
-                    $this->fileStorageService->path($documentProcessing->file_path)
+                    $this->fileStorageService->path($documentProcessing->file_path),
                 );
                 $documentWithAnchors = $extractedDocument->getPlainText();
                 $anchors = [];
@@ -510,7 +510,7 @@ class DocumentProcessingController extends Controller
                 systemName: $systemName,
                 templateName: $templateName,
                 variables: $variables,
-                options: $options
+                options: $options,
             );
 
             // Генерируем промпт без отправки в LLM

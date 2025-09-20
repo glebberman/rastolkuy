@@ -199,14 +199,14 @@ readonly class DocumentProcessingService
         try {
             // Check if we have cached marked-up content
             $metadata = $documentProcessing->processing_metadata;
-            if (is_array($metadata) &&
-                isset($metadata['cached_markup']) &&
-                is_array($metadata['cached_markup']) &&
-                isset($metadata['cached_markup']['content_with_anchors']) &&
-                isset($metadata['cached_markup']['original_content']) &&
-                isset($metadata['cached_markup']['sections'])) {
 
+            if (is_array($metadata)
+                && isset($metadata['cached_markup'])
+                && is_array($metadata['cached_markup'])
+                && isset($metadata['cached_markup']['content_with_anchors'], $metadata['cached_markup']['original_content'], $metadata['cached_markup']['sections'])
+            ) {
                 $cachedMarkup = $metadata['cached_markup'];
+
                 return [
                     'original_content' => $cachedMarkup['original_content'],
                     'content_with_anchors' => $cachedMarkup['content_with_anchors'],
