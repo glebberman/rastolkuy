@@ -21,10 +21,10 @@ use Illuminate\Validation\ValidationException;
 use InvalidArgumentException;
 use RuntimeException;
 
-class AuthService
+readonly class AuthService
 {
     public function __construct(
-        private readonly CreditService $creditService,
+        private CreditService $creditService,
     ) {
     }
 
@@ -185,14 +185,28 @@ class AuthService
         $validated = $request->validated();
 
         // Verify current password
-        if (!Hash::check($validated['current_password'], $user->password)) {
+        $currentPassword = $validated['current_password'];
+        if (!is_string($currentPassword)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['Неверный формат текущего пароля.'],
+            ]);
+        }
+
+        if (!Hash::check($currentPassword, $user->password)) {
             throw ValidationException::withMessages([
                 'current_password' => ['Неверный текущий пароль.'],
             ]);
         }
 
         // Update password
-        $user->password = Hash::make($validated['password']);
+        $newPassword = $validated['password'];
+        if (!is_string($newPassword)) {
+            throw ValidationException::withMessages([
+                'password' => ['Неверный формат нового пароля.'],
+            ]);
+        }
+
+        $user->password = Hash::make($newPassword);
         $user->save();
 
         // Optionally, delete all tokens for security
@@ -246,9 +260,13 @@ class AuthService
                 ->latest('updated_at')
                 ->first();
 
-            $lastActivity = $lastDocument !== null && $lastDocument->updated_at !== null
-                ? $lastDocument->updated_at->toISOString()
-                : ($user->updated_at !== null ? $user->updated_at->toISOString() : now()->toISOString());
+            if ($lastDocument !== null && $lastDocument->updated_at !== null) {
+                $lastActivity = $lastDocument->updated_at->toISOString();
+            } elseif ($user->updated_at !== null) {
+                $lastActivity = $user->updated_at->toISOString();
+            } else {
+                $lastActivity = now()->toISOString();
+            }
 
             return [
                 'credits_balance' => $creditsBalance,

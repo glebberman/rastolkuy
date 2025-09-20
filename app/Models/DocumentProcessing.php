@@ -37,6 +37,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $deleted_at
  *
  * @method static Builder<DocumentProcessing> where(string $column, mixed $operator = null, mixed $value = null, string $boolean = 'and')
+ * @method static DocumentProcessing create(array $attributes)
  */
 class DocumentProcessing extends Model
 {
