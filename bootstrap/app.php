@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ExportRateLimit;
 use App\Http\Middleware\ForceJsonResponse;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PermissionMiddleware;
@@ -39,6 +40,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'custom.throttle' => RateLimitMiddleware::class,
+            'export.rate_limit' => ExportRateLimit::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
         ]);

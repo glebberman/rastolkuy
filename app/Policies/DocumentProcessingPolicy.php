@@ -100,6 +100,17 @@ class DocumentProcessingPolicy
     }
 
     /**
+     * Determine whether the user can export documents.
+     */
+    public function export(User $user, DocumentProcessing $documentProcessing): bool
+    {
+        // Users can export their own completed documents, admins can export any
+        return $user->hasPermissionTo('documents.export')
+               && $documentProcessing->isCompleted()
+               && ($user->hasPermissionTo('documents.view-admin') || $this->isOwner($user, $documentProcessing));
+    }
+
+    /**
      * Determine whether the user can view statistics.
      */
     public function stats(User $user): bool

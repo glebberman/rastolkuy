@@ -6,6 +6,8 @@ namespace Tests\Unit;
 
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\Test;
+use Spatie\Permission\Exceptions\RoleDoesNotExist;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -20,7 +22,7 @@ class RolePermissionTest extends TestCase
         $this->artisan('db:seed', ['--class' => 'RoleAndPermissionSeeder']);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function userCanHaveRoles(): void
     {
         $user = User::factory()->create();
@@ -32,7 +34,7 @@ class RolePermissionTest extends TestCase
         $this->assertFalse($user->hasRole('admin'));
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function userCanHavePermissionsThroughRoles(): void
     {
         $user = User::factory()->create();
@@ -43,7 +45,7 @@ class RolePermissionTest extends TestCase
         $this->assertFalse($user->hasPermissionTo('system.admin'));
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function adminRoleHasAllPermissions(): void
     {
         $user = User::factory()->create();
@@ -56,7 +58,7 @@ class RolePermissionTest extends TestCase
         }
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function guestRoleHasLimitedPermissions(): void
     {
         $user = User::factory()->create();
@@ -68,7 +70,7 @@ class RolePermissionTest extends TestCase
         $this->assertFalse($user->hasPermissionTo('system.admin'));
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function customerRoleHasDocumentPermissions(): void
     {
         $user = User::factory()->create();
@@ -86,7 +88,7 @@ class RolePermissionTest extends TestCase
         $this->assertFalse($user->hasPermissionTo('system.admin'));
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function rolesHaveCorrectPermissionCount(): void
     {
         $guestRole = Role::findByName('guest');
@@ -94,20 +96,20 @@ class RolePermissionTest extends TestCase
         $adminRole = Role::findByName('admin');
 
         $this->assertCount(3, $guestRole->permissions);
-        $this->assertCount(13, $customerRole->permissions); // Updated count
+        $this->assertCount(14, $customerRole->permissions); // Updated count after adding documents.export
         $this->assertCount(Permission::count(), $adminRole->permissions);
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function userCannotHaveNonExistentRole(): void
     {
         $user = User::factory()->create();
 
-        $this->expectException(\Spatie\Permission\Exceptions\RoleDoesNotExist::class);
+        $this->expectException(RoleDoesNotExist::class);
         $user->assignRole('nonexistent-role');
     }
 
-    #[\PHPUnit\Framework\Attributes\Test]
+    #[Test]
     public function newUserIsAutomaticallyAssignedCustomerRole(): void
     {
         $userData = [

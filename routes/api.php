@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\CreditController;
+use App\Http\Controllers\Api\DocumentExportController;
 use App\Http\Controllers\Api\DocumentProcessingController;
 use Illuminate\Support\Facades\Route;
 
@@ -202,6 +203,25 @@ Route::delete('v1/documents/{uuid}', [DocumentProcessingController::class, 'dest
 Route::get('v1/documents', [DocumentProcessingController::class, 'userIndex'])
     ->middleware(['auth:sanctum', 'permission:documents.view'])
     ->name('api.v1.documents.index');
+
+// -----------------------------------------------------------------------------
+// ЭКСПОРТ ДОКУМЕНТОВ
+// -----------------------------------------------------------------------------
+
+// Получение списка доступных форматов экспорта
+Route::get('v1/export/formats', [DocumentExportController::class, 'formats'])
+    ->middleware(['custom.throttle:60,1'])
+    ->name('api.v1.export.formats');
+
+// Экспорт документа в указанный формат
+Route::post('v1/export', [DocumentExportController::class, 'export'])
+    ->middleware(['auth:sanctum', 'permission:documents.export', 'export.rate_limit'])
+    ->name('api.v1.export.create');
+
+// Скачивание экспортированного документа по токену (публичный доступ)
+Route::get('v1/export/download/{token}', [DocumentExportController::class, 'download'])
+    ->middleware(['custom.throttle:60,1'])
+    ->name('api.export.download');
 
 // -----------------------------------------------------------------------------
 // АДМИНИСТРАТИВНЫЕ ФУНКЦИИ (только для администраторов)
