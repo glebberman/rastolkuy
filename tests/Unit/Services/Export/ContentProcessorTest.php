@@ -29,7 +29,7 @@ final class ContentProcessorTest extends TestCase
 
         // Загружаем тестовые данные
         $testData = $this->loadTestTranslationResponse();
-        $this->testContent = $testData['content'];
+        $this->testContent = is_string($testData['content']) ? $testData['content'] : '';
     }
 
     public function testParseDocumentResultWithCompletedDocument(): void
@@ -213,7 +213,7 @@ final class ContentProcessorTest extends TestCase
     /**
      * Загружает тестовые данные из файла.
      *
-     * @return array{content: string, anchors: array<array{id: string, title: string, translation: string}>, risks: array<array{type: string, text: string}>}
+     * @return array<string, mixed>
      */
     private function loadTestTranslationResponse(): array
     {

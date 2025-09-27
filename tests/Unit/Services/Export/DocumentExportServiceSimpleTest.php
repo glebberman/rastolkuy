@@ -63,7 +63,8 @@ final class DocumentExportServiceSimpleTest extends TestCase
         $testData = $this->loadTestTranslationResponse();
 
         // Act
-        $parsedContent = $this->contentProcessor->parseContent($testData['content']);
+        $content = is_string($testData['content']) ? $testData['content'] : '';
+        $parsedContent = $this->contentProcessor->parseContent($content);
 
         // Assert
         $totalRisks = 0;
@@ -99,7 +100,8 @@ final class DocumentExportServiceSimpleTest extends TestCase
         $testData = $this->loadTestTranslationResponse();
 
         // Act
-        $parsedContent = $this->contentProcessor->parseContent($testData['content']);
+        $content = is_string($testData['content']) ? $testData['content'] : '';
+        $parsedContent = $this->contentProcessor->parseContent($content);
 
         // Assert
         $translationsFound = 0;
@@ -122,7 +124,8 @@ final class DocumentExportServiceSimpleTest extends TestCase
         $contentWithAnchors = $testData['content'];
 
         // Act
-        $cleanContent = $this->contentProcessor->removeAnchors($contentWithAnchors);
+        $content = is_string($testData['content']) ? $testData['content'] : '';
+        $cleanContent = $this->contentProcessor->removeAnchors($content);
 
         // Assert
         $this->assertStringNotContainsString('<!-- SECTION_ANCHOR_', $cleanContent);
@@ -143,7 +146,8 @@ final class DocumentExportServiceSimpleTest extends TestCase
         ];
 
         // Act
-        $result = $this->contentProcessor->replaceAnchors($contentWithAnchors, $replacements);
+        $content = is_string($testData['content']) ? $testData['content'] : '';
+        $result = $this->contentProcessor->replaceAnchors($content, $replacements);
 
         // Assert
         $this->assertStringContainsString('<h2 class="replaced">Замененный заголовок</h2>', $result);
@@ -167,25 +171,19 @@ final class DocumentExportServiceSimpleTest extends TestCase
         $this->assertIsArray($testData['risks']);
 
         // Проверяем структуру якорей
-        if (is_array($testData['anchors'])) {
-            foreach ($testData['anchors'] as $anchor) {
-                if (is_array($anchor)) {
-                    $this->assertArrayHasKey('id', $anchor);
-                    $this->assertArrayHasKey('title', $anchor);
-                    $this->assertArrayHasKey('translation', $anchor);
-                }
-            }
+        foreach ($testData['anchors'] as $anchor) {
+            $this->assertIsArray($anchor);
+            $this->assertArrayHasKey('id', $anchor);
+            $this->assertArrayHasKey('title', $anchor);
+            $this->assertArrayHasKey('translation', $anchor);
         }
 
         // Проверяем структуру рисков
-        if (is_array($testData['risks'])) {
-            foreach ($testData['risks'] as $risk) {
-                if (is_array($risk) && isset($risk['type'])) {
-                    $this->assertArrayHasKey('type', $risk);
-                    $this->assertArrayHasKey('text', $risk);
-                    $this->assertContains($risk['type'], ['risk', 'contradiction', 'warning']);
-                }
-            }
+        foreach ($testData['risks'] as $risk) {
+            $this->assertIsArray($risk);
+            $this->assertArrayHasKey('type', $risk);
+            $this->assertArrayHasKey('text', $risk);
+            $this->assertContains($risk['type'], ['risk', 'contradiction', 'warning']);
         }
     }
 
@@ -204,7 +202,7 @@ final class DocumentExportServiceSimpleTest extends TestCase
     /**
      * Загружает тестовые данные из файла.
      *
-     * @return array{content: string, anchors: array<array{id: string, title: string, translation: string}>, risks: array<array{type: string, text: string}>}
+     * @return array<string, mixed>
      */
     private function loadTestTranslationResponse(): array
     {

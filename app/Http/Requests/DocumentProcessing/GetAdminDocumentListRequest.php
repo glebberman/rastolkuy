@@ -128,7 +128,15 @@ final class GetAdminDocumentListRequest extends FormRequest
     {
         $page = $this->validated('page');
 
-        return is_int($page) ? $page : (int) $page;
+        if (is_int($page)) {
+            return $page;
+        }
+
+        if (is_string($page) || is_numeric($page)) {
+            return (int) $page;
+        }
+
+        return 1;
     }
 
     /**

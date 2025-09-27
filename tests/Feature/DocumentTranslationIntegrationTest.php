@@ -21,9 +21,10 @@ final class DocumentTranslationIntegrationTest extends TestCase
         // Arrange - создаем документ с тестовыми данными
         $testData = $this->loadTestTranslationResponse();
 
+        $content = is_string($testData['content']) ? $testData['content'] : '';
         $document = DocumentProcessing::factory()->create([
             'status' => 'completed',
-            'result' => ['content' => $testData['content']],
+            'result' => ['content' => $content],
             'original_filename' => 'test_contract.pdf',
         ]);
 
@@ -99,7 +100,8 @@ final class DocumentTranslationIntegrationTest extends TestCase
         $contentProcessor = new ContentProcessor();
 
         // Act
-        $parsedContent = $contentProcessor->parseContent($testData['content']);
+        $content = is_string($testData['content']) ? $testData['content'] : '';
+        $parsedContent = $contentProcessor->parseContent($content);
 
         // Assert - проверяем корректность извлечения якорей
         $this->assertCount(7, $parsedContent->anchors);
@@ -133,7 +135,8 @@ final class DocumentTranslationIntegrationTest extends TestCase
         $contentProcessor = new ContentProcessor();
 
         // Act
-        $parsedContent = $contentProcessor->parseContent($testData['content']);
+        $content = is_string($testData['content']) ? $testData['content'] : '';
+        $parsedContent = $contentProcessor->parseContent($content);
 
         // Assert - проверяем качество переводов
         $translationsCount = 0;
@@ -166,7 +169,8 @@ final class DocumentTranslationIntegrationTest extends TestCase
         $originalContent = $testData['content'];
 
         // Test 1: Удаление якорей
-        $cleanContent = $contentProcessor->removeAnchors($originalContent);
+        $originalContentStr = is_string($originalContent) ? $originalContent : '';
+        $cleanContent = $contentProcessor->removeAnchors($originalContentStr);
         $this->assertStringNotContainsString('<!-- SECTION_ANCHOR_', $cleanContent);
         $this->assertStringContainsString('ПРЕДМЕТ ДОГОВОРА', $cleanContent);
 
@@ -176,7 +180,7 @@ final class DocumentTranslationIntegrationTest extends TestCase
             'section_2_stoimost_i_poryadok_oplaty' => '<section id="payment"><h2>Оплата</h2></section>',
         ];
 
-        $replacedContent = $contentProcessor->replaceAnchors($originalContent, $replacements);
+        $replacedContent = $contentProcessor->replaceAnchors($originalContentStr, $replacements);
         $this->assertStringContainsString('<section id="subject"><h2>Предмет договора</h2></section>', $replacedContent);
         $this->assertStringContainsString('<section id="payment"><h2>Оплата</h2></section>', $replacedContent);
 
@@ -188,7 +192,7 @@ final class DocumentTranslationIntegrationTest extends TestCase
     /**
      * Загружает тестовые данные из файла.
      *
-     * @return array{content: string, anchors: array<array{id: string, title: string, translation: string}>, risks: array<array{type: string, text: string}>}
+     * @return array<string, mixed>
      */
     private function loadTestTranslationResponse(): array
     {

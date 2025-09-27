@@ -22,8 +22,8 @@ final class DocumentMarkupResponse extends JsonResponse
             'message' => 'Разметка документа получена',
             'data' => [
                 'markup' => $markup,
-                'sections_count' => count($markup['sections'] ?? []),
-                'anchors_count' => count($markup['anchors'] ?? []),
+                'sections_count' => $this->getCountableSafeCount($markup, 'sections'),
+                'anchors_count' => $this->getCountableSafeCount($markup, 'anchors'),
             ],
             'meta' => [
                 'timestamp' => now()->toISOString(),
@@ -33,5 +33,27 @@ final class DocumentMarkupResponse extends JsonResponse
         ];
 
         parent::__construct($data, Response::HTTP_OK);
+    }
+
+    /**
+     * Безопасно получает количество элементов из массива.
+     *
+     * @param mixed $markup
+     * @param string $key
+     * @return int
+     */
+    private function getCountableSafeCount(mixed $markup, string $key): int
+    {
+        if (!is_array($markup) || !isset($markup[$key])) {
+            return 0;
+        }
+
+        $value = $markup[$key];
+
+        if (is_array($value) || $value instanceof \Countable) {
+            return count($value);
+        }
+
+        return 0;
     }
 }

@@ -22,8 +22,8 @@ final class PromptPreviewResponse extends JsonResponse
             'message' => 'Предварительный просмотр промпта сгенерирован',
             'data' => [
                 'prompt' => $promptData,
-                'characters_count' => strlen($promptData['rendered_prompt'] ?? ''),
-                'estimated_tokens' => $this->estimateTokens($promptData['rendered_prompt'] ?? ''),
+                'characters_count' => strlen($this->getStringValue($promptData, 'rendered_prompt')),
+                'estimated_tokens' => $this->estimateTokens($this->getStringValue($promptData, 'rendered_prompt')),
             ],
             'meta' => [
                 'timestamp' => now()->toISOString(),
@@ -33,6 +33,32 @@ final class PromptPreviewResponse extends JsonResponse
         ];
 
         parent::__construct($data, Response::HTTP_OK);
+    }
+
+    /**
+     * Безопасно получает строковое значение из массива.
+     *
+     * @param mixed $data
+     * @param string $key
+     * @return string
+     */
+    private function getStringValue(mixed $data, string $key): string
+    {
+        if (!is_array($data) || !isset($data[$key])) {
+            return '';
+        }
+
+        $value = $data[$key];
+
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_numeric($value)) {
+            return (string) $value;
+        }
+
+        return '';
     }
 
     /**
