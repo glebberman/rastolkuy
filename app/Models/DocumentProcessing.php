@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
@@ -25,7 +26,7 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed> $options Опции обработки
  * @property bool $anchor_at_start Позиция якорей (true = начало, false = конец)
  * @property 'analyzing'|'completed'|'estimated'|'failed'|'pending'|'processing'|'uploaded' $status Статус обработки
- * @property string|null $result Результат обработки
+ * @property array<string, mixed>|null $result Результат обработки
  * @property array<string, mixed>|null $error_details Детали ошибки
  * @property array<string, mixed>|null $processing_metadata Метаданные обработки
  * @property float|null $processing_time_seconds Время обработки в секундах
@@ -338,5 +339,13 @@ class DocumentProcessing extends Model
     public function scopeForUser(Builder $query, User $user): Builder
     {
         return $query->where('user_id', $user->id);
+    }
+
+    /**
+     * Получает экспорты документа.
+     */
+    public function exports(): HasMany
+    {
+        return $this->hasMany(DocumentExport::class);
     }
 }

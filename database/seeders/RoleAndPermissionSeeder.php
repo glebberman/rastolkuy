@@ -33,6 +33,7 @@ class RoleAndPermissionSeeder extends Seeder
             'documents.delete',
             'documents.process',
             'documents.cancel',
+            'documents.export',
             'documents.view-admin',
             'documents.stats',
 
@@ -52,19 +53,19 @@ class RoleAndPermissionSeeder extends Seeder
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::firstOrCreate(['name' => $permission]);
         }
 
         // Create roles and assign permissions
-        $guestRole = Role::create(['name' => 'guest']);
-        $guestRole->givePermissionTo([
+        $guestRole = Role::firstOrCreate(['name' => 'guest']);
+        $guestRole->syncPermissions([
             'auth.register',
             'auth.login',
             'auth.reset-password',
         ]);
 
-        $customerRole = Role::create(['name' => 'customer']);
-        $customerRole->givePermissionTo([
+        $customerRole = Role::firstOrCreate(['name' => 'customer']);
+        $customerRole->syncPermissions([
             // All guest permissions
             'auth.register',
             'auth.login',
@@ -80,9 +81,10 @@ class RoleAndPermissionSeeder extends Seeder
             'documents.delete',
             'documents.process',
             'documents.cancel',
+            'documents.export',
         ]);
 
-        $adminRole = Role::create(['name' => 'admin']);
-        $adminRole->givePermissionTo(Permission::all());
+        $adminRole = Role::firstOrCreate(['name' => 'admin']);
+        $adminRole->syncPermissions(Permission::all());
     }
 }
