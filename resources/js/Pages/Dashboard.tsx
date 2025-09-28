@@ -35,13 +35,20 @@ interface Document {
 }
 
 interface DocumentsResponse {
-    data: Document[];
-    meta: {
-        pagination: {
-            current_page: number;
-            last_page: number;
-            per_page: number;
-            total: number;
+    data: {
+        documents: Document[];
+        meta: {
+            api_version: string;
+            action: string;
+            timestamp: string;
+            pagination: {
+                current_page: number;
+                last_page: number;
+                per_page: number;
+                total: number;
+                from: number | null;
+                to: number | null;
+            };
         };
     };
 }
@@ -172,16 +179,16 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
 
     const loadDocuments = async (page: number = 1, silent: boolean = false) => {
         if (!isAuthenticated) return;
-        
+
         if (!silent) {
             setDocumentsLoading(true);
         }
-        
+
         try {
             const response = await axios.get(`/api/v1/documents?page=${page}&per_page=20`);
-            if (response.data?.data && response.data?.meta?.pagination) {
-                setDocuments(response.data.data);
-                setDocumentsPagination(response.data.meta.pagination);
+            if (response.data?.data?.documents && response.data?.data?.meta?.pagination) {
+                setDocuments(response.data.data.documents);
+                setDocumentsPagination(response.data.data.meta.pagination);
             }
         } catch (error) {
             console.error('Failed to load documents:', error);
