@@ -39,12 +39,18 @@ class FakeAdapterTest extends TestCase
         // Check that response contains valid JSON in Claude's format
         $responseData = json_decode($response->content, true);
         $this->assertIsArray($responseData);
+
+        if (!is_array($responseData)) {
+            $this->fail('Response data should be an array');
+        }
+
         $this->assertArrayHasKey('sections', $responseData);
         $this->assertIsArray($responseData['sections']);
         $this->assertGreaterThan(0, count($responseData['sections']));
 
         // Check section structure
         $section = $responseData['sections'][0];
+        $this->assertIsArray($section);
         $this->assertArrayHasKey('anchor', $section);
         $this->assertArrayHasKey('content', $section);
         $this->assertArrayHasKey('type', $section);
@@ -59,7 +65,14 @@ class FakeAdapterTest extends TestCase
         $response = $this->adapter->execute($request);
         $responseData = json_decode($response->content, true);
 
+        $this->assertIsArray($responseData);
+
+        if (!is_array($responseData)) {
+            $this->fail('Response data should be an array');
+        }
+
         $this->assertArrayHasKey('sections', $responseData);
+        $this->assertIsArray($responseData['sections']);
         $this->assertGreaterThan(0, count($responseData['sections']));
 
         // Check that response is about employment
@@ -79,7 +92,14 @@ class FakeAdapterTest extends TestCase
         $response = $this->adapter->execute($request);
         $responseData = json_decode($response->content, true);
 
+        $this->assertIsArray($responseData);
+
+        if (!is_array($responseData)) {
+            $this->fail('Response data should be an array');
+        }
+
         $this->assertArrayHasKey('sections', $responseData);
+        $this->assertIsArray($responseData['sections']);
         $this->assertGreaterThan(0, count($responseData['sections']));
 
         // Check that we have both translations and risks
@@ -148,7 +168,9 @@ class FakeAdapterTest extends TestCase
             } catch (LLMException $e) {
                 $errorThrown = true;
                 $this->assertStringContainsString('Fake LLM error', $e->getMessage());
-                $this->assertArrayHasKey('fake_error', $e->getContext());
+                $context = $e->getContext();
+                $this->assertIsArray($context);
+                $this->assertArrayHasKey('fake_error', $context);
                 break;
             }
         }
@@ -167,8 +189,15 @@ class FakeAdapterTest extends TestCase
         $response = $this->adapter->execute($request);
         $responseData = json_decode($response->content, true);
 
+        $this->assertIsArray($responseData);
+
+        if (!is_array($responseData)) {
+            $this->fail('Response data should be an array');
+        }
+
         // Should have sections array
         $this->assertArrayHasKey('sections', $responseData);
+        $this->assertIsArray($responseData['sections']);
         $this->assertGreaterThan(0, count($responseData['sections']));
     }
 

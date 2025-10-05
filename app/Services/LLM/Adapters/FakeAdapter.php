@@ -366,12 +366,15 @@ final class FakeAdapter implements LLMAdapterInterface
             // Добавляем риск к переводу если он есть для этой секции
             $risk = $template['risks'][$index] ?? null;
             if ($risk !== null && is_array($risk)) {
-                $riskLabel = match ($risk['type']) {
-                    'risk' => '**[Найден риск]:**',
-                    'warning' => '**[Внимание]:**',
-                    default => '**[Примечание]:**',
-                };
-                $translationText .= "\n\n{$riskLabel} {$risk['text']}";
+                /** @var array{type: string, text: string} $risk */
+                $riskType = $risk['type'];
+                $riskText = $risk['text'];
+
+                $riskLabel = $riskType === 'risk'
+                    ? '**[Найден риск]:**'
+                    : '**[Внимание]:**';
+
+                $translationText .= "\n\n{$riskLabel} {$riskText}";
             }
 
             $sections[] = [

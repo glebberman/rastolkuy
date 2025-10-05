@@ -56,13 +56,23 @@ class SwitchLLMProvider extends Command
     {
         $envContent = File::get($envPath);
 
+        if (!is_string($envContent)) {
+            throw new \RuntimeException("Failed to read .env file at {$envPath}");
+        }
+
         // Update LLM_DEFAULT_PROVIDER
         if (preg_match('/^LLM_DEFAULT_PROVIDER=.*/m', $envContent)) {
-            $envContent = preg_replace(
+            $updated = preg_replace(
                 '/^LLM_DEFAULT_PROVIDER=.*/m',
                 "LLM_DEFAULT_PROVIDER={$provider}",
                 $envContent
             );
+
+            if ($updated === null) {
+                throw new \RuntimeException('Failed to update LLM_DEFAULT_PROVIDER in .env file');
+            }
+
+            $envContent = $updated;
         } else {
             $envContent .= "\nLLM_DEFAULT_PROVIDER={$provider}\n";
         }
