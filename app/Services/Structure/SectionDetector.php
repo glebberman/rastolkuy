@@ -10,6 +10,9 @@ use App\Services\Parser\Extractors\Elements\HeaderElement;
 use App\Services\Structure\Contracts\AnchorGeneratorInterface;
 use App\Services\Structure\Contracts\SectionDetectorInterface;
 use App\Services\Structure\DTOs\DocumentSection;
+use App\Services\Structure\Scoring\DTOs\DocumentContext;
+use App\Services\Structure\Scoring\DTOs\HeaderScore;
+use App\Services\Structure\Scoring\HeaderScorer;
 use App\Services\Structure\Validation\InputValidator;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Log;
@@ -37,6 +40,7 @@ final class SectionDetector implements SectionDetectorInterface
 
     public function __construct(
         private readonly AnchorGeneratorInterface $anchorGenerator,
+        private readonly HeaderScorer $headerScorer = new HeaderScorer(),
     ) {
         /** @var array<string, mixed> $config */
         $config = Config::get('structure_analysis');
@@ -103,6 +107,12 @@ final class SectionDetector implements SectionDetectorInterface
             array_push($sections, ...$headerSections);
         }
 
+        // Попытка детекции через ML-like scoring (новый универсальный метод)
+        if (empty($sections)) {
+            $scoringSections = $this->detectByScoring($elements);
+            array_push($sections, ...$scoringSections);
+        }
+
         // Попытка детекции через паттерны
         if (empty($sections)) {
             $patternSections = $this->detectByPatterns($elements);
@@ -113,6 +123,12 @@ final class SectionDetector implements SectionDetectorInterface
         if (empty($sections)) {
             $heuristicSections = $this->detectByHeuristics($elements);
             array_push($sections, ...$heuristicSections);
+        }
+
+        // Fallback: если ничего не найдено, разбиваем по фиксированному размеру
+        if (empty($sections)) {
+            $fallbackSections = $this->detectByFixedSize($elements);
+            array_push($sections, ...$fallbackSections);
         }
 
         // Пост-обработка: объединение коротких секций, валидация
@@ -564,6 +580,210 @@ final class SectionDetector implements SectionDetectorInterface
                 'merge_reason' => 'short_section',
             ]),
         );
+    }
+
+    /**
+     * Detect sections using ML-like scoring system.
+     *
+     * @param array<DocumentElement> $elements
+     *
+     * @return array<DocumentSection>
+     */
+    private function detectByScoring(array $elements): array
+    {
+        $context = DocumentContext::fromElements($elements);
+        $scores = [];
+
+        // Score all elements
+        foreach ($elements as $index => $element) {
+            $scores[$index] = $this->headerScorer->scoreElement($element, $context);
+        }
+
+        // Calculate adaptive threshold
+        $threshold = $this->calculateAdaptiveThreshold($scores, $context);
+
+        Log::info('ML-like scoring detection', [
+            'threshold' => $threshold,
+            'has_visual_data' => $context->hasVisualData,
+        ]);
+
+        // Detect sections based on scores
+        $sections = [];
+        $currentElements = [];
+        $position = 0;
+
+        foreach ($elements as $index => $element) {
+            $score = $scores[$index];
+
+            if ($score->isLikelyHeader($threshold) && !empty($currentElements)) {
+                // Save previous section
+                $sections[] = $this->createSectionFromElements(
+                    $currentElements,
+                    $position - count($currentElements),
+                    $position - 1,
+                    $this->mediumConfidence,
+                );
+                $currentElements = [];
+            }
+
+            $currentElements[] = $element;
+            ++$position;
+        }
+
+        // Add last section
+        if (!empty($currentElements)) {
+            $sections[] = $this->createSectionFromElements(
+                $currentElements,
+                $position - count($currentElements),
+                $position - 1,
+                $this->mediumConfidence,
+            );
+        }
+
+        return array_filter($sections);
+    }
+
+    /**
+     * Calculate adaptive threshold based on score distribution.
+     *
+     * @param array<HeaderScore> $scores
+     */
+    private function calculateAdaptiveThreshold(
+        array $scores,
+        DocumentContext $context,
+    ): float {
+        $baseThreshold = $context->hasVisualData ? 0.65 : 0.6;
+
+        if (empty($scores)) {
+            return $baseThreshold;
+        }
+
+        // Extract total scores
+        $scoreValues = array_map(fn (HeaderScore $s) => $s->total, $scores);
+        $avgScore = array_sum($scoreValues) / count($scoreValues);
+        $stdDev = $this->calculateStdDev($scoreValues, $avgScore);
+
+        Log::info('Score statistics', [
+            'avg_score' => round($avgScore, 3),
+            'std_dev' => round($stdDev, 3),
+            'base_threshold' => $baseThreshold,
+        ]);
+
+        // If high clustering - use statistical threshold
+        if ($stdDev > 0.2) {
+            return max($avgScore + $stdDev, $baseThreshold);
+        }
+
+        return $baseThreshold;
+    }
+
+    /**
+     * Calculate standard deviation.
+     *
+     * @param array<float> $values
+     */
+    private function calculateStdDev(array $values, float $mean): float
+    {
+        if (empty($values)) {
+            return 0.0;
+        }
+
+        $variance = 0.0;
+
+        foreach ($values as $value) {
+            $variance += ($value - $mean) ** 2;
+        }
+
+        $variance /= count($values);
+
+        return sqrt($variance);
+    }
+
+    /**
+     * Fallback: detect sections by fixed size when no headers found.
+     *
+     * Splits document into chunks of ~500-1000 words with natural boundaries.
+     *
+     * @param array<DocumentElement> $elements
+     *
+     * @return array<DocumentSection>
+     */
+    private function detectByFixedSize(array $elements): array
+    {
+        $sections = [];
+        $currentElements = [];
+        $currentWordCount = 0;
+        $targetWordCount = 750; // Target ~750 words per section
+        $position = 0;
+
+        foreach ($elements as $element) {
+            $words = str_word_count($element->getPlainText());
+            $currentElements[] = $element;
+            $currentWordCount += $words;
+
+            // Check if we reached target size and have a natural boundary
+            if ($currentWordCount >= $targetWordCount) {
+                // Look for natural boundary (double newline or paragraph end)
+                if ($this->isNaturalBoundary($element)) {
+                    $section = $this->createSectionFromElements(
+                        $currentElements,
+                        $position - count($currentElements) + 1,
+                        $position,
+                        $this->lowConfidence,
+                    );
+
+                    if ($section !== null) {
+                        $sections[] = $section;
+                    }
+
+                    $currentElements = [];
+                    $currentWordCount = 0;
+                }
+            }
+
+            ++$position;
+        }
+
+        // Add remaining elements
+        if (!empty($currentElements)) {
+            $section = $this->createSectionFromElements(
+                $currentElements,
+                $position - count($currentElements),
+                $position - 1,
+                $this->lowConfidence,
+            );
+
+            if ($section !== null) {
+                $sections[] = $section;
+            }
+        }
+
+        Log::info('Fixed-size fallback detection', [
+            'sections_created' => count($sections),
+            'target_word_count' => $targetWordCount,
+        ]);
+
+        return $sections;
+    }
+
+    /**
+     * Check if element is a natural section boundary.
+     */
+    private function isNaturalBoundary(DocumentElement $element): bool
+    {
+        $content = $element->getPlainText();
+
+        // Check for double newlines
+        if (str_contains($content, "\n\n")) {
+            return true;
+        }
+
+        // Check for paragraph ending (sentence with period)
+        if (preg_match('/[.!?]\s*$/u', trim($content))) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

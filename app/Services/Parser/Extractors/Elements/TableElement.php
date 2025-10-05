@@ -17,9 +17,14 @@ class TableElement extends DocumentElement
         array $style = [],
         int $pageNumber = 1,
         array $metadata = [],
+        ?float $fontSize = null,
+        ?bool $isBold = null,
+        ?bool $isItalic = null,
+        ?float $topMargin = null,
+        ?float $leftMargin = null,
     ) {
         $content = $this->formatTableAsText($rows, $headers);
-        parent::__construct('table', $content, $position, $style, $pageNumber, $metadata);
+        parent::__construct('table', $content, $position, $style, $pageNumber, $metadata, $fontSize, $isBold, $isItalic, $topMargin, $leftMargin);
     }
 
     public function serialize(): array

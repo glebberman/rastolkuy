@@ -16,9 +16,14 @@ class ListElement extends DocumentElement
         array $style = [],
         int $pageNumber = 1,
         array $metadata = [],
+        ?float $fontSize = null,
+        ?bool $isBold = null,
+        ?bool $isItalic = null,
+        ?float $topMargin = null,
+        ?float $leftMargin = null,
     ) {
         $content = implode("\n", $items);
-        parent::__construct('list', $content, $position, $style, $pageNumber, $metadata);
+        parent::__construct('list', $content, $position, $style, $pageNumber, $metadata, $fontSize, $isBold, $isItalic, $topMargin, $leftMargin);
     }
 
     public function serialize(): array

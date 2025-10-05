@@ -18,6 +18,11 @@ abstract class DocumentElement
         public readonly array $style,
         public readonly int $pageNumber,
         public readonly array $metadata = [],
+        public readonly ?float $fontSize = null,
+        public readonly ?bool $isBold = null,
+        public readonly ?bool $isItalic = null,
+        public readonly ?float $topMargin = null,
+        public readonly ?float $leftMargin = null,
     ) {
     }
 
@@ -48,6 +53,11 @@ abstract class DocumentElement
             'page_number' => $this->pageNumber,
             'metadata' => $this->metadata,
             'confidence_score' => $this->getConfidenceScore(),
+            'font_size' => $this->fontSize,
+            'is_bold' => $this->isBold,
+            'is_italic' => $this->isItalic,
+            'top_margin' => $this->topMargin,
+            'left_margin' => $this->leftMargin,
         ];
     }
 }
