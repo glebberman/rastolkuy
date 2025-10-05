@@ -246,13 +246,39 @@ final readonly class DocumentProcessor
                 Log::warning('Section text not found in document', [
                     'section_id' => $section->id,
                     'section_title' => $section->title,
-                    'text_preview' => mb_substr($sectionText, 0, 100),
+                    'section_start_pos' => $section->startPosition,
+                    'section_end_pos' => $section->endPosition,
+                    'section_text_length' => mb_strlen($sectionText),
+                    'text_preview' => mb_substr($sectionText, 0, 200),
+                    'search_offset' => $insertedLength,
+                    'document_length' => mb_strlen($documentWithAnchors),
                 ]);
-                continue;
+
+                // Попробуем найти хотя бы заголовок секции
+                $titlePos = mb_strpos($documentWithAnchors, $section->title, $insertedLength);
+                if ($titlePos !== false) {
+                    Log::info('Found section title, will use it as anchor position', [
+                        'section_id' => $section->id,
+                        'title' => $section->title,
+                        'title_position' => $titlePos,
+                    ]);
+                    $position = $titlePos;
+                } else {
+                    Log::error('Even section title not found in document', [
+                        'section_id' => $section->id,
+                        'section_title' => $section->title,
+                    ]);
+                    continue;
+                }
             }
 
             $anchor = $section->anchor;
-            $sectionEndPos = $position + mb_strlen($sectionText);
+            // Если нашли полный текст секции, используем его длину
+            // Если нашли только заголовок, используем длину заголовка
+            $foundText = ($position === mb_strpos($documentWithAnchors, $sectionText, $insertedLength))
+                ? $sectionText
+                : $section->title;
+            $sectionEndPos = $position + mb_strlen($foundText);
 
             if ($addAnchorAtStart) {
                 // Вставляем якорь в начало секции
