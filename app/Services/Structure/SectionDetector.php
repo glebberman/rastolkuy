@@ -100,23 +100,23 @@ final class SectionDetector implements SectionDetectorInterface
         $sections = [];
         $elements = $document->elements;
 
-        // Попытка детекции через заголовки
+        // Попытка детекции через заголовки (HeaderElement)
         $headerSections = $this->detectByHeaders($elements);
 
         if (!empty($headerSections)) {
             array_push($sections, ...$headerSections);
         }
 
+        // Попытка детекции через паттерны (нумерация, служебные слова)
+        if (empty($sections)) {
+            $patternSections = $this->detectByPatterns($elements);
+            array_push($sections, ...$patternSections);
+        }
+
         // Попытка детекции через ML-like scoring (новый универсальный метод)
         if (empty($sections)) {
             $scoringSections = $this->detectByScoring($elements);
             array_push($sections, ...$scoringSections);
-        }
-
-        // Попытка детекции через паттерны
-        if (empty($sections)) {
-            $patternSections = $this->detectByPatterns($elements);
-            array_push($sections, ...$patternSections);
         }
 
         // Эвристический анализ если ничего не найдено
