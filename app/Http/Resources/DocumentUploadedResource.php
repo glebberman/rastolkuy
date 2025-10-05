@@ -20,10 +20,7 @@ class DocumentUploadedResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'message' => 'Документ загружен и готов к оценке стоимости',
-            'data' => new DocumentProcessingResource($this->resource),
-        ];
+        return (new DocumentProcessingResource($this->resource))->toArray($request);
     }
 
     /**

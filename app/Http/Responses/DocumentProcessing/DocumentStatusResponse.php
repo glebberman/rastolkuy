@@ -33,14 +33,13 @@ final class DocumentStatusResponse extends BaseDocumentResponse
     private function calculateProgress(DocumentProcessing $document): int
     {
         return match ($document->status) {
-            'uploaded' => 10,
-            'estimated' => 20,
-            'pending' => 30,
-            'processing' => 50,
-            'analyzing' => 80,
-            'completed' => 100,
-            'failed' => 0,
-            default => 0
+            DocumentProcessing::STATUS_UPLOADED => 10,
+            DocumentProcessing::STATUS_ESTIMATED => 20,
+            DocumentProcessing::STATUS_PENDING => 30,
+            DocumentProcessing::STATUS_PROCESSING => 50,
+            DocumentProcessing::STATUS_ANALYZING => 80,
+            DocumentProcessing::STATUS_COMPLETED => 100,
+            DocumentProcessing::STATUS_FAILED => 0,
         };
     }
 }

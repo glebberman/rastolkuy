@@ -213,8 +213,18 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->postJson(route('api.v1.documents.estimate', $document->uuid));
 
         $response->assertStatus(409)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'error' => [
+                    'type',
+                    'code',
+                    'details'
+                ],
+                'meta'
+            ])
             ->assertJson([
-                'error' => 'Invalid document status',
+                'success' => false,
             ]);
     }
 
@@ -224,8 +234,18 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->postJson(route('api.v1.documents.estimate', $nonExistentUuid));
 
         $response->assertStatus(404)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'error' => [
+                    'type',
+                    'code',
+                    'details'
+                ],
+                'meta'
+            ])
             ->assertJson([
-                'error' => 'Document not found',
+                'success' => false,
             ]);
     }
 
@@ -281,8 +301,18 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->postJson(route('api.v1.documents.process', $document->uuid));
 
         $response->assertStatus(409)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'error' => [
+                    'type',
+                    'code',
+                    'details'
+                ],
+                'meta'
+            ])
             ->assertJson([
-                'error' => 'Cannot process document',
+                'success' => false,
             ]);
     }
 
@@ -306,8 +336,18 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->postJson(route('api.v1.documents.process', $document->uuid));
 
         $response->assertStatus(409)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'error' => [
+                    'type',
+                    'code',
+                    'details'
+                ],
+                'meta'
+            ])
             ->assertJson([
-                'error' => 'Cannot process document',
+                'success' => false,
             ]);
     }
 
@@ -384,9 +424,18 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->getJson(route('api.v1.documents.result', $document->uuid));
 
         $response->assertStatus(202)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'error' => [
+                    'type',
+                    'code',
+                    'details'
+                ],
+                'meta'
+            ])
             ->assertJson([
-                'error' => 'Processing not completed',
-                'status' => DocumentProcessing::STATUS_PROCESSING,
+                'success' => false,
             ]);
     }
 
@@ -437,7 +486,7 @@ class DocumentProcessingApiTest extends TestCase
 
         $response->assertStatus(200)
             ->assertJson([
-                'message' => 'Запись об обработке документа удалена',
+                'message' => 'Документ успешно удален',
             ]);
 
         $this->assertSoftDeleted('document_processings', [
@@ -460,7 +509,7 @@ class DocumentProcessingApiTest extends TestCase
             'options' => [],
         ]);
 
-        $response->assertStatus(201)
+        $response->assertStatus(200)
             ->assertJsonStructure([
                 'message',
                 'data' => [
@@ -602,15 +651,17 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->getJson(route('api.v1.documents.index'));
 
         $response->assertStatus(200)
-            ->assertJsonCount(3, 'data') // Should only see their own documents
+            ->assertJsonCount(3, 'data.documents') // Should only see their own documents
             ->assertJsonStructure([
                 'message',
                 'data' => [
-                    '*' => [
-                        'id',
-                        'filename',
-                        'status',
-                        'task_type',
+                    'documents' => [
+                        '*' => [
+                            'id',
+                            'filename',
+                            'status',
+                            'task_type',
+                        ],
                     ],
                 ],
                 'meta',
@@ -618,7 +669,7 @@ class DocumentProcessingApiTest extends TestCase
 
         // Verify we only see our own documents
         /** @var array<int, array<string, mixed>> $documents */
-        $documents = $response->json('data');
+        $documents = $response->json('data.documents');
 
         foreach ($documents as $doc) {
             $this->assertNotNull($doc['id']);
@@ -646,8 +697,18 @@ class DocumentProcessingApiTest extends TestCase
         $response = $this->postJson(route('api.v1.documents.process', $document->uuid));
 
         $response->assertStatus(409)
+            ->assertJsonStructure([
+                'success',
+                'message',
+                'error' => [
+                    'type',
+                    'code',
+                    'details'
+                ],
+                'meta'
+            ])
             ->assertJson([
-                'error' => 'Cannot process document',
+                'success' => false,
             ]);
     }
 

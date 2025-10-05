@@ -101,6 +101,12 @@ final readonly class DocumentProcessor
             $originalContent = $extractedDocument->getPlainText();
             $sectionsWithAnchors = $this->addAnchorsToDocument($originalContent, $structureResult->sections, $addAnchorAtStart);
 
+            Log::debug('Document with anchors', [
+                'sections_count' => count($structureResult->sections),
+                'content_preview' => mb_substr($sectionsWithAnchors, 0, 1000),
+                'content_length' => mb_strlen($sectionsWithAnchors),
+            ]);
+
             // 3. Подготавливаем список якорей для валидации
             $anchorIds = $this->extractAnchorIds($structureResult->sections);
 
@@ -213,37 +219,87 @@ final readonly class DocumentProcessor
     /**
      * Добавляет якоря к документу для идентификации секций.
      *
+     * Ищет текст секции в исходном документе и вставляет якорь после него.
+     *
      * @param array<DocumentSection> $sections
      * @param bool $addAnchorAtStart По умолчанию false (якорь в конце секции)
      */
     private function addAnchorsToDocument(string $content, array $sections, bool $addAnchorAtStart = false): string
     {
+        // Фильтруем валидные секции
+        $validSections = array_filter($sections, fn ($s) => $s instanceof DocumentSection);
+
+        if (empty($validSections)) {
+            return $content;
+        }
+
         $documentWithAnchors = $content;
+        $insertedLength = 0; // Отслеживаем смещение из-за вставленных якорей
 
-        // Сортируем секции по позиции в убывающем порядке для корректной вставки якорей
-        $sortedSections = array_filter($sections, fn ($s) => $s instanceof DocumentSection);
-        usort($sortedSections, fn ($a, $b) => $b->startPosition <=> $a->startPosition);
+        foreach ($validSections as $section) {
+            $sectionText = trim($section->content);
 
-        foreach ($sortedSections as $section) {
-            // Используем существующий якорь секции (уже сгенерированный StructureAnalyzer)
+            // Ищем текст секции в документе
+            $position = mb_strpos($documentWithAnchors, $sectionText, $insertedLength);
+
+            if ($position === false) {
+                Log::warning('Section text not found in document', [
+                    'section_id' => $section->id,
+                    'section_title' => $section->title,
+                    'section_start_pos' => $section->startPosition,
+                    'section_end_pos' => $section->endPosition,
+                    'section_text_length' => mb_strlen($sectionText),
+                    'text_preview' => mb_substr($sectionText, 0, 200),
+                    'search_offset' => $insertedLength,
+                    'document_length' => mb_strlen($documentWithAnchors),
+                ]);
+
+                // Попробуем найти хотя бы заголовок секции
+                $titlePos = mb_strpos($documentWithAnchors, $section->title, $insertedLength);
+                if ($titlePos !== false) {
+                    Log::info('Found section title, will use it as anchor position', [
+                        'section_id' => $section->id,
+                        'title' => $section->title,
+                        'title_position' => $titlePos,
+                    ]);
+                    $position = $titlePos;
+                } else {
+                    Log::error('Even section title not found in document', [
+                        'section_id' => $section->id,
+                        'section_title' => $section->title,
+                    ]);
+                    continue;
+                }
+            }
+
             $anchor = $section->anchor;
-
-            $beforeSection = substr($documentWithAnchors, 0, $section->startPosition);
-            $sectionContent = substr(
-                $documentWithAnchors,
-                $section->startPosition,
-                $section->endPosition - $section->startPosition,
-            );
-            $afterSection = substr($documentWithAnchors, $section->endPosition);
+            // Если нашли полный текст секции, используем его длину
+            // Если нашли только заголовок, используем длину заголовка
+            $foundText = ($position === mb_strpos($documentWithAnchors, $sectionText, $insertedLength))
+                ? $sectionText
+                : $section->title;
+            $sectionEndPos = $position + mb_strlen($foundText);
 
             if ($addAnchorAtStart) {
                 // Вставляем якорь в начало секции
-                $documentWithAnchors = $beforeSection . $anchor . "\n" . $sectionContent . $afterSection;
+                $documentWithAnchors = mb_substr($documentWithAnchors, 0, $position)
+                    . $anchor . "\n"
+                    . mb_substr($documentWithAnchors, $position);
+                $insertedLength = $position + mb_strlen($anchor) + 1;
             } else {
                 // Вставляем якорь в конец секции (по умолчанию)
-                $documentWithAnchors = $beforeSection . $sectionContent . "\n" . $anchor . $afterSection;
+                $documentWithAnchors = mb_substr($documentWithAnchors, 0, $sectionEndPos)
+                    . "\n" . $anchor
+                    . mb_substr($documentWithAnchors, $sectionEndPos);
+                $insertedLength = $sectionEndPos + mb_strlen($anchor) + 1;
             }
         }
+
+        Log::debug('Document with anchors created', [
+            'sections_count' => count($validSections),
+            'result_length' => mb_strlen($documentWithAnchors),
+            'preview' => mb_substr($documentWithAnchors, 0, 500),
+        ]);
 
         return $documentWithAnchors;
     }
@@ -425,17 +481,18 @@ final readonly class DocumentProcessor
 
     /**
      * Форматирует замену якоря в зависимости от типа обработки.
+     *
+     * ВАЖНО: Якорь ЗАМЕНЯЕТСЯ на перевод с маркерами блоков.
+     * Маркеры используются для правильного разделения при экспорте.
+     * Оригинальный текст секции находится ПЕРЕД якорем и не затрагивается.
      */
     private function formatReplacementContent(string $anchor, string $content, ?string $taskType): string
     {
-        $label = match ($taskType) {
-            'translation' => '**[Переведено]:**',
-            'contradiction' => '**[Найдено противоречие]:**',
-            'ambiguity' => '**[Найдена неоднозначность]:**',
-            default => '**[Обработано]:**',
-        };
+        $type = $taskType ?? 'processed';
 
-        return "{$anchor}\n\n{$label} {$content}\n";
+        // Используем XML-подобные маркеры для разделения блоков
+        // Они будут заменены на нужный формат при экспорте
+        return "\n\n<!-- TRANSLATION_BLOCK_START type=\"{$type}\" -->\n{$content}\n<!-- TRANSLATION_BLOCK_END -->\n";
     }
 
     /**

@@ -20,10 +20,7 @@ class DocumentCancelledResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'message' => 'Обработка документа отменена',
-            'data' => new DocumentProcessingResource($this->resource),
-        ];
+        return (new DocumentProcessingResource($this->resource))->toArray($request);
     }
 
     /**

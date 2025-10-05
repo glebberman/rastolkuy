@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Модель для отслеживания обработки документов.
@@ -225,14 +226,59 @@ class DocumentProcessing extends Model
     {
         $processingTime = $this->started_at ? now()->diffInMilliseconds($this->started_at) / 1000 : null;
 
-        $this->update([
-            'status' => self::STATUS_COMPLETED,
-            'result' => $result,
-            'processing_metadata' => $metadata,
-            'processing_time_seconds' => $processingTime,
-            'cost_usd' => $costUsd,
-            'completed_at' => now(),
-        ]);
+        // Очищаем строку от невалидных UTF-8 символов
+        $cleanResult = $this->sanitizeUtf8($result);
+
+        // Кодируем результат в JSON с сохранением Unicode символов
+        // Используем прямой JSON encode чтобы контролировать флаги
+        $resultJson = json_encode(['content' => $cleanResult], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if ($resultJson === false) {
+            throw new \RuntimeException('Failed to encode result to JSON: ' . json_last_error_msg());
+        }
+
+        // Сохраняем напрямую через DB query, минуя Eloquent cast
+        DB::table($this->getTable())
+            ->where($this->getKeyName(), $this->getKey())
+            ->update([
+                'status' => self::STATUS_COMPLETED,
+                'result' => $resultJson,
+                'processing_metadata' => json_encode($metadata, JSON_UNESCAPED_UNICODE),
+                'processing_time_seconds' => $processingTime,
+                'cost_usd' => $costUsd,
+                'completed_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+        // Обновляем модель в памяти
+        $this->setAttribute('status', self::STATUS_COMPLETED);
+        $this->setAttribute('result', ['content' => $cleanResult]);
+        $this->setAttribute('processing_metadata', $metadata);
+        $this->setAttribute('processing_time_seconds', $processingTime);
+        $this->setAttribute('cost_usd', $costUsd);
+        $this->setAttribute('completed_at', now());
+    }
+
+    /**
+     * Очищает строку от невалидных UTF-8 символов.
+     */
+    private function sanitizeUtf8(string $text): string
+    {
+        // Если строка уже валидный UTF-8, просто очищаем control characters
+        if (mb_check_encoding($text, 'UTF-8')) {
+            // Удаляем control characters кроме переносов строк и табуляций
+            $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $text);
+            return $cleaned ?: '';
+        }
+
+        // Если не валидный UTF-8, пытаемся очистить невалидные последовательности
+        $converted = mb_convert_encoding($text, 'UTF-8', 'UTF-8');
+        if (is_string($converted) && $converted !== '') {
+            $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $converted);
+            return $cleaned ?: '';
+        }
+
+        return '';
     }
 
     /**

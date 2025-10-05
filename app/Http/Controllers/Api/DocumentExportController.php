@@ -42,8 +42,21 @@ final class DocumentExportController extends Controller
     public function export(ExportDocumentRequest $request): ExportResponse|ExportErrorResponse
     {
         try {
+            \Log::info('Export request received', [
+                'raw_document_id' => $request->input('document_id'),
+                'converted_document_id' => $request->getDocumentId(),
+                'format' => $request->getExportFormat(),
+            ]);
+
             // Получаем документ и проверяем права доступа
             $document = DocumentProcessing::findOrFail($request->getDocumentId());
+
+            \Log::info('Document found for export', [
+                'id' => $document->id,
+                'uuid' => $document->uuid,
+                'filename' => $document->original_filename,
+                'completed_at' => $document->completed_at?->toISOString(),
+            ]);
 
             // Проверяем, что пользователь имеет доступ к документу
             if ($document->user_id !== $request->user()?->id) {
@@ -56,6 +69,12 @@ final class DocumentExportController extends Controller
                 format: $request->getExportFormat(),
                 options: $request->getOptions()
             );
+
+            \Log::info('Export created', [
+                'export_id' => $export->id,
+                'download_token' => $export->download_token,
+                'document_id' => $document->id,
+            ]);
 
             return new ExportResponse($export);
 

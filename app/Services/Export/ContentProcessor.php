@@ -82,13 +82,15 @@ final readonly class ContentProcessor
     private function extractSections(string $content): array
     {
         $sections = [];
-        $anchorPattern = '/<!-- SECTION_ANCHOR_([^>]+) -->/';
 
-        // Разбиваем контент по якорям
-        $parts = preg_split($anchorPattern, $content, -1, PREG_SPLIT_DELIM_CAPTURE);
+        // Паттерн для разделения по маркерам блоков перевода
+        $blockPattern = '/<!-- TRANSLATION_BLOCK_START type="([^"]+)" -->\n(.*?)\n<!-- TRANSLATION_BLOCK_END -->/s';
+
+        // Разбиваем контент по блокам перевода
+        $parts = preg_split($blockPattern, $content, -1, PREG_SPLIT_DELIM_CAPTURE);
 
         if ($parts === false || count($parts) < 2) {
-            // Если якорей нет, возвращаем весь контент как одну секцию
+            // Если блоков перевода нет, возвращаем весь контент как одну секцию
             return [
                 new Section(
                     id: 'main',
@@ -101,32 +103,112 @@ final readonly class ContentProcessor
             ];
         }
 
-        // Первый элемент - контент до первого якоря (если есть)
-        if (!empty(trim($parts[0]))) {
+        // Обрабатываем секции
+        // parts[0] = оригинальный текст первой секции
+        // parts[1] = тип блока перевода
+        // parts[2] = содержимое блока перевода
+        // parts[3] = оригинальный текст второй секции
+        // parts[4] = тип блока перевода
+        // parts[5] = содержимое блока перевода
+        // и так далее...
+
+        $sectionIndex = 0;
+
+        for ($i = 0, $iMax = count($parts); $i < $iMax; $i += 3) {
+            $originalText = $parts[$i] ?? '';
+            $blockType = $parts[$i + 1] ?? '';
+            $blockContent = $parts[$i + 2] ?? '';
+
+            if (empty(trim($originalText))) {
+                continue;
+            }
+
+            // Парсим перевод и риски из блока
+            $translatedContent = [];
+            $risks = [];
+
+            if (!empty($blockContent)) {
+                $parsed = $this->parseTranslationBlock(trim($blockContent), $blockType);
+                $translatedContent = $parsed['translations'];
+                $risks = $parsed['risks'];
+            }
+
             $sections[] = new Section(
-                id: 'intro',
-                title: 'Введение',
-                originalContent: trim($parts[0]),
-                translatedContent: [],
-                risks: [],
+                id: 'section_' . $sectionIndex++,
+                title: $this->extractTitleFromContent(trim($originalText)),
+                originalContent: trim($originalText),
+                translatedContent: $translatedContent,
+                risks: $risks,
                 anchor: null,
             );
         }
 
-        // Обрабатываем секции с якорями
-        for ($i = 1, $iMax = count($parts); $i < $iMax; $i += 2) {
-            $anchorId = $parts[$i] ?? '';
-            $sectionContent = $parts[$i + 1] ?? '';
+        return $sections;
+    }
 
-            if (empty($anchorId) || empty(trim($sectionContent))) {
-                continue;
+    /**
+     * Парсит блок перевода и извлекает переводы и риски.
+     *
+     * @return array{translations: array<string>, risks: array<Risk>}
+     */
+    private function parseTranslationBlock(string $blockContent, string $blockType): array
+    {
+        $translations = [];
+        $risks = [];
+
+        // Извлекаем переводы (текст между **[Переведено]:**, **[Найден риск]:**, и т.д.)
+        $translationPattern = '/\*\*\[Переведено\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s';
+        if (preg_match_all($translationPattern, $blockContent, $matches)) {
+            foreach ($matches[1] as $translation) {
+                $translations[] = trim($translation);
             }
-
-            $section = $this->parseSection($anchorId, trim($sectionContent));
-            $sections[] = $section;
         }
 
-        return $sections;
+        // Если переводов не найдено, используем весь контент
+        if (empty($translations)) {
+            $translations[] = trim($blockContent);
+        }
+
+        // Извлекаем риски
+        $riskPatterns = [
+            'risk' => '/\*\*\[Найден риск\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s',
+            'warning' => '/\*\*\[Внимание\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s',
+            'contradiction' => '/\*\*\[Найдено противоречие\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s',
+        ];
+
+        foreach ($riskPatterns as $type => $pattern) {
+            if (preg_match_all($pattern, $blockContent, $matches)) {
+                foreach ($matches[1] as $riskText) {
+                    $risks[] = new Risk(
+                        type: $type,
+                        text: trim($riskText),
+                    );
+                }
+            }
+        }
+
+        return [
+            'translations' => $translations,
+            'risks' => $risks,
+        ];
+    }
+
+    /**
+     * Извлекает заголовок из текста (первая строка или начало).
+     */
+    private function extractTitleFromContent(string $content): string
+    {
+        $lines = explode("\n", $content);
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (!empty($line)) {
+                // Обрезаем если слишком длинный
+                return mb_strlen($line) > 80 ? mb_substr($line, 0, 77) . '...' : $line;
+            }
+        }
+
+        return 'Раздел';
     }
 
     /**

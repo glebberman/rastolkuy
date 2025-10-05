@@ -112,19 +112,14 @@ final readonly class HtmlExporter
             $html .= "<div class=\"anchor-comment\">{$section->anchor}</div>\n";
         }
 
-        // Заголовок секции
         $html .= "<section id=\"{$sectionId}\" class=\"document-section\">\n";
-        $html .= "<h2 class=\"section-title\">{$this->escapeHtml($section->title)}</h2>\n";
 
-        // Оригинальный контент (если включен)
+        // Оригинальный контент (если включен) - без дополнительного оформления
         if ($includeOriginal && !empty($section->originalContent)) {
-            $html .= "<div class=\"original-content\">\n";
-            $html .= "<h3>Оригинальный текст:</h3>\n";
             $html .= '<div class="original-text">' . $this->formatText($section->originalContent) . "</div>\n";
-            $html .= "</div>\n";
         }
 
-        // Переводы
+        // Переводы - с оформлением
         if ($section->hasTranslations()) {
             foreach ($section->translatedContent as $index => $translation) {
                 $html .= "<div class=\"translation-block\">\n";
@@ -134,7 +129,7 @@ final readonly class HtmlExporter
             }
         }
 
-        // Риски и противоречия
+        // Риски и противоречия - с оформлением
         if ($section->hasRisks()) {
             foreach ($section->risks as $risk) {
                 $html .= $this->buildRiskHtml($risk);
@@ -295,23 +290,11 @@ final readonly class HtmlExporter
                         border-bottom: 1px solid {$borderColor};
                     }
 
-                    /* Оригинальный контент */
-                    .original-content {
-                        margin-bottom: 20px;
-                    }
-
-                    .original-content h3 {
-                        color: #4b5563;
-                        font-size: 1.1em;
-                        margin-bottom: 10px;
-                    }
-
+                    /* Оригинальный контент - простой текст без украшений */
                     .original-text {
-                        background-color: #f8f9fa;
-                        border-left: 4px solid #6b7280;
-                        padding: 15px;
-                        margin-bottom: 15px;
-                        font-style: italic;
+                        color: #1f2937;
+                        line-height: 1.8;
+                        margin-bottom: 20px;
                     }
 
                     /* Блоки переводов */

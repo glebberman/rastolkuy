@@ -20,10 +20,7 @@ class DocumentProcessedResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'message' => 'Обработка документа запущена',
-            'data' => new DocumentProcessingResource($this->resource),
-        ];
+        return (new DocumentProcessingResource($this->resource))->toArray($request);
     }
 
     /**
