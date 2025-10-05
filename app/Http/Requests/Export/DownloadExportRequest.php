@@ -21,6 +21,17 @@ final class DownloadExportRequest extends FormRequest
     }
 
     /**
+     * Подготавливает данные для валидации.
+     */
+    protected function prepareForValidation(): void
+    {
+        // Добавляем токен из route параметра в данные запроса для валидации
+        $this->merge([
+            'token' => $this->route('token'),
+        ]);
+    }
+
+    /**
      * Правила валидации для запроса.
      *
      * @return array<string, mixed>

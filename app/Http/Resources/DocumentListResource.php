@@ -21,8 +21,7 @@ class DocumentListResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'message' => 'Список обработок документов',
-            'data' => DocumentProcessingResource::collection($this->resource->items()),
+            'documents' => DocumentProcessingResource::collection($this->resource->items()),
             'meta' => [
                 'api_version' => 'v1',
                 'action' => 'documents_list',

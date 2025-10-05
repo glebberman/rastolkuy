@@ -166,6 +166,25 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         }
     }, [isAuthenticated]);
 
+    // Auto-refresh documents when there are processing documents
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        // Check if there are any documents being processed
+        const hasProcessingDocuments = documents.some(
+            doc => doc.status === 'processing' || doc.status === 'pending'
+        );
+
+        if (!hasProcessingDocuments) return;
+
+        // Poll every 2 seconds for processing documents
+        const pollInterval = setInterval(() => {
+            loadDocuments(documentsPagination.current_page, true);
+        }, 2000);
+
+        return () => clearInterval(pollInterval);
+    }, [isAuthenticated, documents, documentsPagination.current_page]);
+
     const handleStartNewUpload = () => {
         setSelectedFile(null);
         setShowProcessor(false);
@@ -208,20 +227,51 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
         }
     };
 
-    const handleDownloadDocument = async (documentId: string) => {
+    const handleDownloadDocument = async (documentId: string, format: 'html' | 'pdf' | 'docx' = 'html') => {
         try {
-            const response = await axios.get(`/api/v1/documents/${documentId}/result`, {
-                responseType: 'blob'
+            console.log('[Download] Initiating download for document:', documentId, 'format:', format);
+
+            // Step 1: Request export to get download token
+            const exportResponse = await axios.post('/api/v1/export', {
+                document_id: documentId,
+                format: format,
+                options: {}
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                }
             });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
+
+            console.log('[Download] Export response received:', exportResponse.data);
+
+            if (!exportResponse.data.success || !exportResponse.data.data.download_token) {
+                throw new Error('Failed to get download token');
+            }
+
+            const downloadToken = exportResponse.data.data.download_token;
+
+            // Step 2: Download file using token with authentication
+            const downloadUrl = `/api/v1/export/download/${downloadToken}`;
+            const downloadResponse = await axios.get(downloadUrl, {
+                responseType: 'blob',
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+                }
+            });
+
+            // Create blob URL and trigger download
+            const blob = new Blob([downloadResponse.data]);
+            const blobUrl = window.URL.createObjectURL(blob);
             const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', 'processed_document.html');
+            link.href = blobUrl;
+            link.setAttribute('download', exportResponse.data.data.filename || 'processed_document.html');
             document.body.appendChild(link);
             link.click();
             link.remove();
+            window.URL.revokeObjectURL(blobUrl);
         } catch (error) {
             console.error('Failed to download document:', error);
+            alert('Не удалось скачать документ. Попробуйте позже.');
         }
     };
 
@@ -282,7 +332,12 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
             case 'completed':
                 return <IconCheck size={16} className="text-success" />;
             case 'processing':
-                return <IconClock size={16} className="text-warning" />;
+            case 'pending':
+                return (
+                    <div className="spinner-border spinner-border-sm text-warning" role="status" style={{ width: '16px', height: '16px' }}>
+                        <span className="visually-hidden">Обработка...</span>
+                    </div>
+                );
             case 'failed':
                 return <IconAlertTriangle size={16} className="text-danger" />;
             default:
@@ -378,15 +433,21 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                 </thead>
                                                 <tbody>
                                                     {documents.map((document) => (
-                                                        <tr 
+                                                        <tr
                                                             key={document.id}
-                                                            className={deletingDocumentId === document.id ? 'deleting-row' : ''}
+                                                            className={`
+                                                                ${deletingDocumentId === document.id ? 'deleting-row' : ''}
+                                                                ${(document.status === 'processing' || document.status === 'pending') ? 'table-active' : ''}
+                                                            `}
                                                             style={{
                                                                 transition: 'opacity 0.3s ease, transform 0.3s ease, max-height 0.3s ease',
                                                                 opacity: deletingDocumentId === document.id ? 0 : 1,
                                                                 transform: deletingDocumentId === document.id ? 'scale(0.95)' : 'scale(1)',
                                                                 maxHeight: deletingDocumentId === document.id ? '0' : '80px',
-                                                                overflow: 'hidden'
+                                                                overflow: 'hidden',
+                                                                animation: (document.status === 'processing' || document.status === 'pending')
+                                                                    ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
+                                                                    : 'none'
                                                             }}
                                                         >
                                                             <td>
@@ -433,13 +494,29 @@ export default function Dashboard({ recentDocuments = [], stats }: DashboardProp
                                                             <td>
                                                                 <div className="btn-group btn-group-sm">
                                                                     {document.status === 'completed' && (
-                                                                        <button
-                                                                            className="btn btn-outline-success"
-                                                                            onClick={() => handleDownloadDocument(document.id)}
-                                                                            title="Скачать"
-                                                                        >
-                                                                            <IconDownload size={14} />
-                                                                        </button>
+                                                                        <div className="btn-group">
+                                                                            <button
+                                                                                className="btn btn-outline-success"
+                                                                                onClick={() => handleDownloadDocument(document.id, 'html')}
+                                                                                title="Скачать HTML"
+                                                                            >
+                                                                                <IconDownload size={14} /> HTML
+                                                                            </button>
+                                                                            <button
+                                                                                className="btn btn-outline-success"
+                                                                                onClick={() => handleDownloadDocument(document.id, 'pdf')}
+                                                                                title="Скачать PDF"
+                                                                            >
+                                                                                PDF
+                                                                            </button>
+                                                                            <button
+                                                                                className="btn btn-outline-success"
+                                                                                onClick={() => handleDownloadDocument(document.id, 'docx')}
+                                                                                title="Скачать DOCX"
+                                                                            >
+                                                                                DOCX
+                                                                            </button>
+                                                                        </div>
                                                                     )}
                                                                     {(document.status === 'uploaded' || document.status === 'estimated') && (
                                                                         <button

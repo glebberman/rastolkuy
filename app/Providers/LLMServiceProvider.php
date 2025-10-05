@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Services\LLM\Adapters\ClaudeAdapter;
+use App\Services\LLM\Adapters\FakeAdapter;
 use App\Services\LLM\Contracts\LLMAdapterInterface;
 use App\Services\LLM\Exceptions\LLMException;
 use App\Services\LLM\LLMService;
@@ -34,6 +35,7 @@ final class LLMServiceProvider extends ServiceProvider
 
             return match ($defaultProvider) {
                 'claude' => $this->createClaudeAdapter(),
+                'fake' => $this->createFakeAdapter(),
                 default => throw new LLMException("Unsupported LLM provider: {$defaultProvider}"),
             };
         });
@@ -144,6 +146,34 @@ final class LLMServiceProvider extends ServiceProvider
             apiKey: $apiKey,
             baseUrl: $baseUrl,
             timeoutSeconds: $timeout,
+        );
+    }
+
+    /**
+     * Create Fake adapter instance for development.
+     */
+    private function createFakeAdapter(): FakeAdapter
+    {
+        $config = config('llm.providers.fake', []);
+
+        if (!is_array($config)) {
+            $config = [];
+        }
+
+        $baseDelay = $config['base_delay'] ?? 0.5;
+        $simulateErrors = $config['simulate_errors'] ?? false;
+
+        if (!is_numeric($baseDelay)) {
+            $baseDelay = 0.5;
+        }
+
+        if (!is_bool($simulateErrors)) {
+            $simulateErrors = false;
+        }
+
+        return new FakeAdapter(
+            baseDelay: (float) $baseDelay,
+            shouldSimulateErrors: $simulateErrors,
         );
     }
 }

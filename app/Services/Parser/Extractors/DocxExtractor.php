@@ -182,8 +182,8 @@ readonly class DocxExtractor implements ExtractorInterface
         // Suppress XML parsing errors
         libxml_use_internal_errors(true);
 
-        $dom = new DOMDocument();
-        $dom->loadXML($xmlContent);
+        $dom = new DOMDocument('1.0', 'UTF-8');
+        $dom->loadXML($xmlContent, LIBXML_NOENT | LIBXML_NOCDATA);
 
         // Get all text nodes
         $xpath = new DOMXPath($dom);

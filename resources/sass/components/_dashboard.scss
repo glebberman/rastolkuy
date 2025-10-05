@@ -1,5 +1,15 @@
 // Dashboard styles
 
+// Pulse animation for processing documents
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 .dashboard-header {
   background: white;
   border-bottom: 1px solid var(--bs-border-color);

@@ -21,17 +21,14 @@ class DocumentResultResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'message' => 'Результат обработки документа',
-            'data' => [
-                'id' => $this->resource->uuid,
-                'filename' => $this->resource->original_filename,
-                'task_type' => $this->resource->task_type,
-                'result' => $this->resource->result,
-                'processing_time_seconds' => $this->resource->processing_time_seconds,
-                'cost_usd' => $this->resource->cost_usd,
-                'metadata' => $this->resource->processing_metadata,
-                'completed_at' => $this->resource->completed_at?->toJSON(),
-            ],
+            'id' => $this->resource->uuid,
+            'filename' => $this->resource->original_filename,
+            'task_type' => $this->resource->task_type,
+            'result' => $this->resource->result,
+            'processing_time_seconds' => $this->resource->processing_time_seconds,
+            'cost_usd' => $this->resource->cost_usd,
+            'metadata' => $this->resource->processing_metadata,
+            'completed_at' => $this->resource->completed_at?->toJSON(),
         ];
     }
 

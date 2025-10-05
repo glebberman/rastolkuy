@@ -20,10 +20,7 @@ class DocumentStatusResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'message' => 'Статус обработки документа',
-            'data' => new DocumentProcessingResource($this->resource),
-        ];
+        return (new DocumentProcessingResource($this->resource))->toArray($request);
     }
 
     /**

@@ -210,6 +210,115 @@ final class ContentProcessorTest extends TestCase
         $this->assertNull($nonExistentSection);
     }
 
+    public function testParseContentWithMalformedAnchors(): void
+    {
+        $malformedContent = '<!-- SECTION_ANCHOR_invalid > Invalid anchor
+
+## 1. INVALID SECTION
+
+This section has a broken anchor.
+
+<!-- SECTION_ANCHOR_missing_close
+
+## 2. ANOTHER SECTION
+
+Content continues...';
+
+        $result = $this->processor->parseContent($malformedContent);
+
+        $this->assertCount(1, $result->sections);
+        $this->assertSame('main', $result->sections[0]->id);
+    }
+
+    public function testParseContentWithDuplicateAnchors(): void
+    {
+        $duplicateAnchors = '## 1. SECTION ONE
+
+First section content.
+
+<!-- SECTION_ANCHOR_duplicate_id -->
+
+## 2. SECTION TWO
+
+Second section content.
+
+<!-- SECTION_ANCHOR_duplicate_id -->';
+
+        $result = $this->processor->parseContent($duplicateAnchors);
+
+        $this->assertCount(2, $result->sections);
+        $this->assertCount(2, $result->anchors);
+    }
+
+    public function testParseContentWithVeryLongContent(): void
+    {
+        $longContent = '## 1. VERY LONG SECTION
+
+' . str_repeat('This is a very long paragraph with lots of text. ', 1000) . '
+
+<!-- SECTION_ANCHOR_long_section -->';
+
+        $startTime = microtime(true);
+        $result = $this->processor->parseContent($longContent);
+        $executionTime = microtime(true) - $startTime;
+
+        $this->assertLessThan(0.1, $executionTime, 'Parsing should complete in less than 100ms');
+        $this->assertCount(1, $result->sections);
+        $this->assertCount(1, $result->anchors);
+    }
+
+    public function testParseContentWithSpecialCharacters(): void
+    {
+        $specialCharsContent = '## 1. РАЗДЕЛ С СПЕЦСИМВОЛАМИ
+
+Текст с символами: @#$%^&*()_+{}|:"<>?[]\\;\'./`~
+
+<!-- SECTION_ANCHOR_special_chars -->
+
+## 2. SECTION WITH UNICODE
+
+Emoji: 🚀💰📊 and Unicode: αβγδε
+
+<!-- SECTION_ANCHOR_unicode_section -->';
+
+        $result = $this->processor->parseContent($specialCharsContent);
+
+        $this->assertCount(2, $result->sections);
+        $this->assertCount(2, $result->anchors);
+        $this->assertStringContainsString('СПЕЦСИМВОЛАМИ', $result->sections[0]->originalContent);
+        $this->assertStringContainsString('🚀💰📊', $result->sections[1]->originalContent);
+    }
+
+    public function testParseContentWithNoRisks(): void
+    {
+        $noRisksContent = '## 1. SAFE SECTION
+
+This is a completely safe section with no risks.
+
+<!-- SECTION_ANCHOR_safe_section -->';
+
+        $result = $this->processor->parseContent($noRisksContent);
+
+        $this->assertCount(1, $result->sections);
+        $this->assertCount(0, $result->sections[0]->risks);
+    }
+
+    public function testPerformanceWithMultipleSections(): void
+    {
+        $multipleSections = '';
+        for ($i = 1; $i <= 50; $i++) {
+            $multipleSections .= "## {$i}. SECTION {$i}\n\nContent for section {$i}.\n\n<!-- SECTION_ANCHOR_section_{$i} -->\n\n";
+        }
+
+        $startTime = microtime(true);
+        $result = $this->processor->parseContent($multipleSections);
+        $executionTime = microtime(true) - $startTime;
+
+        $this->assertLessThan(0.2, $executionTime, 'Parsing 50 sections should complete in less than 200ms');
+        $this->assertCount(50, $result->sections);
+        $this->assertCount(50, $result->anchors);
+    }
+
     /**
      * Загружает тестовые данные из файла.
      *

@@ -20,10 +20,7 @@ class DocumentEstimatedResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'message' => 'Стоимость обработки рассчитана',
-            'data' => new DocumentProcessingResource($this->resource),
-        ];
+        return (new DocumentProcessingResource($this->resource))->toArray($request);
     }
 
     /**

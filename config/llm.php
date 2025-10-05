@@ -39,6 +39,13 @@ return [
             'max_retries' => env('CLAUDE_MAX_RETRIES', 3),
             'retry_delay_seconds' => env('CLAUDE_RETRY_DELAY', 1),
         ],
+
+        'fake' => [
+            'adapter' => 'fake',
+            'base_delay' => env('FAKE_LLM_BASE_DELAY', 0.5),
+            'simulate_errors' => env('FAKE_LLM_SIMULATE_ERRORS', false),
+            'default_model' => 'fake-claude-3-5-sonnet',
+        ],
     ],
 
     /*
@@ -57,6 +64,13 @@ return [
             'requests_per_hour' => env('CLAUDE_REQUESTS_PER_HOUR', 1000),
             'tokens_per_minute' => env('CLAUDE_TOKENS_PER_MINUTE', 40000),
             'tokens_per_hour' => env('CLAUDE_TOKENS_PER_HOUR', 400000),
+        ],
+
+        'fake' => [
+            'requests_per_minute' => 1000, // No real limits for fake adapter
+            'requests_per_hour' => 10000,
+            'tokens_per_minute' => 1000000,
+            'tokens_per_hour' => 10000000,
         ],
     ],
 

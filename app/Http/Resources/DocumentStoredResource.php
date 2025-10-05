@@ -20,10 +20,7 @@ class DocumentStoredResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'message' => 'Документ загружен и поставлен в очередь на обработку',
-            'data' => new DocumentProcessingResource($this->resource),
-        ];
+        return (new DocumentProcessingResource($this->resource))->toArray($request);
     }
 
     /**

@@ -32,8 +32,27 @@ final class ExportDocumentRequest extends FormRequest
         return [
             'document_id' => [
                 'required',
-                'integer',
-                'exists:document_processings,id',
+                // Accept both UUID and integer ID
+                function ($attribute, $value, $fail) {
+                    // Check if it's a valid UUID
+                    if (is_string($value) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value)) {
+                        // Check if document with this UUID exists
+                        if (!\App\Models\DocumentProcessing::where('uuid', $value)->exists()) {
+                            $fail('Документ с указанным ID не найден.');
+                        }
+                        return;
+                    }
+
+                    // Check if it's an integer ID
+                    if (is_numeric($value)) {
+                        if (!\App\Models\DocumentProcessing::where('id', (int)$value)->exists()) {
+                            $fail('Документ с указанным ID не найден.');
+                        }
+                        return;
+                    }
+
+                    $fail('ID документа должен быть UUID или числом.');
+                },
             ],
             'format' => [
                 'required',
@@ -98,12 +117,19 @@ final class ExportDocumentRequest extends FormRequest
     }
 
     /**
-     * Получает ID документа.
+     * Получает ID документа (преобразует UUID в числовой ID если нужно).
      */
     public function getDocumentId(): int
     {
         $documentId = $this->validated('document_id');
 
+        // If it's a UUID string, convert to integer ID
+        if (is_string($documentId) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $documentId)) {
+            $document = \App\Models\DocumentProcessing::where('uuid', $documentId)->first();
+            return $document ? $document->id : 0;
+        }
+
+        // If it's already an integer or numeric string
         if (is_int($documentId)) {
             return $documentId;
         }
