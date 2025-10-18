@@ -90,7 +90,13 @@ final readonly class ContentProcessor
         $parts = preg_split($blockPattern, $content, -1, PREG_SPLIT_DELIM_CAPTURE);
 
         if ($parts === false || count($parts) < 2) {
-            // Если блоков перевода нет, возвращаем весь контент как одну секцию
+            // Если блоков перевода нет, пробуем разбить по якорям (новый формат)
+            $anchorSections = $this->extractSectionsByAnchors($content);
+            if (count($anchorSections) > 1) {
+                return $anchorSections;
+            }
+
+            // Если якорей тоже нет, возвращаем весь контент как одну секцию
             return [
                 new Section(
                     id: 'main',
@@ -154,10 +160,9 @@ final readonly class ContentProcessor
     private function parseTranslationBlock(string $blockContent, string $blockType): array
     {
         $translations = [];
-        $risks = [];
 
         // Извлекаем переводы (текст между **[Переведено]:**, **[Найден риск]:**, и т.д.)
-        $translationPattern = '/\*\*\[Переведено\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s';
+        $translationPattern = '/\*\*\[Переведено\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/us';
         if (preg_match_all($translationPattern, $blockContent, $matches)) {
             foreach ($matches[1] as $translation) {
                 $translations[] = trim($translation);
@@ -169,23 +174,8 @@ final readonly class ContentProcessor
             $translations[] = trim($blockContent);
         }
 
-        // Извлекаем риски
-        $riskPatterns = [
-            'risk' => '/\*\*\[Найден риск\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s',
-            'warning' => '/\*\*\[Внимание\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s',
-            'contradiction' => '/\*\*\[Найдено противоречие\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/s',
-        ];
-
-        foreach ($riskPatterns as $type => $pattern) {
-            if (preg_match_all($pattern, $blockContent, $matches)) {
-                foreach ($matches[1] as $riskText) {
-                    $risks[] = new Risk(
-                        type: $type,
-                        text: trim($riskText),
-                    );
-                }
-            }
-        }
+        // Извлекаем риски (используем общий метод)
+        $risks = $this->extractRisksFromContent($blockContent);
 
         return [
             'translations' => $translations,
@@ -203,6 +193,9 @@ final readonly class ContentProcessor
         foreach ($lines as $line) {
             $line = trim($line);
             if (!empty($line)) {
+                // Убираем markdown заголовки (##)
+                $line = preg_replace('/^#+\s*/', '', $line) ?? $line;
+
                 // Обрезаем если слишком длинный
                 return mb_strlen($line) > 80 ? mb_substr($line, 0, 77) . '...' : $line;
             }
@@ -226,6 +219,147 @@ final readonly class ContentProcessor
         }
 
         return array_values($matches[1]);
+    }
+
+    /**
+     * Извлекает секции по якорям (новый формат из FakeAdapter).
+     *
+     * @return array<Section>
+     */
+    private function extractSectionsByAnchors(string $content): array
+    {
+        // Разбиваем контент по якорям
+        $anchorPattern = '/<!-- SECTION_ANCHOR_([^>]+) -->/';
+        $parts = preg_split($anchorPattern, $content, -1, PREG_SPLIT_DELIM_CAPTURE);
+
+        if ($parts === false || count($parts) < 2) {
+            return [];
+        }
+
+        $sections = [];
+
+        // Определяем формат: якоря в начале или в конце секций
+        // Если первый part пустой или очень короткий - якоря в начале (FakeAdapter)
+        // Если первый part содержит контент - якоря в конце (тесты)
+        $firstPart = trim($parts[0]);
+        $anchorsAtStart = empty($firstPart) || mb_strlen($firstPart) < 10;
+
+        if ($anchorsAtStart) {
+            // Формат FakeAdapter: якоря в НАЧАЛЕ секций
+            // parts[0] - пустой или очень короткий
+            // parts[1] - ID первого якоря
+            // parts[2] - контент первой секции
+            // parts[3] - ID второго якоря
+            // parts[4] - контент второй секции
+
+            for ($i = 1, $iMax = count($parts); $i < $iMax; $i += 2) {
+                $anchorId = $parts[$i] ?? '';
+                $sectionContent = $parts[$i + 1] ?? '';
+
+                if (empty($anchorId)) {
+                    continue;
+                }
+
+                $parsed = $this->parseSectionContent(trim($sectionContent));
+
+                $sections[] = new Section(
+                    id: $anchorId,
+                    title: !empty($parsed['title']) ? $parsed['title'] : 'Раздел',
+                    originalContent: $parsed['original'],
+                    translatedContent: $parsed['translations'],
+                    risks: $parsed['risks'],
+                    anchor: $anchorId,
+                );
+            }
+        } else {
+            // Формат тестов: якоря в КОНЦЕ секций
+            // parts[0] - контент первой секции
+            // parts[1] - ID якоря для первой секции
+            // parts[2] - контент второй секции
+            // parts[3] - ID якоря для второй секции
+
+            for ($i = 0, $iMax = count($parts); $i < $iMax; $i += 2) {
+                $sectionContent = $parts[$i] ?? '';
+                $anchorId = $parts[$i + 1] ?? '';
+
+                if (empty($anchorId)) {
+                    continue;
+                }
+
+                $parsed = $this->parseSectionContent(trim($sectionContent));
+
+                $sections[] = new Section(
+                    id: $anchorId,
+                    title: !empty($parsed['title']) ? $parsed['title'] : 'Раздел',
+                    originalContent: $parsed['original'],
+                    translatedContent: $parsed['translations'],
+                    risks: $parsed['risks'],
+                    anchor: $anchorId,
+                );
+            }
+        }
+
+        return $sections;
+    }
+
+    /**
+     * Парсит контент секции (новый формат).
+     *
+     * @return array{title: string, original: string, translations: array<string>, risks: array<Risk>}
+     */
+    private function parseSectionContent(string $content): array
+    {
+        $title = $this->extractTitleFromContent($content);
+
+        // Извлекаем переводы
+        $translations = [];
+        $translationPattern = '/\*\*\[Переведено\]:\*\*\s*([^*]+?)(?=\*\*\[|$)/us';
+        if (preg_match_all($translationPattern, $content, $matches)) {
+            foreach ($matches[1] as $translation) {
+                $translations[] = trim($translation);
+            }
+        }
+
+        // Извлекаем риски (используем общий метод)
+        $risks = $this->extractRisksFromContent($content);
+
+        // Оригинальный контент - это текст до первого маркера перевода/риска
+        $original = preg_split('/\*\*\[(?:Переведено|Найден риск|Внимание|Предупреждение|Найдено противоречие)\]:\*\*/u', $content, 2)[0] ?? $content;
+
+        return [
+            'title' => $title,
+            'original' => trim($original),
+            'translations' => $translations,
+            'risks' => $risks,
+        ];
+    }
+
+    /**
+     * Извлекает риски из контента (общий метод для устранения дублирования).
+     *
+     * @return array<Risk>
+     */
+    private function extractRisksFromContent(string $content): array
+    {
+        $risks = [];
+        $riskPatterns = [
+            'risk' => '/\*\*\[Найден риск\]:\*\*\s*(.+?)(?=\*\*\[|$)/s',
+            'warning' => '/\*\*\[(?:Внимание|Предупреждение)\]:\*\*\s*(.+?)(?=\*\*\[|$)/s',
+            'contradiction' => '/\*\*\[Найдено противоречие\]:\*\*\s*(.+?)(?=\*\*\[|$)/s',
+        ];
+
+        foreach ($riskPatterns as $type => $pattern) {
+            if (preg_match_all($pattern, $content, $matches)) {
+                foreach ($matches[1] as $riskText) {
+                    $risks[] = new Risk(
+                        type: $type,
+                        text: trim($riskText),
+                    );
+                }
+            }
+        }
+
+        return $risks;
     }
 
 

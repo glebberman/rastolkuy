@@ -207,7 +207,8 @@ final class HeaderScorer
         // Check for punctuation in middle (headers usually have minimal punctuation)
         $features++;
         $middleContent = mb_substr($content, 1, -1);
-        $punctuationCount = preg_match_all('/[,;:!?]/', $middleContent);
+        $punctuationResult = preg_match_all('/[,;:!?]/', $middleContent);
+        $punctuationCount = $punctuationResult !== false ? $punctuationResult : 0;
 
         if ($punctuationCount === 0) {
             $score += 1.0;
@@ -255,7 +256,8 @@ final class HeaderScorer
 
         // Check for numbering patterns
         $features++;
-        $firstWord = preg_split('/\s+/u', $content)[0] ?? '';
+        $splitResult = preg_split('/\s+/u', $content);
+        $firstWord = ($splitResult !== false && count($splitResult) > 0) ? $splitResult[0] : '';
 
         foreach (self::NUMBERING_PATTERNS as $pattern) {
             if (preg_match($pattern, $firstWord)) {

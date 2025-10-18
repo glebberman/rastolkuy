@@ -38,6 +38,11 @@ final class SectionDetector implements SectionDetectorInterface
      */
     private array $patternCache = [];
 
+    /**
+     * Maximum cache size to prevent memory leaks.
+     */
+    private const MAX_CACHE_SIZE = 1000;
+
     public function __construct(
         private readonly AnchorGeneratorInterface $anchorGenerator,
         private readonly HeaderScorer $headerScorer = new HeaderScorer(),
@@ -307,6 +312,16 @@ final class SectionDetector implements SectionDetectorInterface
 
         // Создаем кэш-ключ для контента
         $cacheKey = 'pattern_' . hash('md5', $trimmedContent);
+
+        // Evict cache if it's too large to prevent memory leaks
+        if (count($this->patternCache) >= self::MAX_CACHE_SIZE) {
+            // Remove half of the oldest entries
+            $this->patternCache = array_slice(
+                $this->patternCache,
+                (int) (self::MAX_CACHE_SIZE / 2),
+                preserve_keys: true
+            );
+        }
 
         // Проверяем кэш
         if (isset($this->patternCache[$cacheKey])) {
@@ -696,7 +711,8 @@ final class SectionDetector implements SectionDetectorInterface
 
         $variance /= count($values);
 
-        return sqrt($variance);
+        // Protect against negative variance due to floating point precision errors
+        return sqrt(max(0.0, $variance));
     }
 
     /**
